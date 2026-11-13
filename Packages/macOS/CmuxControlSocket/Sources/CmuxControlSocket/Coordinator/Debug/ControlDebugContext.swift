@@ -64,10 +64,6 @@ public protocol ControlDebugContext: AnyObject {
     ///   selected.
     func controlDebugRequestWorkspaceTodoChecklistAddField() -> UUID?
 
-    /// Shows the Pro welcome checklist window for
-    /// `debug.pro_welcome_checklist.show`.
-    func controlDebugShowProWelcomeChecklist()
-
     /// Runs the shared v1 `is_terminal_focused` body for
     /// `debug.terminal.is_focused`.
     ///
@@ -248,23 +244,6 @@ public protocol ControlDebugContext: AnyObject {
     /// - Returns: The setting's effective value after any write.
     func controlDebugCommandPaletteRenameSelectAll(updating enabled: Bool?) -> Bool
 
-    /// The surface id whose browser address bar currently has focus, for
-    /// `debug.browser.address_bar_focused`.
-    ///
-    /// - Returns: The focused surface id, or `nil` when none.
-    func controlDebugFocusedBrowserAddressBarSurfaceID() -> UUID?
-
-    /// Runs the legacy `debug.browser.favicon` body for the given params.
-    ///
-    /// This is a documented single-method passthrough: the body resolves its
-    /// browser panel through the still-shared `v2BrowserWithPanel` helper
-    /// (used by the entire `browser.*` domain), so the param resolution and
-    /// every error shape stay app-side and byte-identical.
-    ///
-    /// - Parameter params: The decoded request params.
-    /// - Returns: The full call result.
-    func controlDebugBrowserFavicon(params: [String: JSONValue]) -> ControlCallResult
-
     /// Reveals and focuses the right sidebar for `debug.right_sidebar.focus`.
     ///
     /// - Parameters:
@@ -309,8 +288,5 @@ public protocol ControlDebugContext: AnyObject {
     /// - Returns: The stats payload (`nil` only if the counter dictionary ever
     ///   failed to bridge to JSON, which its `String`/`Int` leaves preclude).
     func controlDebugPortalStats() -> JSONValue?
-
-    /// Snapshots exact-span settlement for every visible mirrored tmux window.
-    func controlDebugRemoteTmuxSizingSettled() -> JSONValue?
 #endif
 }

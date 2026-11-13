@@ -395,7 +395,7 @@ def python_client_default_socket_path(extra_env: dict[str, str]) -> str:
 
 
 def test_python_client_ignores_unknown_bundle_env() -> bool:
-    expected_tagged_debug = "com.cmuxterm.app.debug.variant.test.tag"
+    expected_tagged_debug = "com.comux.app.debug.variant.test.tag"
     actual = python_client_default_bundle_id({
         "CMUX_BUNDLE_ID": "com.example.stale.bundle",
         "CMUX_TAG": "variant-test-tag",
@@ -407,10 +407,10 @@ def test_python_client_ignores_unknown_bundle_env() -> bool:
         return False
 
     actual = python_client_default_bundle_id({
-        "CMUX_BUNDLE_ID": "com.cmuxterm.app",
+        "CMUX_BUNDLE_ID": "com.comux.app",
         "CMUX_TAG": "rogue-stable-tag",
     })
-    if actual != "com.cmuxterm.app":
+    if actual != "com.comux.app":
         print("FAIL: python client rejected known stable CMUX_BUNDLE_ID")
         print(f"actual={actual!r}")
         return False
@@ -479,25 +479,25 @@ def test_variant_last_socket_markers(cli_path: str) -> bool:
             cli_path,
             apps,
             "cmux",
-            "com.cmuxterm.app",
+            "com.comux.app",
         )
         nightly_cli = bundled_cli_for_variant(
             cli_path,
             apps,
             "cmux NIGHTLY",
-            f"com.cmuxterm.app.nightly.{nightly_slug}",
+            f"com.comux.app.nightly.{nightly_slug}",
         )
         isolated_nightly_cli = bundled_cli_for_variant(
             cli_path,
             apps,
             "cmux NIGHTLY issue3542",
-            f"com.cmuxterm.app.nightly.{isolated_nightly_slug}",
+            f"com.comux.app.nightly.{isolated_nightly_slug}",
         )
         dev_agent_cli = bundled_cli_for_variant(
             cli_path,
             apps,
             "cmux DEV agent",
-            f"com.cmuxterm.app.debug.{dev_agent_slug}",
+            f"com.comux.app.debug.{dev_agent_slug}",
         )
 
         write_marker(home, "last-socket-path", stable_socket)
@@ -592,7 +592,7 @@ def test_base_debug_cli_discovers_cmux_tag(cli_path: str) -> bool:
                 cli_path,
                 apps,
                 "cmux DEV issue3542",
-                "com.cmuxterm.app.debug",
+                "com.comux.app.debug",
             )
             env = os.environ.copy()
             for key in list(env):

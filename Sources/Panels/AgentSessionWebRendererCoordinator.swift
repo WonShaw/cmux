@@ -230,7 +230,8 @@ final class AgentSessionWebRendererCoordinator: NSObject, WKNavigationDelegate, 
 
         let isMainFrameNavigation = navigationAction.targetFrame?.isMainFrame ?? true
         guard isMainFrameNavigation else {
-            decisionHandler(.allow)
+            // Subframes may only show bundled / loopback content.
+            decisionHandler(Self.isRemoteWebURL(url) ? .cancel : .allow)
             return
         }
 
@@ -244,7 +245,9 @@ final class AgentSessionWebRendererCoordinator: NSObject, WKNavigationDelegate, 
             return
         }
 
-        if navigationAction.navigationType == .linkActivated || navigationAction.targetFrame == nil {
+        // Only an explicit link click may hand a URL to the system; scripted
+        // navigations away from the bundled shell are dropped.
+        if navigationAction.navigationType == .linkActivated {
             handleExternalLink(url)
         }
         decisionHandler(.cancel)
@@ -256,7 +259,8 @@ final class AgentSessionWebRendererCoordinator: NSObject, WKNavigationDelegate, 
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        if let url = navigationAction.request.url {
+        if navigationAction.navigationType == .linkActivated,
+           let url = navigationAction.request.url {
             handleExternalLink(url)
         }
         return nil
@@ -337,6 +341,13 @@ final class AgentSessionWebRendererCoordinator: NSObject, WKNavigationDelegate, 
             return false
         }
         return candidate == expected
+    }
+
+    nonisolated static func isRemoteWebURL(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else { return false }
+        let host = (url.host ?? "").lowercased()
+        return !(host == "127.0.0.1" || host == "localhost" || host == "::1" || host == "[::1]")
     }
 
     nonisolated static func normalizedTrustedFileURL(_ url: URL?) -> URL? {
@@ -712,26 +723,7 @@ final class AgentSessionWebRendererCoordinator: NSObject, WKNavigationDelegate, 
             return
         }
 
-        guard scheme == "http" || scheme == "https" else {
-            NSWorkspace.shared.open(url)
-            return
-        }
-
-        guard let app = AppDelegate.shared,
-              let location = app.workspaceContainingPanel(
-                  panelId: panelId,
-                  preferredWorkspaceId: workspaceId
-              ),
-              let paneId = location.workspace.paneId(forPanelId: panelId) else {
-            NSWorkspace.shared.open(url)
-            return
-        }
-
-        _ = location.workspace.newBrowserSurface(
-            inPane: paneId,
-            url: url,
-            focus: true
-        )
+        NSWorkspace.shared.open(url)
     }
 
     private func isInPageFragment(_ url: URL, currentURL: URL?) -> Bool {

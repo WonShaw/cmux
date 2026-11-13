@@ -18,9 +18,6 @@ struct SidebarWorkspaceRowCommands {
     weak var notificationStore: TerminalNotificationStore?
     let index: Int
     let contextMenuWorkspaceIds: [UUID]
-    let remoteContextMenuWorkspaceIds: [UUID]
-    let allRemoteContextMenuTargetsConnecting: Bool
-    let allRemoteContextMenuTargetsDisconnected: Bool
     let contextMenuPinState: WorkspaceActionDispatcher.PinState?
     let workspaceGroupMenuSnapshot: WorkspaceGroupMenuSnapshot
     /// Resolved cmux scheme used for menu swatches.
@@ -128,10 +125,6 @@ struct SidebarWorkspaceRowCommands {
 
     func closeWorkspace() {
         tabManager?.closeWorkspaceWithConfirmation(tab)
-    }
-
-    func reconnectRemoteConnection() {
-        tab.reconnectRemoteConnection()
     }
 
     // MARK: Shared mutation helpers
@@ -323,9 +316,7 @@ struct SidebarWorkspaceRowMenuBuilder {
             menu.addItem(.separator())
         }
         addRenameAndDescriptionItems(to: menu, tabManager: tabManager)
-        addRemoteSection(to: menu, tabManager: tabManager)
         addColorMenu(to: menu)
-        addSSHErrorItem(to: menu)
         menu.addItem(.separator())
         addMoveItems(to: menu, tabManager: tabManager)
         menu.addItem(.separator())
@@ -380,10 +371,9 @@ struct SidebarWorkspaceRowMenuBuilder {
 
     private func addGroupSection(to menu: NSMenu, tabManager: TabManager) {
         let newGroupShortcut = KeyboardShortcutSettings.shortcut(for: .newWorkspaceGroup)
-        let canCreateEmpty = tabManager.selectedTab?.isRemoteTmuxMirror != true
         menu.addItem(item(
             String(localized: "contextMenu.workspaceGroup.newEmpty", defaultValue: "New Empty Workspace Group"),
-            enabled: canCreateEmpty,
+            enabled: true,
             shortcut: newGroupShortcut
         ) { [weak tabManager] in
             guard let tabManager else { return }
@@ -551,33 +541,6 @@ struct SidebarWorkspaceRowMenuBuilder {
         }
     }
 
-    private func addRemoteSection(to menu: NSMenu, tabManager: TabManager) {
-        guard !commands.remoteContextMenuWorkspaceIds.isEmpty else { return }
-        menu.addItem(.separator())
-        let remoteWorkspaces: () -> [Workspace] = { [weak tabManager, commands] in
-            guard let tabManager else { return [] }
-            return commands.remoteContextMenuWorkspaceIds.compactMap { workspaceId in
-                tabManager.tabs.first(where: { $0.id == workspaceId })
-            }
-        }
-        let reconnectLabel = label(
-            multi: String(localized: "contextMenu.reconnectWorkspaces", defaultValue: "Reconnect Workspaces"),
-            single: String(localized: "contextMenu.reconnectWorkspace", defaultValue: "Reconnect Workspace"))
-        menu.addItem(item(reconnectLabel, enabled: !commands.allRemoteContextMenuTargetsConnecting) {
-            for workspace in remoteWorkspaces() {
-                workspace.reconnectRemoteConnection()
-            }
-        })
-        let disconnectLabel = label(
-            multi: String(localized: "contextMenu.disconnectWorkspaces", defaultValue: "Disconnect Workspaces"),
-            single: String(localized: "contextMenu.disconnectWorkspace", defaultValue: "Disconnect Workspace"))
-        menu.addItem(item(disconnectLabel, enabled: !commands.allRemoteContextMenuTargetsDisconnected) {
-            for workspace in remoteWorkspaces() {
-                workspace.disconnectRemoteConnection(clearConfiguration: false)
-            }
-        })
-    }
-
     private func addColorMenu(to menu: NSMenu) {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
@@ -617,14 +580,6 @@ struct SidebarWorkspaceRowMenuBuilder {
         let parent = item(String(localized: "contextMenu.workspaceColor", defaultValue: "Workspace Color")) {}
         parent.submenu = submenu
         menu.addItem(parent)
-    }
-
-    private func addSSHErrorItem(to menu: NSMenu) {
-        guard let sshError = commands.snapshotProvider()?.copyableSidebarSSHError else { return }
-        menu.addItem(.separator())
-        menu.addItem(item(String(localized: "contextMenu.copySshError", defaultValue: "Copy SSH Error")) {
-            WorkspaceSurfaceIdentifierClipboardText.copy(sshError)
-        })
     }
 
     private func addMoveItems(to menu: NSMenu, tabManager: TabManager) {

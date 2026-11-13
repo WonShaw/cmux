@@ -37,7 +37,6 @@ extension TerminalController {
             payload["tab_id"] = target.surfaceID.uuidString
             payload["tab_ref"] = v2TabRef(uuid: target.surfaceID)
             payload["surface_type"] = target.panel.panelType.rawValue
-            payload["is_browser_surface"] = target.panel.panelType == .browser
             payload["pane_id"] = v2OrNull(target.paneID?.uuidString)
             payload["pane_ref"] = v2Ref(kind: .pane, uuid: target.paneID)
         } else {
@@ -46,7 +45,6 @@ extension TerminalController {
             payload["tab_id"] = NSNull()
             payload["tab_ref"] = NSNull()
             payload["surface_type"] = NSNull()
-            payload["is_browser_surface"] = NSNull()
             payload["pane_id"] = NSNull()
             payload["pane_ref"] = NSNull()
         }
@@ -277,10 +275,8 @@ extension TerminalController {
         var targets: [TerminalCallerTTYBinding: TerminalCallerTarget] = [:]
         for manager in tabManagers {
             for workspace in manager.tabs {
-                guard !workspace.isRemoteWorkspace, !workspace.isRemoteTmuxMirror else { continue }
                 for (surfaceId, panel) in workspace.panels {
-                    guard let terminalPanel = panel as? TerminalPanel,
-                          !workspace.isRemoteTerminalSurface(surfaceId) else { continue }
+                    guard let terminalPanel = panel as? TerminalPanel else { continue }
                     let binding = TerminalCallerTTYBinding(
                         workspaceId: workspace.id,
                         surfaceId: surfaceId

@@ -6,8 +6,6 @@ public struct ControlSidebarSurfaceHealthRow: Sendable, Equatable {
     public enum Kind: Sendable, Equatable {
         /// A terminal panel with view-hosting diagnostics.
         case terminal(inWindow: Bool, portalHosted: Bool, viewDepth: Int)
-        /// A browser panel with window attachment.
-        case browser(inWindow: Bool)
         /// Any other panel kind (`in_window=unknown`).
         case other
     }

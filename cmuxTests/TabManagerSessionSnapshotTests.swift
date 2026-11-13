@@ -697,35 +697,6 @@ final class TabManagerSessionSnapshotTests: XCTestCase {
         XCTAssertNotNil(restoredWorkspace.focusedPanelId.flatMap { restoredWorkspace.panels[$0] })
     }
 
-    func testReopenClosedBrowserSplitFromClosedItemHistoryRestoresCollapsedPane() throws {
-        let manager = TabManager()
-        let workspace = try XCTUnwrap(manager.selectedWorkspace)
-        let sourcePanelId = try XCTUnwrap(workspace.focusedPanelId)
-        let splitBrowserId = try XCTUnwrap(manager.newBrowserSplit(
-            tabId: workspace.id,
-            fromPanelId: sourcePanelId,
-            orientation: .horizontal,
-            insertFirst: false,
-            url: URL(string: "https://example.com/unified-history-split")
-        ))
-
-        drainMainQueue()
-        XCTAssertEqual(workspace.bonsplitController.allPaneIds.count, 2)
-
-        workspace.markCloseHistoryEligible(panelId: splitBrowserId)
-        XCTAssertTrue(workspace.closePanel(splitBrowserId, force: true))
-        drainMainQueue()
-        XCTAssertNil(workspace.panels[splitBrowserId])
-        XCTAssertEqual(workspace.bonsplitController.allPaneIds.count, 1)
-        XCTAssertTrue(ClosedItemHistoryStore.shared.canReopen)
-
-        XCTAssertTrue(manager.reopenMostRecentlyClosedItem())
-        drainMainQueue()
-
-        XCTAssertEqual(workspace.bonsplitController.allPaneIds.count, 2)
-        XCTAssertTrue(workspace.focusedPanelId.flatMap { workspace.panels[$0] } is BrowserPanel)
-    }
-
     func testReopenClosedTerminalSplitFromClosedItemHistoryRestoresCollapsedPane() throws {
         let manager = TabManager()
         let workspace = try XCTUnwrap(manager.selectedWorkspace)
@@ -784,45 +755,6 @@ final class TabManagerSessionSnapshotTests: XCTestCase {
         let restoredTitles = Set(workspace.panelCustomTitles.values)
         XCTAssertTrue(restoredTitles.contains("Pane Closed First"))
         XCTAssertTrue(restoredTitles.contains("Pane Closed Second"))
-    }
-
-    func testReopenClosedBrowserSplitAfterWorkspaceRestoreRestoresCollapsedPane() throws {
-        let manager = TabManager()
-        let firstWorkspace = try XCTUnwrap(manager.selectedWorkspace)
-        let secondWorkspace = manager.addWorkspace(select: true)
-        secondWorkspace.setCustomTitle("Recovered Browser Split")
-        let sourcePanelId = try XCTUnwrap(secondWorkspace.focusedPanelId)
-        let splitBrowserId = try XCTUnwrap(manager.newBrowserSplit(
-            tabId: secondWorkspace.id,
-            fromPanelId: sourcePanelId,
-            orientation: .horizontal,
-            insertFirst: false,
-            url: URL(string: "https://example.com/workspace-restored-browser-split")
-        ))
-
-        drainMainQueue()
-        XCTAssertEqual(secondWorkspace.bonsplitController.allPaneIds.count, 2)
-
-        secondWorkspace.markCloseHistoryEligible(panelId: splitBrowserId)
-        XCTAssertTrue(secondWorkspace.closePanel(splitBrowserId, force: true))
-        drainMainQueue()
-        XCTAssertNil(secondWorkspace.panels[splitBrowserId])
-        XCTAssertEqual(secondWorkspace.bonsplitController.allPaneIds.count, 1)
-
-        manager.closeWorkspace(secondWorkspace)
-        XCTAssertEqual(manager.tabs.map(\.id), [firstWorkspace.id])
-
-        XCTAssertTrue(manager.reopenMostRecentlyClosedItem())
-        let restoredWorkspace = try XCTUnwrap(manager.selectedWorkspace)
-        XCTAssertEqual(restoredWorkspace.customTitle, "Recovered Browser Split")
-        XCTAssertEqual(restoredWorkspace.bonsplitController.allPaneIds.count, 1)
-
-        XCTAssertTrue(manager.reopenMostRecentlyClosedItem())
-        drainMainQueue()
-
-        XCTAssertEqual(manager.selectedTabId, restoredWorkspace.id)
-        XCTAssertEqual(restoredWorkspace.bonsplitController.allPaneIds.count, 2)
-        XCTAssertTrue(restoredWorkspace.focusedPanelId.flatMap { restoredWorkspace.panels[$0] } is BrowserPanel)
     }
 
     func testReopenClosedPanelsAfterWorkspaceRestoreRemapsStillClosedAnchors() throws {
@@ -1822,45 +1754,6 @@ final class TabManagerSessionSnapshotTests: XCTestCase {
         XCTAssertEqual(failedRecordIds, Set([newRecord.id, oldRecord.id]))
     }
 
-    func testFailedClosedWorkspaceRestoreRemovesCreatedWorkspaceAndKeepsHistoryRecord() throws {
-        let originalAppDelegate = AppDelegate.shared
-        AppDelegate.shared = nil
-        defer {
-            AppDelegate.shared = originalAppDelegate
-        }
-
-        let manager = TabManager()
-        let workspace = try XCTUnwrap(manager.selectedWorkspace)
-        var snapshot = workspace.sessionSnapshot(includeScrollback: false)
-        var panelSnapshot = try XCTUnwrap(snapshot.panels.first)
-        panelSnapshot.type = .markdown
-        panelSnapshot.title = "Broken Markdown"
-        panelSnapshot.customTitle = "Broken Workspace Tab"
-        panelSnapshot.terminal = nil
-        panelSnapshot.browser = nil
-        panelSnapshot.markdown = nil
-        panelSnapshot.filePreview = nil
-        panelSnapshot.rightSidebarTool = nil
-        snapshot.customTitle = "Broken Workspace"
-        snapshot.panels = [panelSnapshot]
-        snapshot.layout = .pane(SessionPaneLayoutSnapshot(
-            panelIds: [panelSnapshot.id],
-            selectedPanelId: panelSnapshot.id
-        ))
-
-        ClosedItemHistoryStore.shared.push(.workspace(ClosedWorkspaceHistoryEntry(
-            workspaceId: UUID(),
-            windowId: nil,
-            workspaceIndex: 1,
-            snapshot: snapshot
-        )))
-
-        XCTAssertFalse(manager.reopenMostRecentlyClosedItem())
-        XCTAssertEqual(manager.tabs.count, 1)
-        XCTAssertEqual(manager.selectedTabId, workspace.id)
-        XCTAssertEqual(ClosedItemHistoryStore.shared.menuSnapshot().items.map(\.title), ["Broken Workspace"])
-    }
-
     func testClosedWindowRestoreValidationRejectsFailedRestorablePanelRestore() throws {
         let manager = TabManager()
         let workspace = try XCTUnwrap(manager.selectedWorkspace)
@@ -1898,117 +1791,6 @@ final class TabManagerSessionSnapshotTests: XCTestCase {
 
         XCTAssertEqual(manager.tabs.count, 1)
         XCTAssertNotNil(manager.selectedTabId)
-    }
-
-    func testRestoredPersistentSSHBrowserOnlyWorkspaceAutoConnectsWithoutForegroundAuthTerminal() {
-        let browserPanelId = UUID()
-        let browserOnlySnapshot = Self.persistentSSHWorkspaceSnapshot(
-            panel: Self.browserPanelSnapshot(id: browserPanelId),
-            focusedPanelId: browserPanelId
-        )
-        XCTAssertTrue(Workspace.shouldAutoConnectRestoredRemote(
-            foregroundAuthToken: " token-a ",
-            snapshot: browserOnlySnapshot,
-            isRunningUnderAutomatedTests: false
-        ))
-
-        let terminalPanelId = UUID()
-        let terminalSnapshot = Self.persistentSSHWorkspaceSnapshot(
-            panel: Self.terminalPanelSnapshot(id: terminalPanelId),
-            focusedPanelId: terminalPanelId
-        )
-        XCTAssertFalse(Workspace.shouldAutoConnectRestoredRemote(
-            foregroundAuthToken: "token-a",
-            snapshot: terminalSnapshot,
-            isRunningUnderAutomatedTests: false
-        ))
-
-        let localTerminalPanelId = UUID()
-        var localTerminal = Self.terminalPanelSnapshot(id: localTerminalPanelId)
-        localTerminal.terminal?.isRemoteTerminal = false
-        var browserAndLocalTerminalSnapshot = browserOnlySnapshot
-        browserAndLocalTerminalSnapshot.panels.append(localTerminal)
-        if case .pane(var pane) = browserAndLocalTerminalSnapshot.layout {
-            pane.panelIds.append(localTerminalPanelId)
-            browserAndLocalTerminalSnapshot.layout = .pane(pane)
-        }
-        XCTAssertTrue(Workspace.shouldAutoConnectRestoredRemote(
-            foregroundAuthToken: "token-a",
-            snapshot: browserAndLocalTerminalSnapshot,
-            isRunningUnderAutomatedTests: false
-        ))
-
-        let restoredAttachPanelId = UUID()
-        var restoredAttachTerminal = Self.terminalPanelSnapshot(id: restoredAttachPanelId)
-        restoredAttachTerminal.terminal?.isRemoteTerminal = false
-        restoredAttachTerminal.terminal?.remotePTYSessionID = " ssh-restored-session "
-        var browserAndRestoredAttachSnapshot = browserOnlySnapshot
-        browserAndRestoredAttachSnapshot.panels.append(restoredAttachTerminal)
-        if case .pane(var pane) = browserAndRestoredAttachSnapshot.layout {
-            pane.panelIds.append(restoredAttachPanelId)
-            browserAndRestoredAttachSnapshot.layout = .pane(pane)
-        }
-        XCTAssertFalse(Workspace.shouldAutoConnectRestoredRemote(
-            foregroundAuthToken: "token-a",
-            snapshot: browserAndRestoredAttachSnapshot,
-            isRunningUnderAutomatedTests: false
-        ))
-
-        XCTAssertTrue(Workspace.shouldAutoConnectRestoredRemote(
-            foregroundAuthToken: nil,
-            snapshot: terminalSnapshot,
-            isRunningUnderAutomatedTests: false
-        ))
-        XCTAssertFalse(Workspace.shouldAutoConnectRestoredRemote(
-            foregroundAuthToken: nil,
-            snapshot: browserOnlySnapshot,
-            isRunningUnderAutomatedTests: true
-        ))
-    }
-
-    func testSessionSnapshotIncludesRemoteWorkspacesForRestore() throws {
-        let manager = TabManager()
-        let remoteWorkspace = manager.addWorkspace(select: true)
-        let configuration = WorkspaceRemoteConfiguration(
-            destination: "cmux-macmini",
-            port: nil,
-            identityFile: nil,
-            sshOptions: [],
-            localProxyPort: nil,
-            relayPort: 64001,
-            relayID: "relay-test",
-            relayToken: String(repeating: "b", count: 64),
-            localSocketPath: "/tmp/cmux-test.sock",
-            terminalStartupCommand: "ssh cmux-macmini"
-        )
-        remoteWorkspace.configureRemoteConnection(configuration, autoConnect: false)
-        let paneId = try XCTUnwrap(remoteWorkspace.bonsplitController.allPaneIds.first)
-        _ = remoteWorkspace.newBrowserSurface(inPane: paneId, url: URL(string: "http://localhost:3000"), focus: false)
-
-        let snapshot = manager.sessionSnapshot(includeScrollback: false)
-
-        XCTAssertEqual(snapshot.workspaces.count, 2)
-        XCTAssertEqual(snapshot.selectedWorkspaceIndex, 1)
-        let remoteSnapshot = try XCTUnwrap(snapshot.workspaces.first { $0.processTitle == remoteWorkspace.title })
-        XCTAssertEqual(remoteSnapshot.remote?.destination, "cmux-macmini")
-    }
-
-    func testSessionSnapshotSkipsTemporaryDiffViewerBrowserPanels() throws {
-        let workspace = try XCTUnwrap(TabManager().selectedWorkspace)
-        let paneId = try XCTUnwrap(workspace.bonsplitController.allPaneIds.first)
-        let url = try XCTUnwrap(URL(string: "\(CmuxDiffViewerURLSchemeHandler.scheme)://token/index.html"))
-        _ = try XCTUnwrap(
-            workspace.newBrowserSurface(
-                inPane: paneId,
-                url: url,
-                focus: false,
-                chromeVisibility: .hidden
-            )
-        )
-
-        let snapshot = workspace.sessionSnapshot(includeScrollback: false)
-
-        XCTAssertFalse(snapshot.panels.contains { $0.type == .browser })
     }
 
     func testSessionSnapshotSkipsNonRestorableRemoteWorkspaces() {
@@ -4093,33 +3875,6 @@ final class TabManagerSessionSnapshotTests: XCTestCase {
             RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02))
         }
         XCTAssertEqual(store.menuSnapshot().totalItemCount, expectedCount)
-    }
-
-    private static func browserPanelSnapshot(id: UUID) -> SessionPanelSnapshot {
-        SessionPanelSnapshot(
-            id: id,
-            type: .browser,
-            title: "Browser",
-            customTitle: nil,
-            directory: nil,
-            isPinned: false,
-            isManuallyUnread: false,
-            listeningPorts: [],
-            ttyName: nil,
-            terminal: nil,
-            browser: SessionBrowserPanelSnapshot(
-                urlString: "http://localhost:3000",
-                profileID: nil,
-                shouldRenderWebView: true,
-                pageZoom: 1,
-                developerToolsVisible: false,
-                backHistoryURLStrings: nil,
-                forwardHistoryURLStrings: nil
-            ),
-            markdown: nil,
-            filePreview: nil,
-            rightSidebarTool: nil
-        )
     }
 
     private static func terminalPanelSnapshot(id: UUID) -> SessionPanelSnapshot {

@@ -10,8 +10,6 @@ import Foundation
 public enum ShortcutFocusAtom: String, CaseIterable, Sendable {
     /// The right sidebar (vault/files/find/feed/dock) owns focus.
     case sidebarFocus
-    /// A browser panel owns focus.
-    case browserFocus
     /// A markdown preview viewer owns focus.
     case markdownFocus
     /// A file-preview text editor owns focus.

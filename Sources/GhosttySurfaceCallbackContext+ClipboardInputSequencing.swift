@@ -131,16 +131,7 @@ extension GhosttySurfaceCallbackContext {
         }
         guard completeRuntimeClipboardRequest(requestID) else { return }
 
-        // Remote tmux mirror panes need tmux to bracket the paste because the
-        // local manual-I/O surface cannot know the remote pane's mode.
-        let handledByMirror = !text.isEmpty && (
-            AppDelegate.shared?.remoteTmuxController.pasteIntoMirror(
-                surfaceId: surfaceId,
-                text: text
-            ) ?? false
-        )
-        let completionText = handledByMirror ? "" : text
-        completionText.withCString { pointer in
+        text.withCString { pointer in
             ghostty_surface_complete_clipboard_request(
                 surface,
                 pointer,

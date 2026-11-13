@@ -47,17 +47,15 @@ cmux new-split down --workspace "$CMUX_WORKSPACE_ID" --surface "$CMUX_SURFACE_ID
 cmux new-split down --workspace "$CMUX_WORKSPACE_ID" --command "npm run dev"
 cmux new-pane --workspace "$CMUX_WORKSPACE_ID" --type terminal --direction right
 cmux new-pane --workspace "$CMUX_WORKSPACE_ID" --type terminal --direction right --command "tail -f logs/dev.log"
-cmux new-pane --workspace "$CMUX_WORKSPACE_ID" --type browser --url http://localhost:3000
 cmux new-surface --workspace "$CMUX_WORKSPACE_ID" --type terminal --pane pane:1
 cmux new-surface --workspace "$CMUX_WORKSPACE_ID" --type terminal --pane pane:1 --working-directory "$PWD" --command "npm test"
-cmux new-surface --workspace "$CMUX_WORKSPACE_ID" --type browser --pane pane:1 --url http://localhost:3000
 
 cmux focus-pane --workspace "$CMUX_WORKSPACE_ID" --pane pane:2
 cmux focus-panel --workspace "$CMUX_WORKSPACE_ID" --panel surface:3
 cmux close-surface --workspace "$CMUX_WORKSPACE_ID" --surface surface:3
 cmux move-surface --surface surface:7 --pane pane:2 --focus true
 cmux reorder-surface --surface surface:7 --before surface:3
-cmux move-tab-to-new-workspace --surface surface:7 --title "browser"
+cmux move-tab-to-new-workspace --surface surface:7 --title "logs"
 ```
 
 `--command <text>` (also on `new-workspace`) types the text plus one Enter into the new terminal's interactive shell at spawn time, so no follow-up `send` or `send-key enter` is needed and the shell stays alive after the command exits. It is terminal-only (`--type browser|simulator|agent-session` rejects it), blank text is ignored, and `new-workspace --layout` ignores it.
@@ -102,7 +100,6 @@ cmux surface-health --workspace "$CMUX_WORKSPACE_ID" --json
 
 ```bash
 cmux docs api
-cmux docs browser
 cmux docs settings
 cmux settings path
 cmux settings cmux-json

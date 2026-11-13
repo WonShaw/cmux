@@ -39,11 +39,11 @@ Intel Macs on macOS 14 with Xcode 16.2 (Swift 6.0.3) can still build the macOS a
 
 Each tagged dev build gets its own ExtensionKit sidebar extension point so concurrent dev builds do not collide. Three build settings drive it:
 
-- `CMUX_SIDEBAR_EXTENSION_POINT_ID` (default `com.cmuxterm.app.cmux.sidebar`): the extension point identifier baked into Info.plist at build time.
+- `CMUX_SIDEBAR_EXTENSION_POINT_ID` (default `com.comux.app.cmux.sidebar`): the extension point identifier baked into Info.plist at build time.
 - `CMUX_BUNDLE_ID_SUFFIX` (default empty): inserted into the app and appex bundle ids so a tagged extension gets a distinct identity that pkd records separately.
 - `CMUX_DISPLAY_NAME_SUFFIX` (default empty): appended to the appex `CFBundleDisplayName`. The OS groups sidebar extensions by display name for the enable/disable and availability counts the host reads, so two same-named appexes installed side by side are treated as one logical extension and toggling one perturbs the other.
 
-The host resolves its point id at runtime from the Info.plist key `CMUXSidebarExtensionPointIdentifier` via `CmuxSidebarExtensionPoint.identifier(in:)`. `./scripts/reload.sh --tag <tag>` scopes the host point to `com.cmuxterm.app.debug.<tag>.cmux.sidebar`. Build a matching tag-scoped sample extension with:
+The host resolves its point id at runtime from the Info.plist key `CMUXSidebarExtensionPointIdentifier` via `CmuxSidebarExtensionPoint.identifier(in:)`. `./scripts/reload.sh --tag <tag>` scopes the host point to `com.comux.app.debug.<tag>.cmux.sidebar`. Build a matching tag-scoped sample extension with:
 
 ```bash
 ./scripts/reload-extension.sh --tag <tag> [--host-bundle-id <id>] [--example sample|tabs|both]

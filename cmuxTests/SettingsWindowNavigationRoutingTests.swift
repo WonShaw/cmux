@@ -22,12 +22,12 @@ extension SettingsWindowSharedStateSuites {
                 let presenter = SettingsWindowPresenter(windowFactory: { _ in makePlainFactoryWindow() })
                 let recorder = SettingsNavigationTargetRecorder()
 
-                #expect(presenter.show(navigationTarget: .browserImport) == .presented)
+                #expect(presenter.show(navigationTarget: .terminal) == .presented)
                 presenter.deliverPendingNavigationAfterContentAppears()
                 await drainMainQueue()
                 recorder.stopObserving()
 
-                #expect(recorder.receivedTargets == [.browserImport])
+                #expect(recorder.receivedTargets == [.terminal])
             }
         }
 
@@ -36,8 +36,8 @@ extension SettingsWindowSharedStateSuites {
                 let presenter = SettingsWindowPresenter(windowFactory: { _ in makePlainFactoryWindow() })
                 let recorder = SettingsNavigationTargetRecorder()
 
-                #expect(presenter.show(navigationTarget: .browserImport) == .presented)
-                // Content appears and queues the browserImport post, but a newer
+                #expect(presenter.show(navigationTarget: .terminal) == .presented)
+                // Content appears and queues the terminal post, but a newer
                 // targeted show reuses the window and delivers synchronously
                 // before the queued task runs; the stale post must stay silent.
                 presenter.deliverPendingNavigationAfterContentAppears()
@@ -58,7 +58,7 @@ extension SettingsWindowSharedStateSuites {
                 // readiness (e.g. rapid CLI opens while the window is still
                 // mounting). Nothing may be posted into the void; the latest
                 // target must survive until the content appears.
-                #expect(presenter.show(navigationTarget: .browserImport) == .presented)
+                #expect(presenter.show(navigationTarget: .terminal) == .presented)
                 #expect(presenter.show(navigationTarget: .keyboardShortcuts) == .presented)
                 #expect(recorder.receivedTargets.isEmpty)
 
@@ -75,7 +75,7 @@ extension SettingsWindowSharedStateSuites {
                 let presenter = SettingsWindowPresenter(windowFactory: { _ in makePlainFactoryWindow() })
                 let recorder = SettingsNavigationTargetRecorder()
 
-                #expect(presenter.show(navigationTarget: .browserImport) == .presented)
+                #expect(presenter.show(navigationTarget: .terminal) == .presented)
                 // An untargeted open (e.g. a menu click) lands before the content
                 // appears; it must not erase the still-undelivered target.
                 #expect(presenter.show() == .presented)
@@ -84,7 +84,7 @@ extension SettingsWindowSharedStateSuites {
                 await drainMainQueue()
                 recorder.stopObserving()
 
-                #expect(recorder.receivedTargets == [.browserImport])
+                #expect(recorder.receivedTargets == [.terminal])
             }
         }
 
@@ -100,7 +100,7 @@ extension SettingsWindowSharedStateSuites {
 
                 // A targeted open fails outright (both attempts refuse to
                 // present)…
-                guard case .failed = presenter.show(navigationTarget: .browserImport) else {
+                guard case .failed = presenter.show(navigationTarget: .terminal) else {
                     Issue.record("expected the targeted show to fail")
                     recorder.stopObserving()
                     return

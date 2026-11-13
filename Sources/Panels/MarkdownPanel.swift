@@ -1,5 +1,5 @@
 import AppKit
-import CmuxBrowser
+import CmuxWebSupport
 import CmuxFoundation
 import Combine
 import Foundation

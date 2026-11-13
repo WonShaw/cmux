@@ -3,7 +3,6 @@ import ObjectiveC.runtime
 import SwiftUI
 import Testing
 import WebKit
-import CmuxUpdater
 
 #if canImport(cmux_DEV)
 @testable import cmux_DEV
@@ -17,7 +16,7 @@ struct FileDropOverlayViewTests {
     private func makeContentViewWindow(windowId: UUID = UUID()) -> NSWindow {
         _ = NSApplication.shared
 
-        let root = ContentView(updateViewModel: UpdateStateModel(), windowId: windowId)
+        let root = ContentView(windowId: windowId)
             .environmentObject(TabManager())
             .environmentObject(TerminalNotificationStore.shared)
             .environmentObject(SidebarState())
@@ -191,173 +190,6 @@ struct FileDropOverlayViewTests {
         #expect(
             (objc_getAssociatedObject(window, &fileDropOverlayKey) as? FileDropOverlayView) === overlays.first,
             "The window-associated file-drop overlay should match the single installed view"
-        )
-    }
-
-    @Test
-    func overlayResolvesPortalHostedBrowserWebViewForFileDrops() throws {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 280),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        defer {
-            NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: window)
-            window.orderOut(nil)
-        }
-        realizeWindowLayout(window)
-
-        let contentView = try #require(window.contentView)
-        let container = try #require(contentView.superview)
-
-        let anchor = NSView(frame: NSRect(x: 40, y: 36, width: 220, height: 150))
-        contentView.addSubview(anchor)
-
-        let webView = CmuxWebView(frame: .zero, configuration: WKWebViewConfiguration())
-        BrowserWindowPortalRegistry.bind(webView: webView, to: anchor, visibleInUI: true)
-        BrowserWindowPortalRegistry.synchronizeForAnchor(anchor)
-        defer { BrowserWindowPortalRegistry.detach(webView: webView) }
-
-        let overlay = FileDropOverlayView(frame: container.bounds)
-        overlay.autoresizingMask = [.width, .height]
-        container.addSubview(overlay, positioned: .above, relativeTo: nil)
-
-        let point = anchor.convert(
-            NSPoint(x: anchor.bounds.midX, y: anchor.bounds.midY),
-            to: nil
-        )
-        #expect(
-            overlay.webViewUnderPoint(point) === webView,
-            "File-drop overlay should resolve portal-hosted browser panes so Finder uploads still reach WKWebView"
-        )
-    }
-
-    @Test
-    func overlayDelegatesBrowserFileDragLifecycleToPortalHostedWebView() throws {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 280),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        defer {
-            NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: window)
-            window.orderOut(nil)
-        }
-        realizeWindowLayout(window)
-
-        let contentView = try #require(window.contentView)
-        let container = try #require(contentView.superview)
-
-        let anchor = NSView(frame: NSRect(x: 52, y: 44, width: 210, height: 140))
-        contentView.addSubview(anchor)
-
-        let webView = DragSpyWebView(frame: .zero, configuration: WKWebViewConfiguration())
-        BrowserWindowPortalRegistry.bind(webView: webView, to: anchor, visibleInUI: true)
-        BrowserWindowPortalRegistry.synchronizeForAnchor(anchor)
-        defer { BrowserWindowPortalRegistry.detach(webView: webView) }
-
-        let overlay = FileDropOverlayView(frame: container.bounds)
-        overlay.autoresizingMask = [.width, .height]
-        container.addSubview(overlay, positioned: .above, relativeTo: nil)
-
-        let pasteboard = NSPasteboard(name: NSPasteboard.Name("cmux.test.drag.\(UUID().uuidString)"))
-        pasteboard.clearContents()
-        #expect(
-            pasteboard.writeObjects([URL(fileURLWithPath: "/tmp/upload.mov") as NSURL]),
-            "Expected file URL drag payload"
-        )
-
-        let dropPoint = anchor.convert(
-            NSPoint(x: anchor.bounds.midX, y: anchor.bounds.midY),
-            to: nil
-        )
-        let dragInfo = MockDraggingInfo(
-            window: window,
-            location: dropPoint,
-            pasteboard: pasteboard
-        )
-
-        #expect(overlay.draggingEntered(dragInfo) == .copy)
-        #expect(overlay.prepareForDragOperation(dragInfo))
-        #expect(overlay.performDragOperation(dragInfo))
-        overlay.concludeDragOperation(dragInfo)
-
-        #expect(
-            webView.dragCalls == ["entered", "prepare", "perform", "conclude"],
-            "Finder file drops over browser panes should still reach the portal-hosted WKWebView"
-        )
-    }
-
-    @Test
-    func overlayDoesNotRecordTextDragWhenWebViewRejectsDrop() throws {
-        let defaults = UserDefaults.standard
-        let savedDefaultBehavior = defaults.object(forKey: FileDropBehaviorSettings.defaultBehaviorKey)
-        defaults.set(FileDropDefaultBehavior.text.rawValue, forKey: FileDropBehaviorSettings.defaultBehaviorKey)
-        defer {
-            if let savedDefaultBehavior {
-                defaults.set(savedDefaultBehavior, forKey: FileDropBehaviorSettings.defaultBehaviorKey)
-            } else {
-                defaults.removeObject(forKey: FileDropBehaviorSettings.defaultBehaviorKey)
-            }
-        }
-
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 280),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        defer {
-            NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: window)
-            window.orderOut(nil)
-        }
-        realizeWindowLayout(window)
-
-        let contentView = try #require(window.contentView)
-        let container = try #require(contentView.superview)
-
-        let anchor = NSView(frame: NSRect(x: 52, y: 44, width: 210, height: 140))
-        contentView.addSubview(anchor)
-
-        let webView = DragSpyWebView(frame: .zero, configuration: WKWebViewConfiguration())
-        webView.performResult = false
-        BrowserWindowPortalRegistry.bind(webView: webView, to: anchor, visibleInUI: true)
-        BrowserWindowPortalRegistry.synchronizeForAnchor(anchor)
-        defer { BrowserWindowPortalRegistry.detach(webView: webView) }
-
-        let overlay = FileDropOverlayView(frame: container.bounds)
-        overlay.autoresizingMask = [.width, .height]
-        container.addSubview(overlay, positioned: .above, relativeTo: nil)
-
-        let pasteboard = NSPasteboard(name: NSPasteboard.Name("cmux.test.drag.\(UUID().uuidString)"))
-        pasteboard.clearContents()
-        #expect(
-            pasteboard.writeObjects([URL(fileURLWithPath: "/tmp/rejected-upload.mov") as NSURL]),
-            "Expected file URL drag payload"
-        )
-
-        let dropPoint = anchor.convert(
-            NSPoint(x: anchor.bounds.midX, y: anchor.bounds.midY),
-            to: nil
-        )
-        let dragInfo = MockDraggingInfo(
-            window: window,
-            location: dropPoint,
-            pasteboard: pasteboard
-        )
-
-        #expect(overlay.draggingEntered(dragInfo) == .copy)
-        #expect(overlay.prepareForDragOperation(dragInfo))
-        #expect(!overlay.performDragOperation(dragInfo))
-        #expect(!overlay.didPerformDragAsText)
-        #expect(overlay.performedTextDragWebView == nil)
-
-        overlay.concludeDragOperation(dragInfo)
-        #expect(
-            webView.dragCalls == ["entered", "prepare", "perform"],
-            "Rejected text drops should not be recorded as performed or receive a text-route conclude"
         )
     }
 

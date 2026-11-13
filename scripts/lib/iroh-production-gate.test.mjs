@@ -322,7 +322,7 @@ test("production release gate removes disposable tagged Iroh endpoint state", (t
   writeFileSync(stackEnvironment, "unused=true\n", { mode: 0o600 });
   chmodSync(stackEnvironment, 0o600);
 
-  const bundleID = "com.cmuxterm.app.debug.prodstate";
+  const bundleID = "com.comux.app.debug.prodstate";
   const endpointState = path.join(
     directory,
     "Library",

@@ -8,11 +8,9 @@
 	<true/>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
-	<key>com.apple.developer.web-browser.public-key-credential</key>
-	<true/>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>7WLXT3NR37.com.cmuxterm.app</string>
+		<string>7WLXT3NR37.com.comux.app</string>
 	</array>
 	<key>com.apple.security.device.camera</key>
 	<true/>

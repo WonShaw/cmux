@@ -6,8 +6,7 @@ extension SocketClient {
         _ command: String,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> String {
-        guard !isRelayBacked,
-              let capability = environment[SocketClientCapabilityEnvelope.environmentKey],
+        guard let capability = environment[SocketClientCapabilityEnvelope.environmentKey],
               let envelope = SocketClientCapabilityEnvelope(capability: capability) else {
             return command
         }

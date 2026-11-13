@@ -36,24 +36,12 @@ extension TerminalController: ControlSurfaceContext {
         routing: ControlRoutingSelectors,
         tabManager: TabManager
     ) -> Workspace? {
-        if let owner = routing.remoteRelayOwnerWorkspaceID {
-            guard let workspace = tabManager.tabs.first(where: { $0.id == owner }),
-                  remoteRelayTargetIsCurrent(routing: routing, workspace: workspace) else {
-                return nil
-            }
-            return workspace
-        }
         if let wsId = routing.workspaceID {
             guard !AppDelegate.isWindowDockRoutingId(wsId) else { return nil }
             return tabManager.tabs.first(where: { $0.id == wsId })
         }
         if let surfaceId = routing.surfaceID {
             if let workspace = tabManager.tabs.first(where: { $0.panels[surfaceId] != nil }) {
-                return workspace
-            }
-            if let workspace = tabManager.tabs.first(where: {
-                $0.remoteTmuxControlPane(surfaceID: surfaceId) != nil
-            }) {
                 return workspace
             }
             guard windowDockContainingPanel(surfaceId) == nil else { return nil }
@@ -63,11 +51,6 @@ extension TerminalController: ControlSurfaceContext {
             if let located = v2LocatePane(paneId) {
                 guard located.tabManager === tabManager else { return nil }
                 return located.workspace
-            }
-            if let workspace = tabManager.tabs.first(where: {
-                $0.remoteTmuxControlPane(paneID: paneId) != nil
-            }) {
-                return workspace
             }
             guard windowDockContainingPane(paneId) == nil else { return nil }
             if let located = locateDockPane(paneId), located.tabManager === tabManager {
@@ -93,7 +76,6 @@ extension TerminalController: ControlSurfaceContext {
         case let .resolved(binding):
             effective = binding
         }
-        let remoteContext = effective.launchFlavor.remoteContext
         return ControlSurfaceResumeBinding(
             name: effective.name,
             kind: effective.kind,
@@ -113,9 +95,6 @@ extension TerminalController: ControlSurfaceContext {
             approvalPolicyRawValue: effective.approvalPolicy?.rawValue,
             approvalRecordID: effective.approvalRecordId,
             executionLocationRawValue: effective.launchFlavor.executionLocationRawValue,
-            remoteWorkspaceID: remoteContext?.workspaceID,
-            remoteSurfaceID: remoteContext?.surfaceID,
-            remotePTYSessionID: remoteContext?.persistentPTYSessionID,
             updatedAt: effective.updatedAt,
             resumeEvidenceProvenance: effective.resumeEvidenceProvenance
         )
@@ -132,16 +111,12 @@ extension TerminalController: ControlSurfaceContext {
         }
         guard let ws = resolveSurfaceWorkspace(routing: routing, tabManager: tabManager) else { return nil }
 
-        let summaries = controlSurfaceSummaries(workspace: ws).filter { summary in
-            routing.remoteRelayOwnerWorkspaceID == nil || ws.isRemoteTerminalContext(summary.surfaceID)
-        }
+        let summaries = controlSurfaceSummaries(workspace: ws)
         return ControlSurfaceListSnapshot(
             workspaceID: ws.id,
             windowID: v2ResolveWindowId(tabManager: tabManager),
-            surfaces: summaries + (routing.remoteRelayOwnerWorkspaceID == nil
-                ? controlTopologyDocks(workspace: ws, tabManager: tabManager)
-                    .flatMap { controlSimulatorAwareDockSurfaceSummaries(dock: $0) }
-                : [])
+            surfaces: summaries + controlTopologyDocks(workspace: ws, tabManager: tabManager)
+                .flatMap { controlSimulatorAwareDockSurfaceSummaries(dock: $0) }
         )
     }
 
@@ -169,7 +144,6 @@ extension TerminalController: ControlSurfaceContext {
                 paneID: summary.paneID,
                 indexInPane: summary.indexInPane,
                 selectedInPane: summary.selectedInPane,
-                developerToolsVisible: summary.developerToolsVisible,
                 requestedWorkingDirectory: summary.requestedWorkingDirectory,
                 initialCommand: summary.initialCommand,
                 tmuxStartCommand: summary.tmuxStartCommand,
@@ -204,13 +178,7 @@ extension TerminalController: ControlSurfaceContext {
             )
         }
         guard let ws = resolveSurfaceWorkspace(routing: routing, tabManager: tabManager) else { return nil }
-        let containerPanelID: UUID?
-        if routing.remoteRelayOwnerWorkspaceID != nil {
-            containerPanelID = ws.activeRemoteTerminalSurfaceIds.sorted { $0.uuidString < $1.uuidString }.first
-                ?? ws.remoteTmuxSessionMirror?.controlPaneLocations().first?.pane.panel.id
-        } else {
-            containerPanelID = ws.focusedPanelId ?? orderedPanels(in: ws).first?.id
-        }
+        let containerPanelID: UUID? = ws.focusedPanelId ?? orderedPanels(in: ws).first?.id
         let projection = containerPanelID.flatMap {
             ws.controlSurfaceProjection(forContainerPanelID: $0)
         }
@@ -283,25 +251,6 @@ extension TerminalController: ControlSurfaceContext {
         }
         guard let ws = resolveSurfaceWorkspace(routing: routing, tabManager: tabManager) else {
             return .workspaceNotFound
-        }
-        switch ws.remoteTmuxControlSurfaceTarget(surfaceID: surfaceID) {
-        case .pane(let location):
-            guard focusRemoteTmuxControlPane(
-                location,
-                workspace: ws,
-                tabManager: tabManager
-            ) else {
-                return .surfaceNotFound(surfaceID)
-            }
-            return .focused(
-                windowID: v2ResolveWindowId(tabManager: tabManager),
-                workspaceID: ws.id,
-                surfaceID: location.pane.panel.id
-            )
-        case .unresolvedMirror:
-            return .surfaceNotFound(surfaceID)
-        case .notRemote:
-            break
         }
         let isWorkspaceSurface = ws.panels[surfaceID] != nil
         if ws.containsDockPanel(surfaceID) {

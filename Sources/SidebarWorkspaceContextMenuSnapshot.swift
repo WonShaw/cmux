@@ -8,9 +8,6 @@ import Foundation
 /// the notification store.
 struct SidebarWorkspaceContextMenuSnapshot: Equatable {
     let targetWorkspaceIds: [UUID]
-    let remoteTargetWorkspaceIds: [UUID]
-    let allRemoteTargetsConnecting: Bool
-    let allRemoteTargetsDisconnected: Bool
     let pinState: WorkspaceActionDispatcher.PinState?
     let groupMenuSnapshot: WorkspaceGroupMenuSnapshot
     let canCreateEmptyGroup: Bool

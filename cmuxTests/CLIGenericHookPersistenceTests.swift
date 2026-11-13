@@ -3043,18 +3043,15 @@ extension CLINotifyProcessIntegrationRegressionTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        func environment(socketPath: String, probePath: String? = nil) -> [String: String] {
-            var values: [String: String] = [
+        func environment(socketPath: String) -> [String: String] {
+            [
                 "HOME": root.path,
                 "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
                 "PWD": root.path,
                 "CMUX_SOCKET_PATH": socketPath,
                 "CMUX_AGENT_HOOK_STATE_DIR": root.path,
-                "CMUX_CLI_SENTRY_DISABLED": probePath == nil ? "1" : "0",
                 "GROK_HOME": root.appendingPathComponent("grok-home", isDirectory: true).path,
             ]
-            values["CMUX_CLI_SENTRY_CAPTURE_PROBE_PATH"] = probePath
-            return values
         }
 
         let successSocketPath = makeSocketPath("grok-live-target")
@@ -3133,7 +3130,6 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let failureSocketPath = makeSocketPath("grok-live-failure")
         let failureListenerFD = try bindUnixSocket(at: failureSocketPath)
         let failureState = MockSocketServerState()
-        let probePath = root.appendingPathComponent("target-resolution-error.txt", isDirectory: false).path
         defer {
             Darwin.close(failureListenerFD)
             unlink(failureSocketPath)
@@ -3157,22 +3153,13 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let failedStart = runProcess(
             executablePath: cliPath,
             arguments: ["hooks", "grok", "session-start"],
-            environment: environment(
-                socketPath: failureSocketPath,
-                probePath: probePath
-            ),
+            environment: environment(socketPath: failureSocketPath),
             standardInput: #"{"sessionId":"grok-failed-session","cwd":"\#(root.path)","hookEventName":"SessionStart"}"#,
             timeout: 5
         )
         XCTAssertFalse(failedStart.timedOut, failedStart.stderr)
         XCTAssertEqual(failedStart.status, 0, failedStart.stderr)
         XCTAssertEqual(failedStart.stdout, "{}\n")
-        let capturedError = try String(contentsOfFile: probePath, encoding: .utf8)
-        XCTAssertTrue(
-            capturedError.contains("Grok") && capturedError.contains("session-start"),
-            "Target-resolution telemetry must describe the failure, saw \(capturedError)"
-        )
-        XCTAssertFalse(capturedError.contains("(null)"), capturedError)
     }
 
     func testGrokStopFallbackCompletionsFireForTwoConcurrentThreads() throws {

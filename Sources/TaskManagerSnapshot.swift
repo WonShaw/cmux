@@ -424,12 +424,9 @@ struct CmuxTaskManagerSnapshot {
         if let tty = nonEmptyString(surface["tty"]) {
             detailParts.append(tty)
         }
-        if let url = nonEmptyString(surface["url"]) {
-            detailParts.append(url)
-        }
         rows.append(row(
             surface,
-            kind: type == "browser" ? .browserSurface : .terminalSurface,
+            kind: .terminalSurface,
             level: 3,
             title: title,
             detail: detailParts.joined(separator: " / "),
@@ -439,14 +436,8 @@ struct CmuxTaskManagerSnapshot {
             agentAssetName: agentAssetName(for: [title])
         ))
 
-        let webviews = surface["webviews"] as? [[String: Any]] ?? []
-        if !webviews.isEmpty {
-            for webview in webviews {
-                appendWebView(webview, workspaceId: workspaceId, surfaceId: surfaceId, to: &rows)
-            }
-        }
         let processes = surface["processes"] as? [[String: Any]] ?? []
-        let context = rowID(surface, kind: type == "browser" ? .browserSurface : .terminalSurface)
+        let context = rowID(surface, kind: .terminalSurface)
         for process in processes {
             appendProcess(
                 process,
@@ -455,49 +446,6 @@ struct CmuxTaskManagerSnapshot {
                 workspaceId: workspaceId,
                 surfaceId: surfaceId,
                 terminalSurfaceId: terminalSurfaceId,
-                to: &rows
-            )
-        }
-    }
-
-    private static func appendWebView(
-        _ webview: [String: Any],
-        workspaceId: UUID?,
-        surfaceId: UUID?,
-        to rows: inout [CmuxTaskManagerRow]
-    ) {
-        let title = nonEmptyString(webview["title"])
-            ?? String(localized: "taskManager.row.webview", defaultValue: "WebView")
-        var detailParts: [String] = []
-        if let pid = int(webview["pid"]) {
-            detailParts.append(String(localized: "taskManager.row.pid", defaultValue: "PID \(pid)"))
-        }
-        if let sharedCount = int(webview["shared_process_count"]), sharedCount > 1 {
-            detailParts.append(String(localized: "taskManager.row.sharedProcess", defaultValue: "Shared x\(sharedCount)"))
-        }
-        if let url = nonEmptyString(webview["url"]) {
-            detailParts.append(url)
-        }
-        rows.append(row(
-            webview,
-            kind: .webview,
-            level: 4,
-            title: title,
-            detail: detailParts.joined(separator: " / "),
-            workspaceId: workspaceId,
-            surfaceId: surfaceId
-        ))
-
-        let processes = webview["processes"] as? [[String: Any]] ?? []
-        let context = rowID(webview, kind: .webview)
-        for process in processes {
-            appendProcess(
-                process,
-                level: 5,
-                context: context,
-                workspaceId: workspaceId,
-                surfaceId: surfaceId,
-                terminalSurfaceId: nil,
                 to: &rows
             )
         }
@@ -624,8 +572,6 @@ struct CmuxTaskManagerSnapshot {
 
     private static func surfaceTypeLabel(_ type: String) -> String {
         switch type {
-        case "browser":
-            return String(localized: "taskManager.row.surfaceType.browser", defaultValue: "Browser")
         case "terminal":
             return String(localized: "taskManager.row.surfaceType.terminal", defaultValue: "Terminal")
         case "unknown", "":

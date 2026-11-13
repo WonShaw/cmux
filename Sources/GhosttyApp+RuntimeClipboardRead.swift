@@ -5,7 +5,7 @@ import GhosttyKit
 import os
 
 nonisolated private let runtimeClipboardLogger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "com.cmuxterm.app",
+    subsystem: Bundle.main.bundleIdentifier ?? "com.comux.app",
     category: "RuntimeClipboard"
 )
 
@@ -181,38 +181,6 @@ extension GhosttyApp {
                     fileURLs: fileURLs,
                     target: target
                 )
-                if case .pasteCloudImages = plan {
-                    guard inputAdmission.reservesInput else {
-                        preparedContent.cleanupTransferredTemporaryFiles(using: terminalPasteboard)
-                        completeClipboardRequest(with: "")
-                        return
-                    }
-                    // The daemon pastes on the authenticated lease. Complete the
-                    // Ghostty request empty so no Mac path enters manual I/O.
-                    requestTerminalSurface.hostedView.beginImageTransferIndicator(
-                        for: operation,
-                        onCancel: {}
-                    )
-                    let task = Task { @MainActor in
-                        defer {
-                            requestTerminalSurface.hostedView.endImageTransferIndicator(for: operation)
-                            completeClipboardRequest(with: "")
-                        }
-                        do {
-                            try await requestTerminalSurface.pasteCloudImages(
-                                fileURLs,
-                                operation: operation
-                            )
-                        } catch is CancellationError {
-                            _ = operation.cancel()
-                        } catch {
-                            _ = operation.finish()
-                        }
-                    }
-                    operation.installCancellationHandler { task.cancel() }
-                    return
-                }
-
                 let indicatorView = requestTerminalSurface.hostedView
                 indicatorView.beginImageTransferIndicator(
                     for: operation,
@@ -224,97 +192,40 @@ extension GhosttyApp {
                     indicatorView.endImageTransferIndicator(for: operation)
                 }
 
-                let handledByCustomUpload = Self.handleCustomPasteUploadIfMatched(
+                TerminalImageTransferPlanner.execute(
                     plan: plan,
                     operation: operation,
-                    callbackContext: callbackContext,
-                    surfaceIdentity: requestSurfaceIdentity,
-                    indicatorView: indicatorView,
-                    completeClipboardRequest: completeClipboardRequest
-                )
-
-                if !handledByCustomUpload {
-                    TerminalImageTransferPlanner.execute(
-                        plan: plan,
-                        operation: operation,
-                        uploadWorkspaceRemote: { fileURLs, operation, finish in
-                            let workspace: Workspace? = MainActor.assumeIsolated {
-                                guard requestSurfaceIdentity.matches(
-                                    requestTerminalSurface
-                                ) else { return nil }
-                                return requestTerminalSurface.owningWorkspace()
-                            }
-                            guard let workspace else {
-                                finish(.failure(NSError(domain: "cmux.remote.paste", code: 3)))
-                                preparationService.cleanupTransferredTemporaryFiles(
-                                    .fileURLs(fileURLs)
-                                )
-                                return
-                            }
-                            workspace.uploadDroppedFilesForRemoteTerminal(
-                                fileURLs,
-                                operation: operation,
-                                completion: { result in
-                                    finish(result)
-                                    preparationService.cleanupTransferredTemporaryFiles(
-                                        .fileURLs(fileURLs)
-                                    )
-                                }
+                    insertText: { text in
+                        MainActor.assumeIsolated {
+                            indicatorView.endImageTransferIndicator(
+                                for: operation
                             )
-                        },
-                        uploadDetectedSSH: { session, fileURLs, operation, finish in
-                            guard MainActor.assumeIsolated({
-                                requestSurfaceIdentity.matches(requestTerminalSurface)
-                            }) else {
-                                finish(.failure(NSError(domain: "cmux.remote.paste", code: 4)))
-                                preparationService.cleanupTransferredTemporaryFiles(
-                                    .fileURLs(fileURLs)
-                                )
-                                return
-                            }
-                            session.uploadDroppedFiles(
-                                fileURLs,
-                                operation: operation,
-                                completion: { result in
-                                    finish(result)
-                                    preparationService.cleanupTransferredTemporaryFiles(
-                                        .fileURLs(fileURLs)
-                                    )
-                                }
-                            )
-                        },
-                        insertText: { text in
-                            MainActor.assumeIsolated {
-                                indicatorView.endImageTransferIndicator(
-                                    for: operation
-                                )
-                            }
-                            completeClipboardRequest(with: text)
-                        },
-                        onFailure: { error in
-                            let shouldPresentFailure = MainActor.assumeIsolated {
-                                indicatorView.endImageTransferIndicator(
-                                    for: operation
-                                )
-                                return requestSurfaceIdentity.matches(
-                                    requestTerminalSurface
-                                )
-                            }
-                            if shouldPresentFailure, ManagedFileTransferPolicy.isRefusal(error) {
-                                ManagedFileTransferPolicy.presentRefusal()
-                            } else if shouldPresentFailure {
-                                NSSound.beep()
-#if DEBUG
-                                cmuxDebugLog(
-                                    "terminal.remotePasteUpload.failed " +
-                                    "surface=\(callbackContext.surfaceId.uuidString.prefix(5))"
-                                )
-#endif
-                            }
-                            completeClipboardRequest(with: "")
                         }
-                    )
-                }
+                        completeClipboardRequest(with: text)
+                    },
+                    onFailure: { error in
+                        let shouldPresentFailure = MainActor.assumeIsolated {
+                            indicatorView.endImageTransferIndicator(
+                                for: operation
+                            )
+                            return requestSurfaceIdentity.matches(
+                                requestTerminalSurface
+                            )
+                        }
+                        if shouldPresentFailure, ManagedFileTransferPolicy.isRefusal(error) {
+                            ManagedFileTransferPolicy.presentRefusal()
+                        } else if shouldPresentFailure {
+                            NSSound.beep()
+#if DEBUG
+                            cmuxDebugLog(
+                                "terminal.remotePasteUpload.failed " +
+                                "surface=\(callbackContext.surfaceId.uuidString.prefix(5))"
+                            )
+#endif
+                        }
+                        completeClipboardRequest(with: "")
+                    }
+                )
             }
         }
         let attached = callbackContext.attachRuntimeClipboardTask(

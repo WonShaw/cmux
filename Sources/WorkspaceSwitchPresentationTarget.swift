@@ -1,5 +1,4 @@
 import Foundation
-import WebKit
 
 /// Immutable destination snapshot captured when presentation measurement begins.
 struct WorkspaceSwitchPresentationTarget {
@@ -9,7 +8,6 @@ struct WorkspaceSwitchPresentationTarget {
     let terminalView: GhosttyNSView?
     let terminalRendererPresented: Bool
     let terminalRenderedFrameSequence: UInt64
-    let browserWebView: WKWebView?
     let portalPresented: Bool
     let interactionReady: Bool
     let requiresInteraction: Bool

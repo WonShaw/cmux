@@ -16,27 +16,6 @@ extension TerminalController {
         return key.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
     }
 
-    nonisolated func v2TopBrowserPIDOccurrences(in windows: [[String: Any]]) -> [Int: Int] {
-        var counts: [Int: Int] = [:]
-        for window in windows {
-            let workspaces = window["workspaces"] as? [[String: Any]] ?? []
-            for workspace in workspaces {
-                let panes = workspace["panes"] as? [[String: Any]] ?? []
-                for pane in panes {
-                    let surfaces = pane["surfaces"] as? [[String: Any]] ?? []
-                    for surface in surfaces {
-                        let webviews = surface["webviews"] as? [[String: Any]] ?? []
-                        for webview in webviews {
-                            guard let pid = v2TopInt(webview["pid"]) else { continue }
-                            counts[pid, default: 0] += 1
-                        }
-                    }
-                }
-            }
-        }
-        return counts
-    }
-
     nonisolated func v2TopMemoryDiagnosticPayload(
         processSnapshot: CmuxTopProcessSnapshot,
         annotatedWindows: [[String: Any]],
@@ -52,7 +31,6 @@ extension TerminalController {
     nonisolated func v2AnnotateTopWindows(
         _ windows: inout [[String: Any]],
         processSnapshot: CmuxTopProcessSnapshot,
-        browserPIDOccurrences: [Int: Int],
         includeProcesses: Bool
     ) -> Set<Int> {
         var allPIDs: Set<Int> = []
@@ -67,8 +45,7 @@ extension TerminalController {
                     v2AnnotateTopWorkspace(
                         &workspaces[workspaceIndex],
                         processSnapshot: processSnapshot,
-                        browserPIDOccurrences: browserPIDOccurrences,
-                        includeProcesses: includeProcesses
+                            includeProcesses: includeProcesses
                     )
                 )
                 windowTopLevelPIDs.formUnion(v2TopIntArray(workspaces[workspaceIndex]["top_level_pids"]))
@@ -91,7 +68,6 @@ extension TerminalController {
     nonisolated func v2AnnotateTopWorkspace(
         _ workspace: inout [String: Any],
         processSnapshot: CmuxTopProcessSnapshot,
-        browserPIDOccurrences: [Int: Int],
         includeProcesses: Bool
     ) -> Set<Int> {
         var workspacePIDs: Set<Int> = []
@@ -104,7 +80,6 @@ extension TerminalController {
                 v2AnnotateTopPane(
                     &panes[paneIndex],
                     processSnapshot: processSnapshot,
-                    browserPIDOccurrences: browserPIDOccurrences,
                     includeProcesses: includeProcesses
                 )
             )
@@ -136,7 +111,6 @@ extension TerminalController {
     nonisolated func v2AnnotateTopPane(
         _ pane: inout [String: Any],
         processSnapshot: CmuxTopProcessSnapshot,
-        browserPIDOccurrences: [Int: Int],
         includeProcesses: Bool
     ) -> Set<Int> {
         var panePIDs: Set<Int> = []
@@ -148,7 +122,6 @@ extension TerminalController {
                 v2AnnotateTopSurface(
                     &surfaces[surfaceIndex],
                     processSnapshot: processSnapshot,
-                    browserPIDOccurrences: browserPIDOccurrences,
                     includeProcesses: includeProcesses
                 )
             )
@@ -165,7 +138,6 @@ extension TerminalController {
     nonisolated func v2AnnotateTopSurface(
         _ surface: inout [String: Any],
         processSnapshot: CmuxTopProcessSnapshot,
-        browserPIDOccurrences: [Int: Int],
         includeProcesses: Bool
     ) -> Set<Int> {
         var rootPIDs: Set<Int> = []
@@ -189,57 +161,12 @@ extension TerminalController {
             surface["tty_process_pids"] = []
         }
 
-        var webviews = surface["webviews"] as? [[String: Any]] ?? []
-        for webviewIndex in webviews.indices {
-            if let pid = v2TopInt(webviews[webviewIndex]["pid"]) {
-                rootPIDs.insert(pid)
-            }
-            surfacePIDs.formUnion(
-                v2AnnotateTopWebView(
-                    &webviews[webviewIndex],
-                    processSnapshot: processSnapshot,
-                    browserPIDOccurrences: browserPIDOccurrences,
-                    includeProcesses: includeProcesses
-                )
-            )
-        }
-        surface["webviews"] = webviews
-
         surface["root_pids"] = rootPIDs.sorted()
         surface["top_level_pids"] = processSnapshot.topLevelPIDs(for: surfacePIDs).sorted()
         surface["foreground_pgids"] = processSnapshot.foregroundProcessGroupIDs(for: surfacePIDs).sorted()
         surface["resources"] = processSnapshot.summaryPayload(for: surfacePIDs, rootPIDs: rootPIDs)
         surface["processes"] = includeProcesses ? processSnapshot.processTreePayload(for: surfacePIDs, rootPIDs: rootPIDs) : []
         return surfacePIDs
-    }
-
-    nonisolated func v2AnnotateTopWebView(
-        _ webview: inout [String: Any],
-        processSnapshot: CmuxTopProcessSnapshot,
-        browserPIDOccurrences: [Int: Int],
-        includeProcesses: Bool
-    ) -> Set<Int> {
-        guard let pid = v2TopInt(webview["pid"]) else {
-            webview["shared_process_count"] = NSNull()
-            webview["root_pids"] = []
-            webview["top_level_pids"] = []
-            webview["foreground_pgids"] = []
-            webview["resources"] = processSnapshot.summaryPayload(for: [])
-            webview["processes"] = []
-            return []
-        }
-
-        let rootPIDs: Set<Int> = [pid]
-        let pids = processSnapshot.expandedPIDs(rootPIDs: rootPIDs)
-        let sharedProcessCount = max(1, browserPIDOccurrences[pid] ?? 1)
-        let resources = processSnapshot.summary(for: pids, rootPIDs: rootPIDs)
-        webview["shared_process_count"] = sharedProcessCount
-        webview["root_pids"] = rootPIDs.sorted()
-        webview["top_level_pids"] = processSnapshot.topLevelPIDs(for: pids).sorted()
-        webview["foreground_pgids"] = processSnapshot.foregroundProcessGroupIDs(for: pids).sorted()
-        webview["resources"] = resources.attributedPayload(sharedAcross: sharedProcessCount)
-        webview["processes"] = includeProcesses ? processSnapshot.processTreePayload(for: pids, rootPIDs: rootPIDs) : []
-        return pids
     }
 
     nonisolated func v2AnnotateTopTag(
@@ -357,17 +284,6 @@ extension TerminalController {
                             ambiguousSpecificityByPID: &ambiguousSpecificityByPID,
                             commonOwnerSourceSpecificityByPID: &commonOwnerSourceSpecificityByPID
                         )
-
-                        let webviews = surface["webviews"] as? [[String: Any]] ?? []
-                        for webview in webviews {
-                            assignTopMemoryAttribution(
-                                attribution,
-                                from: webview,
-                                to: &result,
-                                ambiguousSpecificityByPID: &ambiguousSpecificityByPID,
-                                commonOwnerSourceSpecificityByPID: &commonOwnerSourceSpecificityByPID
-                            )
-                        }
                     }
                 }
             }

@@ -20,12 +20,7 @@ public struct SidebarSection: View {
     @State var showNotification: DefaultsValueModel<Bool>
     @State var notificationMessageLineLimit: DefaultsValueModel<Int>
     @State private var showBranchDir: DefaultsValueModel<Bool>
-    @State private var showPR: DefaultsValueModel<Bool>
     @State private var watchGit: DefaultsValueModel<Bool>
-    @State private var prClickable: DefaultsValueModel<Bool>
-    @State private var prLinks: DefaultsValueModel<Bool>
-    @State private var portLinks: DefaultsValueModel<Bool>
-    @State private var showSSH: DefaultsValueModel<Bool>
     @State private var showPorts: DefaultsValueModel<Bool>
     @State private var showLog: DefaultsValueModel<Bool>
     @State private var showProgress: DefaultsValueModel<Bool>
@@ -50,12 +45,7 @@ public struct SidebarSection: View {
         _showNotification = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.showNotificationMessage))
         _notificationMessageLineLimit = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.notificationMessageLineLimit))
         _showBranchDir = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.showBranchDirectory))
-        _showPR = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.showPullRequests))
         _watchGit = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.watchGitStatus))
-        _prClickable = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.makePullRequestsClickable))
-        _prLinks = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.openPullRequestLinksInCmuxBrowser))
-        _portLinks = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.openPortLinksInCmuxBrowser))
-        _showSSH = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.showSSH))
         _showPorts = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.showPorts))
         _showLog = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.showLog))
         _showProgress = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.showProgress))
@@ -90,12 +80,7 @@ public struct SidebarSection: View {
             branchVerticalLayout,
             stackBranchDir,
             pathLastOnly, showNotification, notificationMessageLineLimit, showBranchDir,
-            showPR,
             watchGit,
-            prClickable,
-            prLinks,
-            portLinks,
-            showSSH,
             showPorts,
             showLog,
             showProgress,
@@ -367,21 +352,9 @@ public struct SidebarSection: View {
             SettingsCardDivider()
 
             SettingsCardRow(
-                configurationReview: .json("sidebar.showPullRequests"),
-                String(localized: "settings.app.showPullRequests", defaultValue: "Show Pull Requests in Sidebar"),
-                subtitle: String(localized: "settings.app.showPullRequests.subtitle", defaultValue: "Display review items (PR/MR/etc.) with status and number.")
-            ) {
-                Toggle("", isOn: Binding(get: { showPR.current }, set: { showPR.set($0) }))
-                    .labelsHidden()
-                    .controlSize(.small)
-            }
-            .disabled(hideAll.current)
-            SettingsCardDivider()
-
-            SettingsCardRow(
                 configurationReview: .json("sidebar.watchGitStatus"),
                 String(localized: "settings.app.watchGitStatus", defaultValue: "Watch Git Status in Sidebar"),
-                subtitle: String(localized: "settings.app.watchGitStatus.subtitle", defaultValue: "Update sidebar branch and PR metadata from repository file changes without polling git.")
+                subtitle: String(localized: "settings.app.watchGitStatus.subtitle", defaultValue: "Update sidebar branch metadata from repository file changes without polling git.")
             ) {
                 Toggle("", isOn: Binding(get: { watchGit.current }, set: { watchGit.set($0) }))
                     .labelsHidden()
@@ -390,56 +363,6 @@ public struct SidebarSection: View {
             .disabled(hideAll.current)
             SettingsCardDivider()
 
-            SettingsCardRow(
-                configurationReview: .json("sidebar.makePullRequestsClickable"),
-                String(localized: "settings.app.makeSidebarPullRequestClickable", defaultValue: "Make Sidebar PR Clickable"),
-                subtitle: String(localized: "settings.app.makeSidebarPullRequestClickable.subtitle", defaultValue: "Review items stay visible as plain text, and clicks in that area select the workspace row.")
-            ) {
-                Toggle("", isOn: Binding(get: { prClickable.current }, set: { prClickable.set($0) }))
-                    .labelsHidden()
-                    .controlSize(.small)
-                    .accessibilityIdentifier("SettingsSidebarPullRequestClickableToggle")
-            }
-            .disabled(hideAll.current || !showPR.current)
-            SettingsCardDivider()
-
-            SettingsCardRow(
-                configurationReview: .json("sidebar.openPullRequestLinksInCmuxBrowser"),
-                String(localized: "settings.app.openSidebarPRLinks", defaultValue: "Open Sidebar PR Links in cmux Browser"),
-                subtitle: prLinksSubtitle(prVisible: showPR.current, prClickable: prClickable.current, openInCmux: prLinks.current)
-            ) {
-                Toggle("", isOn: Binding(get: { prLinks.current }, set: { prLinks.set($0) }))
-                    .labelsHidden()
-                    .controlSize(.small)
-            }
-            .disabled(hideAll.current || !showPR.current || !prClickable.current)
-            SettingsCardDivider()
-
-            SettingsCardRow(
-                configurationReview: .json("sidebar.openPortLinksInCmuxBrowser"),
-                String(localized: "settings.app.openSidebarPortLinks", defaultValue: "Open Sidebar Port Links in cmux Browser"),
-                subtitle: portLinks.current
-                    ? String(localized: "settings.app.openSidebarPortLinks.subtitleOn", defaultValue: "Port clicks open inside cmux browser.")
-                    : String(localized: "settings.app.openSidebarPortLinks.subtitleOff", defaultValue: "Port clicks open in your default browser.")
-            ) {
-                Toggle("", isOn: Binding(get: { portLinks.current }, set: { portLinks.set($0) }))
-                    .labelsHidden()
-                    .controlSize(.small)
-            }
-            .disabled(hideAll.current)
-            SettingsCardDivider()
-
-            SettingsCardRow(
-                configurationReview: .json("sidebar.showSSH"),
-                String(localized: "settings.app.showSSH", defaultValue: "Show SSH in Sidebar"),
-                subtitle: String(localized: "settings.app.showSSH.subtitle", defaultValue: "Display the SSH target for remote workspaces in its own row.")
-            ) {
-                Toggle("", isOn: Binding(get: { showSSH.current }, set: { showSSH.set($0) }))
-                    .labelsHidden()
-                    .controlSize(.small)
-            }
-            .disabled(hideAll.current)
-            SettingsCardDivider()
 
             SettingsCardRow(
                 configurationReview: .json("sidebar.showPorts"),
@@ -490,17 +413,5 @@ public struct SidebarSection: View {
             }
             .disabled(hideAll.current)
         }
-    }
-
-    private func prLinksSubtitle(prVisible: Bool, prClickable: Bool, openInCmux: Bool) -> String {
-        if !prVisible {
-            return String(localized: "settings.app.openSidebarPRLinks.subtitleHidden", defaultValue: "Enable sidebar PR visibility to choose where PR links open.")
-        }
-        if !prClickable {
-            return String(localized: "settings.app.openSidebarPRLinks.subtitleDisabled", defaultValue: "Enable sidebar PR clickability to choose where PR links open.")
-        }
-        return openInCmux
-            ? String(localized: "settings.app.openSidebarPRLinks.subtitleOn", defaultValue: "Clicks open inside cmux browser.")
-            : String(localized: "settings.app.openSidebarPRLinks.subtitleOff", defaultValue: "Clicks open in your default browser.")
     }
 }

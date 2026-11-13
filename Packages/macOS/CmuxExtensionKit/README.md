@@ -27,7 +27,7 @@ as the reference project:
 1. Open `SampleSidebarExtensionApp.xcodeproj`.
 2. Change the app and extension bundle identifiers to your own reverse-DNS prefix.
 3. Change the signing team from Manaflow to your team.
-4. Keep the extension point identifier as `com.cmuxterm.app.cmux.sidebar`.
+4. Keep the extension point identifier as `com.comux.app.cmux.sidebar`.
 5. Keep App Sandbox enabled for the extension target.
 6. Build and launch the containing app once so macOS registers the embedded extension.
 7. In CMUX, open Sidebar Extensions from the puzzle button next to the sidebar
@@ -38,7 +38,7 @@ as the reference project:
 
 The extension target declares the extension point in its `Info.plist`. The
 reference project gives this build setting the production value
-`com.cmuxterm.app.cmux.sidebar`; the tagged development helper overrides it to
+`com.comux.app.cmux.sidebar`; the tagged development helper overrides it to
 match the tagged host:
 
 ```xml
@@ -134,7 +134,7 @@ registration independently of CMUX with:
 pluginkit -mAvvv
 ```
 
-The normal CMUX release uses `com.cmuxterm.app.cmux.sidebar`. Tagged development
+The normal CMUX release uses `com.comux.app.cmux.sidebar`. Tagged development
 builds use the point stored in the host's `CMUXSidebarExtensionPointIdentifier`
 Info.plist key (currently `<host-bundle-id>.cmux.sidebar`). If the extension is
 absent from the unfiltered output, fix its sandbox, signing, bundle identifier,

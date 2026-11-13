@@ -8,8 +8,8 @@ import CmuxSettings
 #endif
 
 final class ShortcutWhenClauseTests: XCTestCase {
-    private func state(browser: Bool = false, markdown: Bool = false, sidebar: Bool = false) -> ShortcutFocusState {
-        ShortcutFocusState(browser: browser, markdown: markdown, sidebar: sidebar)
+    private func state(simulator: Bool = false, markdown: Bool = false, sidebar: Bool = false) -> ShortcutFocusState {
+        ShortcutFocusState(markdown: markdown, sidebar: sidebar, simulator: simulator)
     }
 
     func testParsesNegatedAtom() {
@@ -20,12 +20,12 @@ final class ShortcutWhenClauseTests: XCTestCase {
     func testParsesAndOrWithPrecedence() {
         // && binds tighter than ||: "a || b && c" == "a || (b && c)".
         XCTAssertEqual(
-            ShortcutWhenClause.parse("terminalFocus || browserFocus && markdownFocus"),
-            .or(.atom(.terminalFocus), .and(.atom(.browserFocus), .atom(.markdownFocus)))
+            ShortcutWhenClause.parse("terminalFocus || simulatorFocus && markdownFocus"),
+            .or(.atom(.terminalFocus), .and(.atom(.simulatorFocus), .atom(.markdownFocus)))
         )
         XCTAssertEqual(
-            ShortcutWhenClause.parse("(terminalFocus || browserFocus) && !sidebarFocus"),
-            .and(.or(.atom(.terminalFocus), .atom(.browserFocus)), .not(.atom(.sidebarFocus)))
+            ShortcutWhenClause.parse("(terminalFocus || simulatorFocus) && !sidebarFocus"),
+            .and(.or(.atom(.terminalFocus), .atom(.simulatorFocus)), .not(.atom(.sidebarFocus)))
         )
     }
 
@@ -51,7 +51,7 @@ final class ShortcutWhenClauseTests: XCTestCase {
 
     func testEvaluateAtoms() {
         XCTAssertTrue(ShortcutWhenClause.atom(.sidebarFocus).evaluate(state(sidebar: true)))
-        XCTAssertFalse(ShortcutWhenClause.atom(.sidebarFocus).evaluate(state(browser: true)))
+        XCTAssertFalse(ShortcutWhenClause.atom(.sidebarFocus).evaluate(state(simulator: true)))
         // terminalFocus is true exactly when nothing else is focused.
         XCTAssertTrue(ShortcutWhenClause.atom(.terminalFocus).evaluate(state()))
         XCTAssertFalse(ShortcutWhenClause.atom(.terminalFocus).evaluate(state(sidebar: true)))
@@ -60,7 +60,7 @@ final class ShortcutWhenClauseTests: XCTestCase {
     func testWorkspaceDigitsExceptSidebar() throws {
         let clause = try XCTUnwrap(ShortcutWhenClause.parse("!sidebarFocus"))
         XCTAssertTrue(clause.evaluate(state()), "terminal focus → workspace digit allowed")
-        XCTAssertTrue(clause.evaluate(state(browser: true)), "browser focus → workspace digit allowed")
+        XCTAssertTrue(clause.evaluate(state(simulator: true)), "simulator focus → workspace digit allowed")
         XCTAssertFalse(clause.evaluate(state(sidebar: true)), "sidebar focus → workspace digit suppressed")
     }
 
@@ -75,9 +75,9 @@ final class ShortcutWhenClauseTests: XCTestCase {
     func testCanCoexistDetectsRealOverlap() {
         // Two always-on bindings on the same key genuinely collide.
         XCTAssertTrue(ShortcutWhenClause.canCoexist(.always, .always))
-        // Workspace-except-sidebar still overlaps a browser-scoped binding
-        // (browser focus satisfies both).
+        // Workspace-except-sidebar still overlaps a simulator-scoped binding
+        // (simulator focus satisfies both).
         let workspace = try! XCTUnwrap(ShortcutWhenClause.parse("!sidebarFocus"))
-        XCTAssertTrue(ShortcutWhenClause.canCoexist(workspace, .atom(.browserFocus)))
+        XCTAssertTrue(ShortcutWhenClause.canCoexist(workspace, .atom(.simulatorFocus)))
     }
 }

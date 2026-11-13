@@ -361,11 +361,8 @@ extension TerminalController {
         ) else {
             return .surfaceNotFound
         }
-        guard let locatedBinding = target.registeredBinding(binding, inputs: inputs) else {
-            return .setFailed
-        }
         let effectiveBinding: SurfaceResumeBindingSnapshot
-        switch surfaceResumeBindingWithApproval(locatedBinding) {
+        switch surfaceResumeBindingWithApproval(binding) {
         case .pendingSigningSecret:
             return .approvalPending(message: surfaceResumeApprovalPendingMessage)
         case let .resolved(binding):

@@ -85,7 +85,7 @@ extension CmuxConfigExecutor {
                     lines.append(String(format: cwdDisclosureFormat, cwd))
                 }
                 if let url = surface.url {
-                    // Browser/project surfaces open these on run; URLs can
+                    // Project surfaces open these on run; URLs can
                     // carry private query strings.
                     lines.append(String(format: urlDisclosureFormat, url))
                 }

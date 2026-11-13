@@ -111,9 +111,6 @@ extension WorkspaceGroupCoordinator {
                     title: nil,
                     workingDirectory: nil,
                     initialSurface: .terminal,
-                    initialBrowserURL: nil,
-                    initialBrowserOmnibarVisible: false,
-                    initialBrowserTransparentBackground: false,
                     inheritWorkingDirectory: true,
                     select: true,
                     applyCreationTitleAsCustomTitle: true

@@ -414,40 +414,6 @@ struct CmuxConfigActionSaverTests {
         #expect(TerminalForegroundCommandCapture.knownAgentKind(forExecutableName: "mytool") == nil)
     }
 
-    @Test func snapshotDisclosuresListEveryPersistedCommandURLAndEnvKey() {
-        let snapshot = WorkspaceConfigActionSnapshot(
-            definition: CmuxWorkspaceDefinition(
-                name: "W",
-                env: ["API_TOKEN": "secret"],
-                layout: .split(CmuxSplitDefinition(
-                    direction: .horizontal,
-                    split: 0.5,
-                    children: [
-                        .pane(CmuxPaneDefinition(surfaces: [
-                            CmuxSurfaceDefinition(type: .terminal, command: "claude", env: ["RUST_LOG": "debug"])
-                        ])),
-                        .pane(CmuxPaneDefinition(surfaces: [
-                            CmuxSurfaceDefinition(type: .browser, url: "https://example.com/callback?code=abc"),
-                            CmuxSurfaceDefinition(type: .terminal, command: "curl -H 'Authorization: Bearer x'"),
-                        ])),
-                    ]
-                ))
-            ),
-            skippedPanelCount: 0
-        )
-        #expect(snapshot.capturedCommands == ["claude", "curl -H 'Authorization: Bearer x'"])
-        #expect(snapshot.capturedURLs == ["https://example.com/callback?code=abc"])
-        #expect(snapshot.capturedEnvironmentKeys == ["API_TOKEN", "RUST_LOG"])
-
-        let plain = WorkspaceConfigActionSnapshot(
-            definition: CmuxWorkspaceDefinition(name: "P"),
-            skippedPanelCount: 0
-        )
-        #expect(plain.capturedCommands == [])
-        #expect(plain.capturedURLs == [])
-        #expect(plain.capturedEnvironmentKeys == [])
-    }
-
     @Test func snapshotReportsOversizedCommands() {
         let exactLimit = String(repeating: "a", count: TerminalForegroundCommandCapture.maxReplayableCommandUTF8Length)
         let oversized = exactLimit + "b"

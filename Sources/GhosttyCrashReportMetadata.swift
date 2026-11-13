@@ -101,7 +101,7 @@ extension GhosttyCrashReportMetadata {
         let appVersion: String?
         /// Build number of the build that crashed.
         let appBuild: String?
-        /// Bundle identifier of the crashed build, e.g. `com.cmuxterm.app`.
+        /// Bundle identifier of the crashed build, e.g. `com.comux.app`.
         let appNamespace: String?
     }
 

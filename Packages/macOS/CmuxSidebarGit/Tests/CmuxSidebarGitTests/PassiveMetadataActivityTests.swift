@@ -10,12 +10,10 @@ import CmuxGit
         host.workspaces[0].state.isRemote = true
         host.workspaces[0].state.panels[panelId]?.isRemoteTerminal = true
         let clock = ManualGitPollClock()
-        let pullRequestProbing = RecordingPullRequestProbing()
         let reader = GatedMetadataReader(metadata: .nonRepository)
         let service = SidebarGitMetadataService(
             workspaceGitMetadataReader: reader,
             gitMetadataService: GitMetadataService(),
-            pullRequestProbing: pullRequestProbing,
             probeLimiter: WorkspaceGitMetadataProbeLimiter(limit: 2),
             clock: clock
         )
@@ -42,7 +40,6 @@ import CmuxGit
         ))
         #expect(!host.events.contains(.clearAllGitMetadata))
         #expect(await reader.probedDirectories.isEmpty)
-        #expect(pullRequestProbing.scheduledRefreshes.isEmpty)
 
         host.gitMetadataActivity = .activePolling
         service.sidebarGitMetadataWatchSettingsDidChange()

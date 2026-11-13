@@ -220,4 +220,14 @@ extension CMUXCLI {
     func simulatorTerminalText(_ value: String) -> String {
         Self.sanitizeForTerminal(value)
     }
+
+    /// Replaces control and format characters with U+FFFD so untrusted strings
+    /// cannot embed terminal escape sequences in table output.
+    static func sanitizeForTerminal(_ value: String) -> String {
+        String(value.unicodeScalars.map { scalar in
+            (scalar.properties.generalCategory == .control || scalar.properties.generalCategory == .format)
+                ? Character("\u{FFFD}")
+                : Character(scalar)
+        })
+    }
 }

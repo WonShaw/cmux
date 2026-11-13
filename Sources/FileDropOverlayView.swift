@@ -22,15 +22,6 @@ extension PaneDropTargetView: FileDropPaneTarget {
     func fileDropConcludeDragOperation(_ sender: (any NSDraggingInfo)?) { concludeDragOperation(sender) }
 }
 
-extension BrowserPaneDropTargetView: FileDropPaneTarget {
-    func fileDropDraggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation { draggingEntered(sender) }
-    func fileDropDraggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation { draggingUpdated(sender) }
-    func fileDropDraggingExited(_ sender: (any NSDraggingInfo)?) { draggingExited(sender) }
-    func fileDropPrepareForDragOperation(_ sender: any NSDraggingInfo) -> Bool { prepareForDragOperation(sender) }
-    func fileDropPerformDragOperation(_ sender: any NSDraggingInfo) -> Bool { performDragOperation(sender) }
-    func fileDropConcludeDragOperation(_ sender: (any NSDraggingInfo)?) { concludeDragOperation(sender) }
-}
-
 /// Transparent NSView installed on the window's theme frame (above the NSHostingView) to
 /// handle file/URL drags from Finder. Nested NSHostingController layers (created by bonsplit's
 /// SinglePaneWrapper) prevent AppKit's NSDraggingDestination routing from reaching deeply
@@ -52,7 +43,7 @@ final class FileDropOverlayView: NSView {
     /// synthesize draggingExited/draggingEntered as the cursor moves.
     weak var activeDragWebView: WKWebView?
     /// The WKWebView that accepted prepareForDragOperation so conclude can be
-    /// delivered to the same browser target after the drop completes.
+    /// delivered to the same web view after the drop completes.
     weak var preparedDragWebView: WKWebView?
     /// Pane drop target currently receiving delegated file drag events.
     weak var activePaneDropTarget: (any FileDropPaneTarget)?
@@ -291,11 +282,11 @@ final class FileDropOverlayView: NSView {
     override func otherMouseDragged(with event: NSEvent) { forwardEvent(event) }
     override func scrollWheel(with event: NSEvent) { forwardEvent(event) }
 
-    // MARK: NSDraggingDestination – accept file drops over terminal and browser views.
+    // MARK: NSDraggingDestination – accept file drops over terminal and web views.
     //
     // AppKit sends draggingEntered once when the drag enters this overlay, then
     // draggingUpdated as the cursor moves within it. We track which WKWebView (if
-    // any) is under the cursor and synthesize enter/exit calls so the browser's
+    // any) is under the cursor and synthesize enter/exit calls so the web view's
     // HTML5 drag events (dragenter, dragleave, drop) fire correctly.
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
@@ -449,8 +440,6 @@ final class FileDropOverlayView: NSView {
                     performedTextDragWebView = nil
                     activeDragWebView = nil
                 } else {
-                    // Delivered drops only; see BrowserPaneDropTargetView.performDragOperation.
-                    BrowserFileDropNavigationGuard.shared.recordDelivery(webView: webView, pasteboard: sender.draggingPasteboard)
                     didPerformDragAsText = true
                     performedTextDragWebView = webView
                 }
@@ -499,10 +488,7 @@ final class FileDropOverlayView: NSView {
         preparedPaneDropTarget = nil
         if let webView {
             let handled = webView.performDragOperation(sender)
-            if handled {
-                // Delivered drops only; see BrowserPaneDropTargetView.performDragOperation.
-                BrowserFileDropNavigationGuard.shared.recordDelivery(webView: webView, pasteboard: sender.draggingPasteboard)
-            } else {
+            if !handled {
                 preparedDragWebView = nil
                 activeDragWebView = nil
             }

@@ -14,21 +14,15 @@ extension CMUXCLI {
     func resolvedSummarizerAgent(
         probe: [String: Any],
         sessionAgent: String,
-        env: [String: String],
-        telemetry: CLISocketSentryTelemetry
+        env: [String: String]
     ) -> (agent: String, missingOverride: String?) {
         // Pure decision (unit-tested in CmuxSettings); the CLI only supplies the
-        // binary-availability probe and emits telemetry.
+        // binary-availability probe.
         let decision = AutoNamingAgentCatalog.resolveSummarizer(
             chosen: probe["summarizer_agent"] as? String,
             sessionAgent: sessionAgent,
             isInstalled: { summarizerBinaryAvailable(agent: $0, env: env) }
         )
-        if let missing = decision.missingOverride {
-            telemetry.breadcrumb("auto-name.summarizer-fallback.\(missing)")
-        } else if decision.agent != sessionAgent {
-            telemetry.breadcrumb("auto-name.summarizer-override.\(decision.agent)")
-        }
         return (decision.agent, decision.missingOverride)
     }
 
@@ -63,8 +57,7 @@ extension CMUXCLI {
         summarizerAgent agent: String,
         prompt: String,
         env: [String: String],
-        timeout: TimeInterval,
-        telemetry: CLISocketSentryTelemetry
+        timeout: TimeInterval
     ) -> String? {
         switch agent {
         case "claude":
@@ -77,8 +70,7 @@ extension CMUXCLI {
                 def: def,
                 prompt: prompt,
                 env: env,
-                timeout: timeout,
-                telemetry: telemetry
+                timeout: timeout
             )
         }
     }

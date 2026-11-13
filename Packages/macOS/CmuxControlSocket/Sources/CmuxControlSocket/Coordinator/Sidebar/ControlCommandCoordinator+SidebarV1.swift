@@ -109,9 +109,6 @@ extension ControlCommandCoordinator {
         case "clear_progress": return sidebarClearProgress(args, context: context)
         case "report_git_branch": return sidebarReportGitBranch(args, context: context)
         case "clear_git_branch": return sidebarClearGitBranch(args, context: context)
-        case "report_pr", "report_review": return sidebarReportPullRequest(args, context: context)
-        case "clear_pr": return sidebarClearPullRequest(args, context: context)
-        case "report_pr_action": return sidebarReportPullRequestAction(args, context: context)
         case "report_ports": return sidebarReportPorts(args, context: context)
         case "clear_ports": return sidebarClearPorts(args, context: context)
         case "report_pwd": return sidebarReportPwd(args, context: context)
@@ -412,41 +409,5 @@ extension ControlCommandCoordinator {
         var line = "\(block.key)=\(block.markdown.replacingOccurrences(of: "\n", with: "\\n"))"
         if block.priority != 0 { line += " priority=\(block.priority)" }
         return line
-    }
-
-    /// The shared pre-validation of the panel-metadata mutation commands
-    /// (the parse-level head of the legacy `schedulePanelMetadataMutation`;
-    /// the enqueue halves live behind the seam).
-    nonisolated func sidebarPanelMutationTarget(
-        options: [String: String],
-        missingPanelUsage: String
-    ) -> (target: ControlSidebarPanelMutationTarget?, error: String?) {
-        let rawPanelArg = options["panel"] ?? options["surface"]
-        let surfaceIdFromOptions: UUID?
-        if let rawPanelArg {
-            if rawPanelArg.isEmpty {
-                return (nil, "ERROR: Missing panel id — usage: \(missingPanelUsage)")
-            }
-            guard let surfaceId = UUID(uuidString: rawPanelArg) else {
-                return (nil, "ERROR: Invalid panel id '\(rawPanelArg)'")
-            }
-            surfaceIdFromOptions = surfaceId
-        } else {
-            surfaceIdFromOptions = nil
-        }
-
-        if let tabArg = options["tab"]?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !tabArg.isEmpty,
-           UUID(uuidString: tabArg) == nil,
-           Int(tabArg) == nil {
-            return (nil, "ERROR: Tab not found")
-        }
-
-        let target = ControlSidebarPanelMutationTarget(
-            scope: sidebarExplicitScope(options: options).scope,
-            tabArg: options["tab"],
-            panelID: surfaceIdFromOptions
-        )
-        return (target, nil)
     }
 }

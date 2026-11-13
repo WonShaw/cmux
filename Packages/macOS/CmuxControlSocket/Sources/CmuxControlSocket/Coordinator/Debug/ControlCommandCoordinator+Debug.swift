@@ -16,8 +16,6 @@ extension ControlCommandCoordinator {
     func handleDebug(_ request: ControlRequest) -> ControlCallResult? {
 #if DEBUG
         switch request.method {
-        case "remote.tmux.sizing_settled":
-            return debugRemoteTmuxSizingSettled()
         case "debug.session_snapshot_benchmark":
             return debugSessionSnapshotBenchmark(request.params)
         case "debug.session_snapshot_seed_scrollback":
@@ -36,8 +34,6 @@ extension ControlCommandCoordinator {
             return debugActivateApp()
         case "debug.workspace_todo.checklist_add_field":
             return debugWorkspaceTodoChecklistAddField()
-        case "debug.pro_welcome_checklist.show":
-            return debugShowProWelcomeChecklist()
         case "debug.command_palette.toggle":
             return debugCommandPaletteEvent(.toggle, request.params)
         case "debug.command_palette.rename_tab.open":
@@ -56,10 +52,6 @@ extension ControlCommandCoordinator {
             return debugCommandPaletteRenameInputSelection(request.params)
         case "debug.command_palette.rename_input.select_all":
             return debugCommandPaletteRenameInputSelectAll(request.params)
-        case "debug.browser.address_bar_focused":
-            return debugBrowserAddressBarFocused(request.params)
-        case "debug.browser.favicon":
-            return debugBrowserFavicon(request.params)
         case "debug.right_sidebar.focus":
             return debugRightSidebarFocus(request.params)
         case "debug.sidebar.visible":
@@ -210,16 +202,6 @@ extension ControlCommandCoordinator {
             // equally unreachable unwired-context case.
             return .err(code: "internal_error", message: "No window", data: nil)
         }
-    }
-
-    // MARK: - debug.pro_welcome_checklist.show — show the Pro welcome checklist
-
-    func debugShowProWelcomeChecklist() -> ControlCallResult {
-        guard let debugContext else {
-            return .err(code: "unavailable", message: "Control context unavailable", data: nil)
-        }
-        debugContext.controlDebugShowProWelcomeChecklist()
-        return .ok(.object(["shown": .bool(true)]))
     }
 
     // MARK: - debug.textbox.*

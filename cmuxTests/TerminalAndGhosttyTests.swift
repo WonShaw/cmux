@@ -1787,47 +1787,6 @@ final class TerminalOffscreenStartupTests: XCTestCase {
         )
     }
 
-    func testMobileBrowserCreateReturnsStreamableDescriptorAndKeepsMacSelection() async throws {
-        let previousManager = TerminalController.shared.activeTabManagerForCallerNotification()
-        let manager = RecordingMobileTabManager()
-        TerminalController.shared.setActiveTabManager(manager)
-        defer {
-            TerminalController.shared.setActiveTabManager(previousManager)
-        }
-
-        let selectedWorkspace = try XCTUnwrap(manager.selectedWorkspace)
-        let mobileWorkspace = manager.addWorkspace(
-            title: "Mobile Browser Workspace",
-            select: false,
-            eagerLoadTerminal: false,
-            autoRefreshMetadata: false
-        )
-
-        let response = await TerminalController.shared.mobileHostHandleRPC(
-            MobileHostRPCRequest(
-                id: "browser-create",
-                method: "mobile.browser.create",
-                params: ["workspace_id": mobileWorkspace.id.uuidString],
-                auth: nil
-            )
-        )
-
-        guard case let .ok(rawPayload) = response,
-              let payload = rawPayload as? [String: Any],
-              let panelID = payload["panel_id"] as? String,
-              let panelUUID = UUID(uuidString: panelID) else {
-            XCTFail("Expected mobile browser.create to return the created panel descriptor")
-            return
-        }
-
-        XCTAssertEqual(payload["workspace_id"] as? String, mobileWorkspace.id.uuidString)
-        XCTAssertNotNil(mobileWorkspace.browserPanel(for: panelUUID))
-        XCTAssertEqual(
-            manager.selectedWorkspace?.id,
-            selectedWorkspace.id,
-            "Mobile background browser creation should not steal the Mac's workspace selection."
-        )
-    }
 #endif
 
     private func waitForMobileHostRoutesForTesting() async -> Bool {
@@ -2984,12 +2943,6 @@ final class TerminalDirectoryOpenTargetAvailabilityTests: XCTestCase {
         XCTAssertFalse(availableTargets.contains(.vscode))
     }
 
-    func testVSCodeInlineRequiresCodeTunnelExecutable() {
-        let env = environment(existingPaths: ["/Applications/Visual Studio Code.app"])
-        XCTAssertTrue(TerminalDirectoryOpenTarget.vscode.isAvailable(in: env))
-        XCTAssertFalse(TerminalDirectoryOpenTarget.vscodeInline.isAvailable(in: env))
-    }
-
     func testITerm2DetectsLegacyBundleName() {
         let env = environment(existingPaths: ["/Applications/iTerm.app"])
         XCTAssertTrue(TerminalDirectoryOpenTarget.iterm2.isAvailable(in: env))
@@ -2998,23 +2951,6 @@ final class TerminalDirectoryOpenTargetAvailabilityTests: XCTestCase {
     func testTowerDetected() {
         let env = environment(existingPaths: ["/Applications/Tower.app"])
         XCTAssertTrue(TerminalDirectoryOpenTarget.tower.isAvailable(in: env))
-    }
-
-    func testAvailableTargetsFallbackToApplicationLookupForVSCodeAliasOutsideApplications() {
-        let vscodePath = "/Volumes/Tools/Code.app"
-        let env = environment(
-            existingPaths: [
-                vscodePath,
-                "\(vscodePath)/Contents/Resources/app/bin/code-tunnel",
-            ],
-            applicationPathsByName: [
-                "Code": vscodePath,
-            ]
-        )
-
-        let availableTargets = TerminalDirectoryOpenTarget.availableTargets(in: env)
-        XCTAssertTrue(availableTargets.contains(.vscode))
-        XCTAssertTrue(availableTargets.contains(.vscodeInline))
     }
 
     func testTowerDetectedViaApplicationLookupOutsideApplications() {
@@ -5635,52 +5571,6 @@ final class TerminalWindowPortalLifecycleTests: XCTestCase {
         )
     }
 
-    func testTerminalPortalHostStaysBelowBrowserPortalHostWhenBothAreInstalled() {
-        let window = makeTestWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 320)
-        )
-        defer { window.orderOut(nil) }
-        realizeWindowLayout(window)
-
-        let originalContentView = window.contentView
-        let browserPortal = WindowBrowserPortal(window: window)
-        let terminalPortal = makeTrackedPortal(window: window)
-        _ = browserPortal.webViewAtWindowPoint(NSPoint(x: 1, y: 1))
-        _ = terminalPortal.viewAtWindowPoint(NSPoint(x: 1, y: 1))
-
-        guard let contentView = originalContentView,
-              let container = window.contentView else {
-            XCTFail("Expected content container")
-            return
-        }
-
-        func assertHostOrder(_ message: String) {
-            guard let terminalHostIndex = container.subviews.firstIndex(where: { $0 is WindowTerminalHostView }),
-                  let browserHostIndex = container.subviews.firstIndex(where: { $0 is WindowBrowserHostView }) else {
-                XCTFail("Expected both portal hosts in same container")
-                return
-            }
-
-            XCTAssertLessThan(
-                terminalHostIndex,
-                browserHostIndex,
-                message
-            )
-        }
-
-        assertHostOrder("Terminal portal host should start below browser portal host")
-
-        let anchor = NSView(frame: NSRect(x: 24, y: 24, width: 220, height: 150))
-        contentView.addSubview(anchor)
-        let hosted = GhosttySurfaceScrollView(
-            surfaceView: GhosttyNSView(frame: NSRect(x: 0, y: 0, width: 120, height: 80))
-        )
-        terminalPortal.bind(hostedView: hosted, to: anchor, visibleInUI: true)
-        terminalPortal.synchronizeHostedViewForAnchor(anchor)
-
-        assertHostOrder("Terminal portal bind/sync should not rise above the browser portal host")
-    }
-
     func testRegistryPrunesPortalWhenWindowCloses() {
         let baseline = TerminalWindowPortalRegistry.debugPortalCount()
         let window = makeTestWindow(
@@ -6621,30 +6511,6 @@ final class TerminalWindowPortalLifecycleTests: XCTestCase {
 
 
 final class TerminalOpenURLTargetResolutionTests: XCTestCase {
-    func testResolvesHTTPSAsEmbeddedBrowser() throws {
-        let target = try XCTUnwrap(resolveTerminalOpenURLTarget("https://example.com/path?q=1"))
-        switch target {
-        case let .embeddedBrowser(url):
-            XCTAssertEqual(url.scheme, "https")
-            XCTAssertEqual(url.host, "example.com")
-            XCTAssertEqual(url.path, "/path")
-        default:
-            XCTFail("Expected web URL to route to embedded browser")
-        }
-    }
-
-    func testResolvesBareDomainAsEmbeddedBrowser() throws {
-        let target = try XCTUnwrap(resolveTerminalOpenURLTarget("example.com/docs"))
-        switch target {
-        case let .embeddedBrowser(url):
-            XCTAssertEqual(url.scheme, "https")
-            XCTAssertEqual(url.host, "example.com")
-            XCTAssertEqual(url.path, "/docs")
-        default:
-            XCTFail("Expected bare domain to be normalized as an HTTPS browser URL")
-        }
-    }
-
     func testResolvesFileSchemeAsExternal() throws {
         let target = try XCTUnwrap(resolveTerminalOpenURLTarget("file:///tmp/cmux.txt"))
         switch target {

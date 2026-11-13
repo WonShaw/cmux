@@ -34,8 +34,6 @@ extension KeyboardShortcutSettings {
     static func resizePaneRightShortcut() -> StoredShortcut { shortcut(for: .resizePaneRight) }
     static func resizePaneUpShortcut() -> StoredShortcut { shortcut(for: .resizePaneUp) }
     static func resizePaneDownShortcut() -> StoredShortcut { shortcut(for: .resizePaneDown) }
-    static func splitBrowserRightShortcut() -> StoredShortcut { shortcut(for: .splitBrowserRight) }
-    static func splitBrowserDownShortcut() -> StoredShortcut { shortcut(for: .splitBrowserDown) }
 
     static func nextSurfaceShortcut() -> StoredShortcut { shortcut(for: .nextSurface) }
     static func prevSurfaceShortcut() -> StoredShortcut { shortcut(for: .prevSurface) }
@@ -45,7 +43,4 @@ extension KeyboardShortcutSettings {
     static func focusTextBoxInputShortcut() -> StoredShortcut { shortcut(for: .focusTextBoxInput) }
     static func attachTextBoxFileShortcut() -> StoredShortcut { shortcut(for: .attachTextBoxFile) }
 
-    static func openBrowserShortcut() -> StoredShortcut { shortcut(for: .openBrowser) }
-    static func toggleBrowserDeveloperToolsShortcut() -> StoredShortcut { shortcut(for: .toggleBrowserDeveloperTools) }
-    static func showBrowserJavaScriptConsoleShortcut() -> StoredShortcut { shortcut(for: .showBrowserJavaScriptConsole) }
 }

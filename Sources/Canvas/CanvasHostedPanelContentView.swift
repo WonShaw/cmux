@@ -4,7 +4,7 @@ import CmuxAppKitSupportUI
 import CmuxSettingsUI
 
 /// SwiftUI fallback content for canvas panes whose panel kind is not yet
-/// direct-hosted (browser, markdown, file preview, agent session, ...).
+/// direct-hosted (markdown, file preview, agent session, ...).
 ///
 /// Reuses the exact split-mode panel views so behavior stays shared; the
 /// known v1 caveat is that window-portal content inside these views clips by
@@ -21,7 +21,6 @@ struct CanvasHostedPanelContentView: View {
     let settingsRuntime: SettingsRuntime?
     let customSidebarTabManager: TabManager?
     let onRequestPanelFocus: () -> Void
-    let onRequestDeferredBrowserMaterialization: () -> Void
 
     var body: some View {
         PanelContentView(
@@ -44,8 +43,7 @@ struct CanvasHostedPanelContentView: View {
             onRequestPanelFocus: onRequestPanelFocus,
             onResumeAgentHibernation: {},
             onAutoResumeAgentHibernation: {},
-            onTriggerFlash: {},
-            onRequestDeferredBrowserMaterialization: onRequestDeferredBrowserMaterialization
+            onTriggerFlash: {}
         )
         .environment(\.settingsRuntime, settingsRuntime)
         .environment(\.workspaceAttentionColor, presentation.workspaceAttentionColor)
@@ -53,14 +51,5 @@ struct CanvasHostedPanelContentView: View {
         // border; this inset keeps the focus ring visible around it.
         .padding(.horizontal, 2)
         .padding(.bottom, 2)
-        // Inline hosting parents the webview inside the pane hierarchy: pans
-        // track frame-perfectly (no window-portal trailing), content scales
-        // with magnification, and z-order is native. Default-on; the
-        // launch-time default `canvasInlineBrowserHostingDisabled` is the
-        // escape hatch back to window-portal hosting.
-        .environment(
-            \.cmuxCanvasInlineBrowserHosting,
-            !UserDefaults.standard.bool(forKey: "canvasInlineBrowserHostingDisabled")
-        )
     }
 }

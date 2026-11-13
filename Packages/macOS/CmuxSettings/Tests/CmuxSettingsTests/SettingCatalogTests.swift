@@ -98,11 +98,6 @@ struct SettingCatalogTests {
         #expect(ids.contains("automation.socketPassword"))
     }
 
-    @Test func browserCatalogIncludesDefaultZoomLevel() {
-        let ids = Set(SettingCatalog().browser.all.map(\.id))
-        #expect(ids.contains("browser.defaultZoomLevel"))
-    }
-
     @Test func focusHistoryDefaultsToWorkspacesOnly() {
         #expect(!SettingCatalog().app.focusHistoryIncludesPanesAndTabs.defaultValue)
     }
@@ -120,7 +115,6 @@ struct SettingCatalogTests {
         // the convention that lets the JSON store use `id` as the JSON path.
         let catalog = SettingCatalog()
         for key in catalog.app.all { #expect(key.id.hasPrefix("app.")) }
-        for key in catalog.mobile.all { #expect(key.id.hasPrefix("mobile.")) }
         for key in catalog.automation.all { #expect(key.id.hasPrefix("automation.")) }
         #expect(catalog.paneChrome.paneBorderColorHex.id == "paneBorderColor")
         #expect(catalog.paneChrome.activePaneBorderColorHex.id == "activePaneBorderColor")

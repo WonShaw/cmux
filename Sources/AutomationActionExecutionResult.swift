@@ -1,6 +1,6 @@
 import Foundation
 
-/// The bounded result returned by an automation process or webhook action.
+/// The bounded result returned by an automation process action.
 struct AutomationActionExecutionResult: Sendable {
     let succeeded: Bool
     let detail: String

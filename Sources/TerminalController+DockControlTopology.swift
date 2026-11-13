@@ -63,7 +63,6 @@ extension TerminalController {
                 paneID: paneByPanelID[panel.id],
                 indexInPane: indexInPaneByPanelID[panel.id],
                 selectedInPane: selectedInPaneByPanelID[panel.id],
-                developerToolsVisible: (panel as? BrowserPanel)?.isDeveloperToolsVisible(),
                 requestedWorkingDirectory: terminal.flatMap {
                     v2NonEmptyString($0.requestedWorkingDirectory)
                 },

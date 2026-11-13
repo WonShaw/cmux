@@ -45,13 +45,4 @@ import CmuxTerminalCore
         )
     }
 
-    @Test func nonFileTargetsBypassCmuxFileRouting() throws {
-        let url = try #require(URL(string: "https://example.com/audio.wav"))
-        #expect(
-            policy.shouldAttemptCmuxFileRouting(
-                rawOpenURLValue: url.absoluteString,
-                target: .embeddedBrowser(url)
-            ) == false
-        )
-    }
 }

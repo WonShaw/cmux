@@ -33,11 +33,8 @@ extension KeyboardShortcutSettings.Action {
              .splitRight, .splitDown, .toggleSplitZoom,
              .resizePaneLeft, .resizePaneRight, .resizePaneUp, .resizePaneDown,
              .equalizeSplits,
-             .splitBrowserRight, .splitBrowserDown,
-             .openBrowser, .focusBrowserAddressBar,
              .find, .findNext, .findPrevious, .hideFind,
-             .useSelectionForFind,
-             .toggleReactGrab:
+             .useSelectionForFind:
             .dockScoped
 
         case .commandPaletteNext, .commandPalettePrevious,
@@ -46,14 +43,8 @@ extension KeyboardShortcutSettings.Action {
              .fileExplorerOpenSelection,
              .fileExplorerOpenSelectionFinderAlias,
              .saveFilePreview,
-             .browserBack, .browserForward,
-             .browserReload, .browserHardReload,
              .browserZoomIn, .browserZoomOut, .browserZoomReset,
              .markdownZoomIn, .markdownZoomOut, .markdownZoomReset,
-             .toggleBrowserDeveloperTools,
-             .showBrowserJavaScriptConsole,
-             .toggleBrowserFocusMode,
-             .toggleBrowserDesignMode,
              .diffViewerScrollDown, .diffViewerScrollUp,
              .diffViewerScrollHalfPageDown,
              .diffViewerScrollHalfPageUp,
@@ -61,21 +52,19 @@ extension KeyboardShortcutSettings.Action {
              .diffViewerScrollUpEmacs,
              .diffViewerScrollToBottom,
              .diffViewerScrollToTop,
-             .diffViewerOpenFileSearch,
              .simulatorHome, .simulatorRotateLeft,
              .simulatorRotateRight,
              .simulatorToggleAppearance,
-             .simulatorToggleSoftwareKeyboard,
-             .diffViewerNextFile, .diffViewerPreviousFile:
+             .simulatorToggleSoftwareKeyboard:
             .focusResolved
 
         case .openSettings, .reloadConfiguration,
              .showHideAllWindows, .globalSearch,
              .newWindow, .closeWindow, .toggleFullScreen, .quit,
-             .toggleSidebar, .newTab, .newBrowserWorkspace, .newCloudWorkspace, .newCloudMachine,
+             .toggleSidebar, .newTab,
              .saveLayoutTemplate, .openFolder,
              .reopenPreviousSession, .goToWorkspace,
-             .commandPalette, .sendFeedback,
+             .commandPalette,
              .showNotifications, .jumpToUnread, .toggleUnread,
              .markOldestUnreadAndJumpNext,
              .markAllNotificationsRead, .clearAllNotifications,
@@ -85,7 +74,6 @@ extension KeyboardShortcutSettings.Action {
              .switchRightSidebarToSessions,
              .switchRightSidebarToFeed,
              .switchRightSidebarToDock,
-             .switchRightSidebarToMachines,
              .nextSidebarTab, .prevSidebarTab,
              .nextSidebarTabInGroup, .prevSidebarTabInGroup,
              .moveWorkspaceUp, .moveWorkspaceDown,
@@ -109,20 +97,19 @@ extension KeyboardShortcutSettings.Action {
              .canvasDistributeHorizontally,
              .canvasDistributeVertically,
              .toggleRightSidebar,
-             .findInDirectory,
-             .openDiffViewer:
+             .findInDirectory:
             .mainContainer
         }
     }
 }
 
-/// Routes "create a surface" keyboard shortcuts (New Browser, New Terminal,
+/// Routes "create a surface" keyboard shortcuts (New Terminal,
 /// Split Right/Down) into the Dock when the Dock currently owns keyboard focus.
 ///
 /// Without this, every creation shortcut targets the main content `tabManager`,
-/// so pressing e.g. Cmd+Shift+L while a Dock pane is focused spawned a browser in
+/// so pressing e.g. Cmd+D while a Dock pane is focused spawned a split in
 /// the main split tree instead of the Dock. Mirrors the existing focus-gated
-/// routing in `closeFocusedDockPanelForCommand` (`Workspace+DockBrowserLookup.swift`):
+/// routing in `closeFocusedDockPanelForCommand` (`Workspace+DockSessionRestore.swift`):
 /// the gate is `activeRightSidebarMode == .dock`, and the right-sidebar Dock is
 /// that window's own Dock (`RightSidebarPanelView` renders the per-window store).
 extension AppDelegate {
@@ -160,19 +147,15 @@ extension AppDelegate {
         )
     }
 
-    /// Creates a New Terminal / New Browser surface in the focused Dock pane.
+    /// Creates a New Terminal surface in the focused Dock pane.
     /// Returns the created Dock panel id when handled, or `nil` to fall through to
     /// the main-area creation path.
     @discardableResult
     func routeCreateToFocusedDock(
         _ kind: DockSurfaceKind,
-        focusAddressBar: Bool,
         action: KeyboardShortcutSettings.Action,
         preferredWindow: NSWindow?
     ) -> UUID? {
-        if kind == .browser, !BrowserAvailabilitySettings.isEnabled() {
-            return nil
-        }
         guard let store = focusedDockStoreForShortcut(
                   action: action,
                   preferredWindow: preferredWindow
@@ -185,13 +168,10 @@ extension AppDelegate {
               ) else {
             return nil
         }
-        if focusAddressBar, kind == .browser, let browser = store.browserPanel(for: panelId) {
-            focusBrowserAddressBar(in: browser)
-        }
         return panelId
     }
 
-    /// Splits the focused Dock pane (terminal or browser). Returns `true` when
+    /// Splits the focused Dock pane. Returns `true` when
     /// handled, or `false` to fall through to the main-area split path. Reuses the
     /// main area's `SplitDirection` → orientation/insert mapping so Dock splits
     /// match the main split affordances (Cmd+D = side-by-side, Cmd+Shift+D = stacked).
@@ -202,9 +182,6 @@ extension AppDelegate {
         action: KeyboardShortcutSettings.Action,
         preferredWindow: NSWindow?
     ) -> Bool {
-        if kind == .browser, !BrowserAvailabilitySettings.isEnabled() {
-            return false
-        }
         guard let store = focusedDockStoreForShortcut(
             action: action,
             preferredWindow: preferredWindow
@@ -225,10 +202,6 @@ extension AppDelegate {
             panelId,
             window: preferredWindow
         )
-        if kind == .browser,
-           let browser = store.browserPanel(for: panelId) {
-            _ = focusBrowserAddressBar(in: browser)
-        }
         return true
     }
 

@@ -101,10 +101,6 @@ final class GlobalSearchCoordinator {
         }
     }
 
-    func captureBrowserPanel(_ panel: BrowserPanel) {
-        captureManager.captureBrowserPanel(panel)
-    }
-
     func captureMarkdownPanel(_ panel: MarkdownPanel) {
         captureManager.captureMarkdownPanel(panel)
     }

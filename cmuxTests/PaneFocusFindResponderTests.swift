@@ -345,56 +345,6 @@ struct PaneFocusFindResponderTests {
         return webView
     }
 
-    /// Verifies that a diff viewer WebView yields focus on pane leave.
-    @Test
-    func testDiffViewerFindWebViewIsReleasedWhenPaneFocusMoves() throws {
-        let panel = BrowserPanel(
-            workspaceId: UUID(),
-            renderInitialNavigation: false
-        )
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 300),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        defer {
-            window.orderOut(nil)
-            window.close()
-            panel.close()
-        }
-
-        let webView = try #require(panel.webView as? CmuxWebView)
-        webView.diffViewerFocusStateDidChange(
-            viewer: true,
-            editable: true,
-            rendererReady: true
-        )
-        #expect(
-            panel.isDiffViewerFindOwner,
-            "The fixture must model a ready diff viewer that owns Cmd+F"
-        )
-
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 300))
-        container.addSubview(webView)
-        window.contentView = container
-        window.makeKeyAndOrderFront(nil)
-        #expect(
-            window.makeFirstResponder(webView),
-            "The diff viewer WebView must own first responder before the pane move"
-        )
-        #expect(
-            panel.ownedFocusIntent(for: window.firstResponder ?? window, in: window) == .browser(.webView)
-        )
-
-        panel.unfocus()
-
-        #expect(
-            !responderChainContains(window.firstResponder, target: webView),
-            "Leaving a diff viewer pane must resign the WebView responder"
-        )
-    }
-
     /// Returns whether a responder chain contains the supplied target.
     private func responderChainContains(_ start: NSResponder?, target: NSResponder) -> Bool {
         var current = start

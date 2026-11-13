@@ -10,7 +10,7 @@ import os
 import SQLite3
 
 nonisolated private let sessionIndexLogger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "com.cmuxterm.app",
+    subsystem: Bundle.main.bundleIdentifier ?? "com.comux.app",
     category: "SessionIndexStore"
 )
 
@@ -1285,7 +1285,7 @@ final class SessionIndexStore: ObservableObject {
     /// schema) without requiring the helpers to throw across actor boundaries.
     final class ErrorBag: @unchecked Sendable {
         private static let logger = Logger(
-            subsystem: Bundle.main.bundleIdentifier ?? "com.cmuxterm.app",
+            subsystem: Bundle.main.bundleIdentifier ?? "com.comux.app",
             category: "SessionIndexSearch"
         )
         static let genericProviderFailure = String(

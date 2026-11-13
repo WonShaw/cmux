@@ -34,9 +34,6 @@ public protocol WorkspaceGroupHosting<Tab>: WorkspaceOrderHosting {
         title: String?,
         workingDirectory: String?,
         initialSurface: NewWorkspaceInitialSurface,
-        initialBrowserURL: URL?,
-        initialBrowserOmnibarVisible: Bool,
-        initialBrowserTransparentBackground: Bool,
         inheritWorkingDirectory: Bool,
         select: Bool,
         applyCreationTitleAsCustomTitle: Bool

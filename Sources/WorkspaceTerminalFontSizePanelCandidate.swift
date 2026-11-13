@@ -17,14 +17,6 @@ extension WorkspaceTerminalFontSizePanelDiscovery {
             case .workspaceDock:
                 return workspace?._dockSplit?.panels[panelId]
                     as? TerminalPanel
-            case .remoteMirror(let mirrorId, let paneId):
-                guard let panel = workspace?
-                    .remoteTmuxWindowMirror(forPanelId: mirrorId)?
-                    .panelsByPaneId[paneId],
-                      panel.id == panelId else {
-                    return nil
-                }
-                return panel
             case .windowDock:
                 return windowDock?.panels[panelId] as? TerminalPanel
             }

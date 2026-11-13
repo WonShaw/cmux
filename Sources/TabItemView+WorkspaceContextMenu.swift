@@ -30,14 +30,6 @@ extension TabItemView {
             ? (isMulti ? NotificationMuteMenuOption.unmuteWorkspaces : .unmuteWorkspace).title
             : (isMulti ? NotificationMuteMenuOption.muteWorkspaces : .muteWorkspace).title
         let shouldPin = context.pinState?.pinned ?? !workspaceSnapshot.isPinned
-        let reconnectLabel = contextMenuLabel(
-            multi: String(localized: "contextMenu.reconnectWorkspaces", defaultValue: "Reconnect Workspaces"),
-            single: String(localized: "contextMenu.reconnectWorkspace", defaultValue: "Reconnect Workspace"),
-            isMulti: isMulti)
-        let disconnectLabel = contextMenuLabel(
-            multi: String(localized: "contextMenu.disconnectWorkspaces", defaultValue: "Disconnect Workspaces"),
-            single: String(localized: "contextMenu.disconnectWorkspace", defaultValue: "Disconnect Workspace"),
-            isMulti: isMulti)
         let pinLabel = shouldPin
             ? contextMenuLabel(
                 multi: String(localized: "contextMenu.pinWorkspaces", defaultValue: "Pin Workspaces"),
@@ -139,20 +131,6 @@ extension TabItemView {
             }
         }
 
-        if !context.remoteTargetWorkspaceIds.isEmpty {
-            Divider()
-
-            Button(reconnectLabel) {
-                actions.reconnectTargets(context.remoteTargetWorkspaceIds)
-            }
-            .disabled(context.allRemoteTargetsConnecting)
-
-            Button(disconnectLabel) {
-                actions.disconnectTargets(context.remoteTargetWorkspaceIds)
-            }
-            .disabled(context.allRemoteTargetsDisconnected)
-        }
-
         Menu(String(localized: "contextMenu.workspaceColor", defaultValue: "Workspace Color")) {
             let tabColorPalette = WorkspaceTabColorSettings.palette()
             let currentColorHex = workspaceSnapshot.customColorHex.flatMap {
@@ -193,14 +171,6 @@ extension TabItemView {
                         Text(entry.name)
                     }
                 }
-            }
-        }
-
-        if let copyableSidebarSSHError = workspaceSnapshot.copyableSidebarSSHError {
-            Divider()
-
-            Button(String(localized: "contextMenu.copySshError", defaultValue: "Copy SSH Error")) {
-                WorkspaceSurfaceIdentifierClipboardText.copy(copyableSidebarSSHError)
             }
         }
 

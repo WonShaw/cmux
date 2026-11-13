@@ -133,34 +133,6 @@ import Testing
         #expect(decision.pendingWorkspaceSnapshot == nil)
         #expect(!decision.hasDeferredWorkspaceObservationInvalidation)
     }
-    @Test func contextMenuMediaActivityChangeUpdatesDisplayedGlyphImmediately() {
-        let current = Self.snapshot(
-            remoteConnectionStatusText: "Connected",
-            latestConversationMessage: "old message",
-            listeningPorts: [3000],
-            mediaActivity: BrowserMediaActivity(isPlayingAudio: true)
-        )
-        let next = Self.snapshot(
-            remoteConnectionStatusText: "Disconnected",
-            latestConversationMessage: "new message",
-            listeningPorts: [3000, 4000],
-            mediaActivity: BrowserMediaActivity(isPlayingAudio: false)
-        )
-
-        let decision = SidebarWorkspaceSnapshotRefreshPolicy().decision(
-            current: current,
-            next: next,
-            force: false,
-            contextMenuVisible: true
-        )
-
-        #expect(decision.workspaceSnapshotStorage?.mediaActivity.isPlayingAudio == false)
-        #expect(decision.workspaceSnapshotStorage?.remoteConnectionStatusText == "Connected")
-        #expect(decision.workspaceSnapshotStorage?.latestConversationMessage == "old message")
-        #expect(decision.workspaceSnapshotStorage?.listeningPorts == [3000])
-        #expect(decision.pendingWorkspaceSnapshot == next)
-        #expect(decision.hasDeferredWorkspaceObservationInvalidation)
-    }
     @Test func closedContextMenuStoresNextAndClearsPending() {
         let current = Self.snapshot(title: "old", isPinned: false)
         let next = Self.snapshot(title: "new", isPinned: true)
@@ -187,7 +159,6 @@ import Testing
         latestConversationMessage: String? = nil,
         listeningPorts: [Int] = [],
         finderDirectoryPath: String? = nil,
-        mediaActivity: BrowserMediaActivity = BrowserMediaActivity(),
         activeCodingAgentCount: Int = 0
     ) -> SidebarWorkspaceSnapshotBuilder.Snapshot {
         SidebarWorkspaceSnapshotBuilder.Snapshot(
@@ -214,10 +185,8 @@ import Testing
             compactBranchDirectoryCandidates: [],
             branchDirectoryLines: [],
             branchLinesContainBranch: false,
-            pullRequestRows: [],
             listeningPorts: listeningPorts,
             finderDirectoryPath: finderDirectoryPath,
-            mediaActivity: mediaActivity,
             taskStatus: nil,
             todoStatusMenuModel: nil,
             hasManualTaskStatus: false,
@@ -239,7 +208,6 @@ import Testing
             showsLog: true,
             showsProgress: true,
             showsBranchDirectory: true,
-            showsPullRequests: true,
             showsPorts: true
         )
     ) -> SidebarWorkspaceSnapshotBuilder.PresentationKey {

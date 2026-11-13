@@ -46,7 +46,6 @@ struct AgentHookDeliveryEvent: Sendable {
     let subcommand: String
     let payload: String
     let socketPath: String
-    let relayBacked: Bool
     let environment: [String: String]
     let sessionID: String?
     private(set) var queueAdmissionInstant: ContinuousClock.Instant?
@@ -107,7 +106,6 @@ struct AgentHookDeliveryEvent: Sendable {
               !socketPath.isEmpty,
               socketPath.utf8.count <= 4_096,
               !socketPath.contains("\0"),
-              params["relay_backed"] == nil || params["relay_backed"] is Bool,
               let environment = Self.validatedEnvironment(params["environment"], agent: agent) else {
             return nil
         }
@@ -115,7 +113,6 @@ struct AgentHookDeliveryEvent: Sendable {
         self.subcommand = subcommand
         self.payload = payload
         self.socketPath = socketPath
-        self.relayBacked = params["relay_backed"] as? Bool ?? false
         self.environment = environment
         self.sessionID = Self.sessionID(from: payload)
         self.queueAdmissionInstant = nil
@@ -258,79 +255,5 @@ struct AgentHookDeliveryEvent: Sendable {
             totalBytes += entryBytes
         }
         return validated
-    }
-}
-
-@MainActor
-extension TerminalController {
-    /// Resolves portable relay TTY evidence against the app's current surface
-    /// registry before an event or barrier receives its delivery-lane identity.
-    func agentHookParametersResolvingRelayTTY(_ params: [String: Any]) -> [String: Any] {
-        guard params["relay_backed"] as? Bool == true,
-              let rawCallerTTY = params["caller_tty"] as? String,
-              rawCallerTTY.utf8.count <= 256,
-              !rawCallerTTY.contains("\0"),
-              let callerTTY = TerminalCallerTTYResolver.normalizedName(rawCallerTTY),
-              var environment = params["environment"] as? [String: String] else {
-            return params
-        }
-
-        func workspace(for rawID: Any?) -> Workspace? {
-            guard let rawID = rawID as? String,
-                  rawID.utf8.count <= 64,
-                  !rawID.contains("\0"),
-                  let workspaceID = UUID(uuidString: rawID) else {
-                return nil
-            }
-            if let workspace = tabManager?.tabs.first(where: { $0.id == workspaceID }) {
-                return workspace
-            }
-            return AppDelegate.shared?
-                .tabManagerFor(tabId: workspaceID)?
-                .tabs
-                .first(where: { $0.id == workspaceID })
-        }
-
-        // Relay alias rewriting has already converted these IDs to local UUIDs.
-        // When they still identify a live panel, they are stronger evidence than
-        // a portable TTY and avoid any registry search.
-        if let rawWorkspaceID = environment["CMUX_WORKSPACE_ID"],
-           let rawSurfaceID = environment["CMUX_SURFACE_ID"],
-           rawSurfaceID.utf8.count <= 64,
-           !rawSurfaceID.contains("\0"),
-           let surfaceID = UUID(uuidString: rawSurfaceID),
-           let workspace = workspace(for: rawWorkspaceID),
-           workspace.panels[surfaceID] != nil {
-            return params
-        }
-
-        // The relay rewriter injects its owning local workspace. Restrict the
-        // TTY fallback to that workspace so one hook does not enumerate every
-        // window/workspace/surface on the main actor.
-        guard let workspace = workspace(for: params["_cmux_remote_workspace_id"]) else {
-            return params
-        }
-        var candidates: [(binding: TerminalCallerTTYBinding, ttyName: String)] = []
-        for (surfaceID, ttyName) in workspace.surfaceTTYNames
-            where workspace.panels[surfaceID] != nil {
-            candidates.append((
-                binding: TerminalCallerTTYBinding(
-                    workspaceId: workspace.id,
-                    surfaceId: surfaceID
-                ),
-                ttyName: ttyName
-            ))
-        }
-        guard let binding = TerminalCallerTTYResolver(
-            reportedCandidates: candidates
-        ).binding(for: callerTTY) else {
-            return params
-        }
-
-        environment["CMUX_WORKSPACE_ID"] = binding.workspaceId.uuidString
-        environment["CMUX_SURFACE_ID"] = binding.surfaceId.uuidString
-        var resolved = params
-        resolved["environment"] = environment
-        return resolved
     }
 }

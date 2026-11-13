@@ -3,7 +3,7 @@ import OSLog
 import WebKit
 
 nonisolated private let browserNavigationDecisionHandlerLogger = Logger(
-    subsystem: "com.cmuxterm.app",
+    subsystem: "com.comux.app",
     category: "BrowserNavigationDecision"
 )
 

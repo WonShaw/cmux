@@ -221,6 +221,22 @@ extension ControlCommandCoordinator {
         )
     }
 
+    /// Rejects the removed `browser` surface type explicitly, so creation
+    /// RPCs do not silently fall back to a terminal for it.
+    func unsupportedSurfaceTypeError(
+        _ params: [String: JSONValue]
+    ) -> ControlCallResult? {
+        guard let typeRaw = string(params, "type"),
+              normalizedToken(typeRaw) == "browser" else {
+            return nil
+        }
+        return .err(
+            code: "invalid_params",
+            message: "Unsupported surface type",
+            data: .object(["type": .string(typeRaw)])
+        )
+    }
+
     /// `v2InitialDividerPosition`: optional clamped `[0.1, 0.9]` divider, or an
     /// `invalid_params` error when present-but-non-numeric.
     func initialDividerPosition(

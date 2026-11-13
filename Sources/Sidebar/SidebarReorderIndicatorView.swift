@@ -1,6 +1,6 @@
 import AppKit
 
-/// The insertion line shared by local workspace rows and the Cloud outline.
+/// The insertion line shared by local workspace rows.
 @MainActor
 final class SidebarReorderIndicatorView: NSView {
     nonisolated static let thickness: CGFloat = 2

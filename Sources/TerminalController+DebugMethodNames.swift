@@ -1,10 +1,6 @@
 #if DEBUG
 extension TerminalController {
     nonisolated static let v2DebugMethodNames: [String] = [
-        "remote.tmux.test_exec",
-        "remote.tmux.test_set_frame",
-        "remote.tmux.test_perturb_divider",
-        "remote.tmux.sizing_settled",
         "debug.shortcut.set",
         "debug.shortcut.simulate",
         "debug.type",
@@ -12,7 +8,6 @@ extension TerminalController {
         "debug.textbox.interact",
         "debug.app.activate",
         "debug.workspace_todo.checklist_add_field",
-        "debug.pro_welcome_checklist.show",
         "debug.command_palette.toggle",
         "debug.command_palette.rename_tab.open",
         "debug.command_palette.visible",
@@ -22,8 +17,6 @@ extension TerminalController {
         "debug.command_palette.rename_input.delete_backward",
         "debug.command_palette.rename_input.selection",
         "debug.command_palette.rename_input.select_all",
-        "debug.browser.address_bar_focused",
-        "debug.browser.favicon",
         "debug.right_sidebar.focus",
         "debug.sidebar.visible",
         "debug.terminal.is_focused",
@@ -46,12 +39,8 @@ extension TerminalController {
         "debug.session_snapshot_benchmark",
         "debug.session_snapshot_seed_scrollback",
         "debug.window.screenshot",
-        "debug.cloudtree.gallery",
         "debug.terminal.simulate_file_drop",
         "debug.sidebar.simulate_drag",
-        "debug.mobile.transport.disconnect",
-        "debug.mobile.transport.reconnect_loop",
-        "mobile.dev_stack_auth.configure",
     ]
 }
 #endif

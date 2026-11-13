@@ -1,13 +1,12 @@
 public import Foundation
 
 /// The outcome of `pane.create`, preserving every distinct branch of the legacy
-/// `v2PaneCreate` body — including its delegation to the browser-disabled
-/// external-open path — and the created-pane identity it echoes back.
+/// `v2PaneCreate` body and the created-pane identity it echoes back.
 ///
 /// The coordinator parses the primitive inputs (direction string, type string,
 /// url, working directory, commands, environment, initial divider) and shapes
 /// the final `JSONValue`; the seam runs all the app-coupled work (panel-type
-/// resolution, browser-availability check, the split creation) and returns this.
+/// resolution, the split creation) and returns this.
 public enum ControlPaneCreateResolution: Sendable, Equatable {
     /// No TabManager resolved (legacy `unavailable` / "TabManager not
     /// available").
@@ -27,7 +26,7 @@ public enum ControlPaneCreateResolution: Sendable, Equatable {
     /// (legacy `invalid_params` / "agent-session is only supported by
     /// surface.create", `data: {"type": rawValue}`). Carries the raw type value.
     case agentSessionRejected(typeRawValue: String)
-    /// Dock placement only supports terminal and browser panes. Carries the raw
+    /// Dock placement only supports terminal panes. Carries the raw
     /// type and the localized message produced by the app seam.
     case dockUnsupportedType(typeRawValue: String, message: String)
     /// Dock placement was requested while the Dock sidebar mode is unavailable.
@@ -36,30 +35,6 @@ public enum ControlPaneCreateResolution: Sendable, Equatable {
     /// Dock placement was requested with selectors that name different window
     /// Docks. Carries the localized message produced by the app seam.
     case dockConflictingRoutingSelectors(message: String)
-    /// A browser split was requested while the cmux browser is disabled and an
-    /// invalid URL was supplied (legacy `invalid_params` / "Invalid URL",
-    /// `data: {"url": rawURL}`). Carries the raw URL string.
-    case browserDisabledInvalidURL(rawURL: String)
-    /// A browser split was requested while the cmux browser is disabled and no
-    /// URL was supplied (legacy `browser_disabled` / "cmux browser is
-    /// disabled", `data: nil`).
-    case browserDisabledNoURL
-    /// A browser split was requested while the cmux browser is disabled and the
-    /// external open failed (legacy `external_open_failed` / "Failed to open URL
-    /// externally", `data: {"url": absoluteString}`). Carries the URL string.
-    case browserDisabledExternalOpenFailed(url: String)
-    /// A browser split was requested while the cmux browser is disabled and the
-    /// URL opened externally (legacy `ok`, the external-open payload). Carries
-    /// the resolved window (may be absent) and the opened URL string.
-    case browserDisabledOpenedExternally(windowID: UUID?, url: String)
-    /// An explicit browser profile selector did not identify exactly one
-    /// profile. An empty candidate list means no profile matched; otherwise the
-    /// candidates share the requested display name.
-    case invalidBrowserProfile(
-        selector: String,
-        message: String,
-        candidates: [ControlPaneBrowserProfileCandidate]
-    )
     /// A TabManager resolved but no workspace did (legacy `not_found` /
     /// "Workspace not found", `data: nil`).
     case workspaceNotFound
@@ -69,12 +44,8 @@ public enum ControlPaneCreateResolution: Sendable, Equatable {
     /// The split creation failed (legacy `internal_error` / "Failed to create
     /// pane", `data: nil`).
     case createFailed
-    /// The request carried options the routed remote tmux `split-window`
-    /// cannot honor; rejected BEFORE the remote session was mutated (an error
-    /// after the mutation invites retries that duplicate remote panes).
-    case mirrorUnsupportedOptions([String])
-    /// The split was routed to the remote tmux mirror backing the workspace;
-    /// the pane arrives asynchronously via `%layout-change`.
+    /// The split was routed to the terminal's remote owner; the pane arrives
+    /// asynchronously.
     case routedToRemote(windowID: UUID?, workspaceID: UUID, typeRawValue: String)
     /// The pane was created in the right-sidebar Dock. Dock handles are scoped to
     /// the Dock container and are not ordinary workspace surface/pane ids.

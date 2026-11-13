@@ -1,11 +1,7 @@
 @preconcurrency import XCTest
 import CmuxAppKitSupportUI
 import CmuxSettings
-import CmuxBrowser
 import CmuxCore
-import CmuxRemoteDaemon
-import CmuxRemoteSession
-import CmuxRemoteWorkspace
 import CmuxFoundation
 import AppKit
 import Combine
@@ -217,7 +213,7 @@ final class GhosttyConfigTests: XCTestCase {
 
         XCTAssertTrue(
             paths.contains(
-                "\(NSHomeDirectory())/Library/Application Support/com.cmuxterm.app/themes/Zag Light"
+                "\(NSHomeDirectory())/Library/Application Support/com.comux.app/themes/Zag Light"
             )
         )
     }
@@ -232,7 +228,7 @@ final class GhosttyConfigTests: XCTestCase {
 
         XCTAssertTrue(
             paths.contains(
-                "\(fixedHome)/Library/Application Support/com.cmuxterm.app/themes/Zag Light"
+                "\(fixedHome)/Library/Application Support/com.comux.app/themes/Zag Light"
             )
         )
     }
@@ -245,7 +241,7 @@ final class GhosttyConfigTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         let themesDirectory = root
-            .appendingPathComponent("Library/Application Support/com.cmuxterm.app/themes", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/com.comux.app/themes", isDirectory: true)
         try fileManager.createDirectory(at: themesDirectory, withIntermediateDirectories: true)
         try "background = #ffffff\nforeground = #1f2328\n".write(
             to: themesDirectory.appendingPathComponent("Zag Light", isDirectory: false),
@@ -1302,39 +1298,6 @@ final class GhosttyConfigTests: XCTestCase {
         XCTAssertFalse(AgentIntegrationSettingsStore(defaults: defaults).suppressesSubagentNotifications)
     }
 
-    func testTelemetryDefaultsToEnabledWhenUnset() {
-        let suiteName = "cmux.tests.telemetry.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            XCTFail("Failed to create isolated user defaults suite")
-            return
-        }
-        defer {
-            defaults.removePersistentDomain(forName: suiteName)
-        }
-
-        let telemetry = AppCatalogSection().sendAnonymousTelemetry
-        defaults.removeObject(forKey: telemetry.userDefaultsKey)
-        XCTAssertTrue(telemetry.value(in: defaults))
-    }
-
-    func testTelemetryRespectsStoredPreference() {
-        let suiteName = "cmux.tests.telemetry.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            XCTFail("Failed to create isolated user defaults suite")
-            return
-        }
-        defer {
-            defaults.removePersistentDomain(forName: suiteName)
-        }
-
-        let telemetry = AppCatalogSection().sendAnonymousTelemetry
-        defaults.set(true, forKey: telemetry.userDefaultsKey)
-        XCTAssertTrue(telemetry.value(in: defaults))
-
-        defaults.set(false, forKey: telemetry.userDefaultsKey)
-        XCTAssertFalse(telemetry.value(in: defaults))
-    }
-
     private func rgb255(_ color: NSColor) -> RGB {
         let srgb = color.usingColorSpace(.sRGB)!
         var red: CGFloat = 0
@@ -1920,753 +1883,6 @@ final class RemoteLoopbackHTTPRequestRewriterTests: XCTestCase {
 }
 
 
-@MainActor
-final class BrowserPanelPopupContextTests: XCTestCase {
-    func testFloatingPopupInheritsOpenerBrowserContext() throws {
-        let panel = BrowserPanel(workspaceId: UUID(), isRemoteWorkspace: false)
-        let popupWebView = try XCTUnwrap(
-            panel.createFloatingPopup(
-                configuration: WKWebViewConfiguration(),
-                windowFeatures: WKWindowFeatures()
-            )
-        )
-        defer { popupWebView.window?.close() }
-
-        XCTAssertTrue(
-            popupWebView.configuration.websiteDataStore === panel.webView.configuration.websiteDataStore
-        )
-    }
-
-    func testFloatingPopupInheritsRemoteWorkspaceWebsiteDataStore() throws {
-        let remoteWorkspaceId = UUID()
-        let panel = BrowserPanel(
-            workspaceId: remoteWorkspaceId,
-            isRemoteWorkspace: true,
-            remoteWebsiteDataStoreIdentifier: remoteWorkspaceId
-        )
-        let popupWebView = try XCTUnwrap(
-            panel.createFloatingPopup(
-                configuration: WKWebViewConfiguration(),
-                windowFeatures: WKWindowFeatures()
-            )
-        )
-        defer { popupWebView.window?.close() }
-
-        XCTAssertTrue(
-            popupWebView.configuration.websiteDataStore === panel.webView.configuration.websiteDataStore
-        )
-        XCTAssertFalse(popupWebView.configuration.websiteDataStore === WKWebsiteDataStore.default())
-    }
-}
-
-@MainActor
-final class BrowserPanelWebViewLifecycleTests: XCTestCase {
-    func testHiddenDiscardPolicyReadsUserDefaults() throws {
-        let suiteName = "cmux.browserHiddenDiscardPolicyTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer {
-            defaults.removePersistentDomain(forName: suiteName)
-        }
-        let hasEnabledEnvironmentOverride =
-            ProcessInfo.processInfo.environment["CMUX_BROWSER_HIDDEN_WEBVIEW_DISCARD_ENABLED"] != nil
-        let hasDelayEnvironmentOverride =
-            ProcessInfo.processInfo.environment["CMUX_BROWSER_HIDDEN_WEBVIEW_DISCARD_DELAY_SECONDS"] != nil
-
-        if !hasEnabledEnvironmentOverride {
-            XCTAssertEqual(
-                BrowserHiddenWebViewDiscardPolicy.isEnabled(defaults: defaults),
-                BrowserHiddenWebViewDiscardPolicy.defaultEnabled
-            )
-        }
-        if !hasDelayEnvironmentOverride {
-            XCTAssertEqual(
-                BrowserHiddenWebViewDiscardPolicy.hiddenDelay(defaults: defaults),
-                BrowserHiddenWebViewDiscardPolicy.defaultHiddenDelay
-            )
-        }
-
-        defaults.set(false, forKey: BrowserHiddenWebViewDiscardPolicy.enabledKey)
-        defaults.set(42.5, forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
-
-        if !hasEnabledEnvironmentOverride {
-            XCTAssertEqual(defaults.object(forKey: BrowserHiddenWebViewDiscardPolicy.enabledKey) as? Bool, false)
-            XCTAssertFalse(BrowserHiddenWebViewDiscardPolicy.isEnabled(defaults: defaults))
-        }
-        if !hasDelayEnvironmentOverride {
-            XCTAssertEqual(BrowserHiddenWebViewDiscardPolicy.hiddenDelay(defaults: defaults), 42.5)
-
-            defaults.set(7200, forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
-            XCTAssertEqual(
-                BrowserHiddenWebViewDiscardPolicy.hiddenDelay(defaults: defaults),
-                BrowserHiddenWebViewDiscardPolicy.maximumHiddenDelay
-            )
-
-            defaults.set(-1, forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
-            XCTAssertEqual(
-                BrowserHiddenWebViewDiscardPolicy.hiddenDelay(defaults: defaults),
-                BrowserHiddenWebViewDiscardPolicy.defaultHiddenDelay
-            )
-        }
-    }
-
-    func testLifecycleDistinguishesDeferredURLFromNewTab() {
-        let panel = BrowserPanel(
-            workspaceId: UUID(),
-            initialURL: URL(string: "https://example.test/")!,
-            renderInitialNavigation: false,
-            isRemoteWorkspace: false
-        )
-        defer { panel.close() }
-
-        XCTAssertEqual(panel.webViewLifecycleState, .deferredURL)
-
-        panel.noteWebViewVisibility(true, reason: "test.visible")
-
-        XCTAssertEqual(panel.webViewLifecycleState, .deferredURL)
-    }
-
-    func testBackgroundInitialNavigationOwnsHeadlessWebKitHostBeforeViewAppears() {
-        let panel = BrowserPanel(
-            workspaceId: UUID(),
-            initialURL: URL(string: "about:blank")!,
-            preloadInitialNavigationInBackground: true,
-            isRemoteWorkspace: false
-        )
-        defer { panel.close() }
-
-        XCTAssertTrue(panel.shouldRenderWebView)
-        XCTAssertEqual(panel.webViewLifecycleState, .liveHidden)
-        XCTAssertTrue(panel.hasBackgroundPreloadHost)
-        XCTAssertNotNil(panel.webView.window)
-        XCTAssertEqual(panel.webView.window?.isVisible, true)
-        XCTAssertLessThan(panel.webView.window?.frame.minX ?? 0, -9_000)
-    }
-
-    func testBackgroundInitialNavigationDoesNotExposeHiddenHostAsModalParent() {
-        let panel = BrowserPanel(
-            workspaceId: UUID(),
-            initialURL: URL(string: "about:blank")!,
-            preloadInitialNavigationInBackground: true,
-            isRemoteWorkspace: false
-        )
-        defer { panel.close() }
-
-        XCTAssertTrue(panel.hasBackgroundPreloadHost)
-        XCTAssertNotNil(panel.webView.window)
-        XCTAssertNil(browserInteractiveModalHostWindow(for: panel.webView))
-    }
-
-    func testBackgroundPreloadHostStaysOpenUntilWebViewHasRealWindow() {
-        let panel = BrowserPanel(
-            workspaceId: UUID(),
-            initialURL: URL(string: "about:blank")!,
-            preloadInitialNavigationInBackground: true,
-            isRemoteWorkspace: false
-        )
-        defer { panel.close() }
-
-        XCTAssertTrue(panel.hasBackgroundPreloadHost)
-        panel.webView.removeFromSuperview()
-
-        XCTAssertNil(panel.webView.window)
-
-        panel.releaseBackgroundPreloadHostIfAttachedToRealWindow(reason: "test.detached")
-
-        XCTAssertTrue(panel.hasBackgroundPreloadHost)
-    }
-
-    func testBackgroundPreloadIsConsumedByInitialNavigation() {
-        let panel = BrowserPanel(
-            workspaceId: UUID(),
-            initialURL: URL(string: "about:blank")!,
-            preloadInitialNavigationInBackground: true,
-            isRemoteWorkspace: false
-        )
-        defer { panel.close() }
-
-        XCTAssertTrue(panel.hasBackgroundPreloadHost)
-
-        let frame = NSRect(x: 0, y: 0, width: 800, height: 600)
-        let realHostWindow = NSWindow(
-            contentRect: frame,
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: false
-        )
-        // AppKit defaults to isReleasedWhenClosed, so the close() below would release a
-        // window ARC still owns and the over-release lands in a later autorelease pool drain.
-        realHostWindow.isReleasedWhenClosed = false
-        defer {
-            realHostWindow.contentView = nil
-            realHostWindow.close()
-        }
-        let contentView = NSView(frame: frame)
-        realHostWindow.contentView = contentView
-        panel.webView.removeFromSuperview()
-        contentView.addSubview(panel.webView)
-
-        panel.releaseBackgroundPreloadHostIfAttachedToRealWindow(reason: "test.realWindow")
-
-        XCTAssertFalse(panel.hasBackgroundPreloadHost)
-
-        panel.webView.removeFromSuperview()
-        realHostWindow.contentView = nil
-        panel.navigate(to: URL(string: "about:blank#second")!)
-
-        XCTAssertFalse(panel.hasBackgroundPreloadHost)
-    }
-
-    func testLifecycleTracksVisibleHiddenAndClosingStates() {
-        let hiddenAt = Date(timeIntervalSince1970: 100)
-        let duplicateHiddenAt = hiddenAt.addingTimeInterval(10)
-        let now = hiddenAt.addingTimeInterval(11.25)
-        let panel = BrowserPanel(
-            workspaceId: UUID(),
-            initialURL: URL(string: "https://example.test/")!,
-            isRemoteWorkspace: false
-        )
-
-        XCTAssertEqual(panel.webViewLifecycleState, .liveHidden)
-
-        panel.noteWebViewVisibility(true, reason: "test.visible", now: hiddenAt)
-        XCTAssertEqual(panel.webViewLifecycleState, .liveVisible)
-
-        panel.noteWebViewVisibility(false, reason: "test.hidden", now: hiddenAt)
-        XCTAssertEqual(panel.webViewLifecycleState, .liveHidden)
-        panel.noteWebViewVisibility(
-            false,
-            reason: "test.hidden.duplicate",
-            now: duplicateHiddenAt,
-            recordIfUnchanged: true
-        )
-
-        let payload = panel.webViewLifecycleTopPayload(now: now)
-        XCTAssertEqual(payload["state"] as? String, "live_hidden")
-        XCTAssertEqual(payload["visible_in_ui"] as? Bool, false)
-        XCTAssertEqual(payload["should_render"] as? Bool, true)
-        XCTAssertEqual(payload["last_visibility_change_reason"] as? String, "test.hidden")
-        XCTAssertEqual(payload["hidden_duration_ms"] as? Int, 11250)
-
-        panel.close()
-        XCTAssertEqual(panel.webViewLifecycleState, .closing)
-    }
-
-    func testDiscardReplacesHiddenWebViewAndRestoresOnDemand() {
-        let discardedAt = Date(timeIntervalSince1970: 200)
-        let panel = BrowserPanel(
-            workspaceId: UUID(),
-            initialURL: URL(string: "about:blank")!,
-            isRemoteWorkspace: false
-        )
-        defer { panel.close() }
-
-        let deadline = Date().addingTimeInterval(1.0)
-        while panel.webView.isLoading,
-              RunLoop.main.run(mode: .default, before: deadline),
-              Date() < deadline {}
-        XCTAssertFalse(panel.webView.isLoading, "Timed out waiting for about:blank to finish loading")
-
-        panel.noteWebViewVisibility(false, reason: "test.hidden", now: discardedAt)
-        let originalWebView = panel.webView
-
-        XCTAssertTrue(panel.discardHiddenWebViewForMemory(reason: "test.discard", now: discardedAt))
-        XCTAssertFalse(panel.webView === originalWebView)
-        XCTAssertFalse(panel.shouldRenderWebView)
-        XCTAssertEqual(panel.webViewLifecycleState, .discarded)
-
-        let discardedPayload = panel.webViewLifecycleTopPayload(now: discardedAt)
-        XCTAssertEqual(discardedPayload["state"] as? String, "discarded")
-        XCTAssertEqual(discardedPayload["last_discard_reason"] as? String, "test.discard")
-        XCTAssertNotNil(discardedPayload["discarded_at"] as? String)
-
-        var observedStates: [BrowserWebViewLifecycleState] = []
-        var cancellable: AnyCancellable?
-        cancellable = panel.$webViewLifecycleState.sink { state in
-            observedStates.append(state)
-        }
-        defer { cancellable?.cancel() }
-
-        XCTAssertTrue(panel.restoreDiscardedWebViewIfNeeded(reason: "test.restore"))
-        XCTAssertTrue(panel.shouldRenderWebView)
-        XCTAssertEqual(panel.webViewLifecycleState, .liveHidden)
-        XCTAssertFalse(observedStates.contains(.newTab), "Restore emitted unexpected states: \(observedStates)")
-
-        panel.noteWebViewVisibility(true, reason: "test.visible")
-        XCTAssertEqual(panel.webViewLifecycleState, .liveVisible)
-    }
-
-    /// Regression guard for the issue #5303 render loop: `BrowserPanelView.onAppear`
-    /// re-fired on every CoreAnimation commit and re-asserted webview visibility,
-    /// which restored + re-navigated the webview repeatedly. Once the webview is live
-    /// and visible, redundant visibility notifications (the shape a spurious appear
-    /// produces) must be no-ops: no lifecycle churn and no webview replacement, so no
-    /// re-navigation is issued.
-    func testRedundantVisibleNotificationsDoNotChurnLiveWebView() {
-        let panel = BrowserPanel(
-            workspaceId: UUID(),
-            initialURL: URL(string: "about:blank")!,
-            isRemoteWorkspace: false
-        )
-        defer { panel.close() }
-
-        let deadline = Date().addingTimeInterval(1.0)
-        while panel.webView.isLoading,
-              RunLoop.main.run(mode: .default, before: deadline),
-              Date() < deadline {}
-        XCTAssertFalse(panel.webView.isLoading, "Timed out waiting for about:blank to finish loading")
-
-        panel.noteWebViewVisibility(true, reason: "test.visible.first")
-        XCTAssertEqual(panel.webViewLifecycleState, .liveVisible)
-
-        let webViewAfterFirst = panel.webView
-        let instanceIDAfterFirst = panel.webViewInstanceID
-        let reasonAfterFirst = panel.webViewLastVisibilityChangeReason
-        let changeAtAfterFirst = panel.webViewLastVisibilityChangeAt
-
-        var observedStates: [BrowserWebViewLifecycleState] = []
-        var cancellable: AnyCancellable?
-        cancellable = panel.$webViewLifecycleState.dropFirst().sink { state in
-            observedStates.append(state)
-        }
-        defer { cancellable?.cancel() }
-
-        // Simulate `.onAppear` re-firing many times in one commit storm.
-        for index in 0..<32 {
-            panel.noteWebViewVisibility(true, reason: "test.visible.spurious-\(index)")
-        }
-
-        XCTAssertEqual(panel.webViewLifecycleState, .liveVisible)
-        XCTAssertTrue(observedStates.isEmpty, "Redundant visible notes churned lifecycle: \(observedStates)")
-        XCTAssertTrue(panel.webView === webViewAfterFirst, "A live webview must not be replaced by redundant visibility notes")
-        XCTAssertEqual(panel.webViewInstanceID, instanceIDAfterFirst)
-        XCTAssertEqual(
-            panel.webViewLastVisibilityChangeReason,
-            reasonAfterFirst,
-            "Redundant visible notes must early-return without recording a new transition"
-        )
-        XCTAssertEqual(panel.webViewLastVisibilityChangeAt, changeAtAfterFirst)
-    }
-
-    func testRestoredHistoryBackDoesNotEmitNewTabLifecycleState() {
-        let discardedAt = Date(timeIntervalSince1970: 300)
-        let panel = BrowserPanel(
-            workspaceId: UUID(),
-            initialURL: URL(string: "about:blank")!,
-            isRemoteWorkspace: false
-        )
-        defer { panel.close() }
-
-        let deadline = Date().addingTimeInterval(1.0)
-        while panel.webView.isLoading,
-              RunLoop.main.run(mode: .default, before: deadline),
-              Date() < deadline {}
-        XCTAssertFalse(panel.webView.isLoading, "Timed out waiting for about:blank to finish loading")
-
-        panel.restoreSessionNavigationHistory(
-            backHistoryURLStrings: ["https://example.test/back"],
-            forwardHistoryURLStrings: [],
-            currentURLString: "https://example.test/current"
-        )
-        XCTAssertTrue(panel.canGoBack)
-
-        panel.noteWebViewVisibility(false, reason: "test.hidden", now: discardedAt)
-        XCTAssertTrue(panel.discardHiddenWebViewForMemory(reason: "test.discard", now: discardedAt))
-        XCTAssertEqual(panel.webViewLifecycleState, .discarded)
-
-        var observedStates: [BrowserWebViewLifecycleState] = []
-        var cancellable: AnyCancellable?
-        cancellable = panel.$webViewLifecycleState.sink { state in
-            observedStates.append(state)
-        }
-        defer { cancellable?.cancel() }
-
-        panel.goBack()
-
-        XCTAssertFalse(observedStates.contains(.newTab), "Back restore emitted unexpected states: \(observedStates)")
-        XCTAssertEqual(panel.webViewLifecycleState, .liveHidden)
-    }
-}
-
-@MainActor
-final class BrowserDefaultsNormalizationTests: XCTestCase {
-    /// The legacy forced-dark-mode migration must run through the same defaults
-    /// normalization entry point used at app startup. Registering a fallback for
-    /// `modeKey` before reading the legacy value makes an unset key look like an
-    /// explicit `.system` choice and silently skips the migration.
-    func testNormalizeMigratesLegacyForcedDarkModeBeforeDefaultFallbackRegistration() throws {
-        let suiteName = "cmux.browserDefaultsLegacyThemeMigrationTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        defaults.removeObject(forKey: BrowserThemeSettings.modeKey)
-        defaults.set(true, forKey: BrowserThemeSettings.legacyForcedDarkModeEnabledKey)
-
-        BrowserPanel.normalizeBrowserDefaults(defaults: defaults)
-
-        XCTAssertEqual(BrowserThemeSettings.mode(defaults: defaults), .dark)
-        XCTAssertEqual(
-            defaults.string(forKey: BrowserThemeSettings.modeKey),
-            BrowserThemeMode.dark.rawValue
-        )
-    }
-
-    /// Moving default registration + settings normalization out of
-    /// `BrowserPanelView.onAppear` into the model bootstrap (issue #5303) keeps the
-    /// canonicalization behavior: an out-of-range or legacy raw value stored in
-    /// defaults is rewritten to its canonical form, and registered fallbacks are
-    /// available for unset keys.
-    func testNormalizeRewritesOutOfRangeAndLegacyValues() throws {
-        let suiteName = "cmux.browserDefaultsNormalizationTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        // Out-of-range / invalid raw values that must be canonicalized.
-        defaults.set("not-a-real-mode", forKey: BrowserThemeSettings.modeKey)
-        defaults.set("not-a-real-variant", forKey: BrowserImportHintSettings.variantKey)
-        defaults.set(999, forKey: BrowserToolbarAccessorySpacingDebugSettings.key)
-        defaults.set(999.0, forKey: BrowserProfilePopoverDebugSettings.horizontalPaddingKey)
-        defaults.set(-5.0, forKey: BrowserProfilePopoverDebugSettings.verticalPaddingKey)
-
-        BrowserPanel.normalizeBrowserDefaults(defaults: defaults)
-
-        XCTAssertEqual(defaults.string(forKey: BrowserThemeSettings.modeKey), BrowserThemeSettings.defaultMode.rawValue)
-        XCTAssertEqual(defaults.string(forKey: BrowserImportHintSettings.variantKey), BrowserImportHintSettings.defaultVariant.rawValue)
-        XCTAssertEqual(defaults.integer(forKey: BrowserToolbarAccessorySpacingDebugSettings.key), BrowserToolbarAccessorySpacingDebugSettings.defaultSpacing)
-        XCTAssertEqual(defaults.double(forKey: BrowserProfilePopoverDebugSettings.horizontalPaddingKey), BrowserProfilePopoverDebugSettings.defaultHorizontalPadding, accuracy: 0.0001)
-        XCTAssertEqual(defaults.double(forKey: BrowserProfilePopoverDebugSettings.verticalPaddingKey), BrowserProfilePopoverDebugSettings.defaultVerticalPadding, accuracy: 0.0001)
-
-        // Registered fallbacks are available for keys that were never set.
-        XCTAssertEqual(defaults.string(forKey: BrowserSearchSettingsStore.searchEngineKey), BrowserSearchSettingsStore.defaultSearchEngine.rawValue)
-    }
-
-    /// Already-canonical, in-range values must be left untouched (no clobbering of
-    /// valid user settings during normalization).
-    func testNormalizePreservesValidValues() throws {
-        let suiteName = "cmux.browserDefaultsNormalizationTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        let validSpacing = BrowserToolbarAccessorySpacingDebugSettings.supportedValues.last ?? BrowserToolbarAccessorySpacingDebugSettings.defaultSpacing
-        // Resolve the app-target theme mode via the app-only settings type; the bare
-        // `BrowserThemeMode` is ambiguous here because this file also imports
-        // `CmuxSettings`, which declares a same-named enum.
-        let validThemeRaw = BrowserThemeSettings.mode(for: "dark").rawValue
-        defaults.set(validThemeRaw, forKey: BrowserThemeSettings.modeKey)
-        defaults.set(validSpacing, forKey: BrowserToolbarAccessorySpacingDebugSettings.key)
-
-        BrowserPanel.normalizeBrowserDefaults(defaults: defaults)
-
-        XCTAssertEqual(defaults.string(forKey: BrowserThemeSettings.modeKey), validThemeRaw)
-        XCTAssertEqual(defaults.integer(forKey: BrowserToolbarAccessorySpacingDebugSettings.key), validSpacing)
-    }
-}
-
-final class BrowserNewTabNavigationSeedTests: XCTestCase {
-    func testPreservesOriginalRequestHeadersMethodBodyAndBypassHost() throws {
-        let url = try XCTUnwrap(URL(string: "https://www.linkedin.com/redir/redirect?url=https%3A%2F%2Fexample.com"))
-        let body = Data("payload=1".utf8)
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
-        request.httpMethod = "POST"
-        request.httpBody = body
-        request.setValue("https://www.linkedin.com/feed/", forHTTPHeaderField: "Referer")
-        request.setValue("keep-me", forHTTPHeaderField: "X-Cmux-Test")
-
-        let seed = try XCTUnwrap(
-            browserNewTabNavigationSeed(
-                from: request,
-                bypassInsecureHTTPHostOnce: "www.linkedin.com"
-            )
-        )
-
-        // This covers the pure seeding helper only. WebKit may still rewrite
-        // programmatic loads when the request is replayed in the destination tab.
-        XCTAssertEqual(seed.url, url)
-        XCTAssertEqual(seed.bypassInsecureHTTPHostOnce, "www.linkedin.com")
-        XCTAssertEqual(seed.initialRequest.httpMethod, "POST")
-        XCTAssertEqual(seed.initialRequest.httpBody, body)
-        XCTAssertEqual(
-            seed.initialRequest.value(forHTTPHeaderField: "Referer"),
-            "https://www.linkedin.com/feed/"
-        )
-        XCTAssertEqual(
-            seed.initialRequest.value(forHTTPHeaderField: "X-Cmux-Test"),
-            "keep-me"
-        )
-        XCTAssertEqual(seed.initialRequest.cachePolicy, .reloadIgnoringLocalCacheData)
-    }
-}
-
-@MainActor
-final class BrowserPanelRemoteStoreTests: XCTestCase {
-    private var previousProfileID: UUID?
-
-    override func setUp() {
-        super.setUp()
-        previousProfileID = BrowserProfileStore.shared.lastUsedProfileID
-        // A local browser panel resolves its website data store through the
-        // last-used browser profile, and only the built-in default profile maps
-        // to `WKWebsiteDataStore.default()`. That selection is persisted in
-        // `UserDefaults`, so a profile some other test switched to (in this run
-        // or an earlier one) leaves the local-panel checks below resolving a
-        // leftover profile's store. Pin the built-in default so this suite
-        // tests store scoping instead of machine state.
-        BrowserProfileStore.shared.noteUsed(BrowserProfileStore.shared.builtInDefaultProfileID)
-    }
-
-    override func tearDown() {
-        // The pin above persists through UserDefaults, so put back whatever profile was
-        // selected before this suite ran rather than leaking the built-in default forward.
-        if let previousProfileID {
-            BrowserProfileStore.shared.noteUsed(previousProfileID)
-        }
-        super.tearDown()
-    }
-
-    func testRemoteWorkspacePanelsShareWorkspaceScopedWebsiteDataStore() {
-        let localPanel = BrowserPanel(workspaceId: UUID(), isRemoteWorkspace: false)
-        let remoteWorkspaceId = UUID()
-        let firstRemotePanel = BrowserPanel(
-            workspaceId: remoteWorkspaceId,
-            isRemoteWorkspace: true,
-            remoteWebsiteDataStoreIdentifier: remoteWorkspaceId
-        )
-        let secondRemotePanel = BrowserPanel(
-            workspaceId: remoteWorkspaceId,
-            isRemoteWorkspace: true,
-            remoteWebsiteDataStoreIdentifier: remoteWorkspaceId
-        )
-
-        XCTAssertTrue(localPanel.webView.configuration.websiteDataStore === WKWebsiteDataStore.default())
-        XCTAssertFalse(firstRemotePanel.webView.configuration.websiteDataStore === WKWebsiteDataStore.default())
-        XCTAssertTrue(
-            firstRemotePanel.webView.configuration.websiteDataStore ===
-                secondRemotePanel.webView.configuration.websiteDataStore
-        )
-    }
-
-    func testRemoteWorkspaceDefersInitialNavigationUntilProxyEndpointIsReady() {
-        let remoteWorkspaceId = UUID()
-        let url = URL(string: "http://localhost:3000/demo")!
-        let panel = BrowserPanel(
-            workspaceId: remoteWorkspaceId,
-            initialURL: url,
-            isRemoteWorkspace: true,
-            remoteWebsiteDataStoreIdentifier: remoteWorkspaceId
-        )
-
-        XCTAssertEqual(panel.preferredURLStringForOmnibar(), url.absoluteString)
-        XCTAssertNil(panel.webView.url)
-
-        panel.setRemoteProxyEndpoint(BrowserProxyEndpoint(host: "127.0.0.1", port: 9876))
-
-        let deadline = Date().addingTimeInterval(1.0)
-        while panel.webView.url == nil, RunLoop.main.run(mode: .default, before: deadline), Date() < deadline {}
-
-        XCTAssertEqual(panel.preferredURLStringForOmnibar(), url.absoluteString)
-        XCTAssertEqual(panel.webView.url?.host, "cmux-loopback.localtest.me")
-    }
-
-    func testRemoteWorkspacePreservesLocalhostSubdomainWhenAliasingLoopbackURL() {
-        let remoteWorkspaceId = UUID()
-        let url = URL(string: "http://api.localhost:3000/demo")!
-        let panel = BrowserPanel(
-            workspaceId: remoteWorkspaceId,
-            initialURL: url,
-            isRemoteWorkspace: true,
-            remoteWebsiteDataStoreIdentifier: remoteWorkspaceId
-        )
-
-        XCTAssertEqual(panel.preferredURLStringForOmnibar(), url.absoluteString)
-        XCTAssertNil(panel.webView.url)
-
-        panel.setRemoteProxyEndpoint(BrowserProxyEndpoint(host: "127.0.0.1", port: 9876))
-
-        let deadline = Date().addingTimeInterval(1.0)
-        while panel.webView.url == nil, RunLoop.main.run(mode: .default, before: deadline), Date() < deadline {}
-
-        XCTAssertEqual(panel.preferredURLStringForOmnibar(), url.absoluteString)
-        XCTAssertEqual(panel.webView.url?.host, "api.cmux-loopback.localtest.me")
-    }
-
-    func testRemoteWorkspaceRuntimeBridgeAliasesMultipleLoopbackPortsFromSamePage() async throws {
-        let remoteWorkspaceId = UUID()
-        let panel = BrowserPanel(
-            workspaceId: remoteWorkspaceId,
-            isRemoteWorkspace: true,
-            remoteWebsiteDataStoreIdentifier: remoteWorkspaceId
-        )
-        let baseURL = try XCTUnwrap(URL(string: "http://cmux-loopback.localtest.me:3000/"))
-
-        panel.webView.loadHTMLString(
-            "<!doctype html><html><body>remote loopback bridge</body></html>",
-            baseURL: baseURL
-        )
-        try await waitForBrowserWebViewLoad(panel.webView)
-
-        let result = try await panel.evaluateJavaScript(
-            """
-            (() => {
-              const rewrite = window.__cmuxRewriteRemoteLoopbackURL;
-              if (typeof rewrite !== 'function') {
-                return 'missing bridge';
-              }
-              return JSON.stringify([
-                rewrite('http://localhost:3000/frontend'),
-                rewrite('http://localhost:8000/api'),
-                rewrite('http://api.localhost:8000/v1'),
-                rewrite('ws://localhost:5173/hmr'),
-                rewrite('wss://localhost:5173/hmr'),
-                rewrite('https://localhost:9443/secure')
-              ]);
-            })()
-            """
-        ) as? String
-
-        XCTAssertEqual(
-            result,
-            #"["http://cmux-loopback.localtest.me:3000/frontend","http://cmux-loopback.localtest.me:8000/api","http://api.cmux-loopback.localtest.me:8000/v1","ws://cmux-loopback.localtest.me:5173/hmr","wss://localhost:5173/hmr","https://localhost:9443/secure"]"#
-        )
-    }
-
-    func testRemoteWorkspaceKeepsHTTPSLoopbackUnaliased() {
-        let remoteWorkspaceId = UUID()
-        let url = URL(string: "https://localhost:3443/demo")!
-        let panel = BrowserPanel(
-            workspaceId: remoteWorkspaceId,
-            initialURL: url,
-            isRemoteWorkspace: true,
-            remoteWebsiteDataStoreIdentifier: remoteWorkspaceId
-        )
-
-        XCTAssertEqual(panel.preferredURLStringForOmnibar(), url.absoluteString)
-        XCTAssertNil(panel.webView.url)
-
-        panel.setRemoteProxyEndpoint(BrowserProxyEndpoint(host: "127.0.0.1", port: 9876))
-
-        let deadline = Date().addingTimeInterval(1.0)
-        while panel.webView.url == nil, RunLoop.main.run(mode: .default, before: deadline), Date() < deadline {}
-
-        XCTAssertEqual(panel.preferredURLStringForOmnibar(), url.absoluteString)
-        XCTAssertEqual(panel.webView.url?.host, "localhost")
-    }
-
-    private func waitForBrowserWebViewLoad(_ webView: WKWebView, timeout: TimeInterval = 2.0) async throws {
-        let deadline = Date().addingTimeInterval(timeout)
-        while webView.isLoading {
-            if Date() >= deadline {
-                XCTFail("Timed out waiting for browser web view to finish loading")
-                return
-            }
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
-    }
-
-    func testBrowserMoveIntoRemoteWorkspaceRebuildsWebsiteDataStoreScope() throws {
-        let source = Workspace()
-        let sourcePaneId = try XCTUnwrap(source.bonsplitController.allPaneIds.first)
-        let sourceBrowser = try XCTUnwrap(source.newBrowserSurface(inPane: sourcePaneId, focus: false))
-        let localStore = sourceBrowser.webView.configuration.websiteDataStore
-        XCTAssertTrue(localStore === WKWebsiteDataStore.default())
-
-        let destination = Workspace()
-        destination.configureRemoteConnection(
-            WorkspaceRemoteConfiguration(
-                destination: "cmux-macmini",
-                port: 22,
-                identityFile: nil,
-                sshOptions: [],
-                localProxyPort: nil,
-                relayPort: 64001,
-                relayID: "relay-store-dest",
-                relayToken: String(repeating: "a", count: 64),
-                localSocketPath: "/tmp/cmux-store-dest.sock",
-                terminalStartupCommand: "ssh cmux-macmini"
-            ),
-            autoConnect: false
-        )
-        let destinationPaneId = try XCTUnwrap(destination.bonsplitController.allPaneIds.first)
-        let destinationBrowser = try XCTUnwrap(destination.newBrowserSurface(inPane: destinationPaneId, focus: false))
-        let destinationStore = destinationBrowser.webView.configuration.websiteDataStore
-        XCTAssertFalse(destinationStore === WKWebsiteDataStore.default())
-
-        let detached = try XCTUnwrap(source.detachSurface(panelId: sourceBrowser.id))
-        let attachedPanelId = try XCTUnwrap(
-            destination.attachDetachedSurface(detached, inPane: destinationPaneId, focus: false)
-        )
-        let movedBrowser = try XCTUnwrap(destination.panels[attachedPanelId] as? BrowserPanel)
-
-        XCTAssertTrue(movedBrowser.webView.configuration.websiteDataStore === destinationStore)
-        XCTAssertFalse(movedBrowser.webView.configuration.websiteDataStore === localStore)
-    }
-
-    func testBrowserMoveOutOfRemoteWorkspaceRestoresDefaultWebsiteDataStore() throws {
-        let source = Workspace()
-        source.configureRemoteConnection(
-            WorkspaceRemoteConfiguration(
-                destination: "cmux-macmini",
-                port: 22,
-                identityFile: nil,
-                sshOptions: [],
-                localProxyPort: nil,
-                relayPort: 64002,
-                relayID: "relay-store-source",
-                relayToken: String(repeating: "b", count: 64),
-                localSocketPath: "/tmp/cmux-store-source.sock",
-                terminalStartupCommand: "ssh cmux-macmini"
-            ),
-            autoConnect: false
-        )
-        let sourcePaneId = try XCTUnwrap(source.bonsplitController.allPaneIds.first)
-        let movedBrowser = try XCTUnwrap(source.newBrowserSurface(inPane: sourcePaneId, focus: false))
-        let remainingRemoteBrowser = try XCTUnwrap(source.newBrowserSurface(inPane: sourcePaneId, focus: false))
-        let remoteStore = remainingRemoteBrowser.webView.configuration.websiteDataStore
-        XCTAssertFalse(remoteStore === WKWebsiteDataStore.default())
-
-        let destination = Workspace()
-        let destinationPaneId = try XCTUnwrap(destination.bonsplitController.allPaneIds.first)
-        let detached = try XCTUnwrap(source.detachSurface(panelId: movedBrowser.id))
-        let attachedPanelId = try XCTUnwrap(
-            destination.attachDetachedSurface(detached, inPane: destinationPaneId, focus: false)
-        )
-        let attachedBrowser = try XCTUnwrap(destination.panels[attachedPanelId] as? BrowserPanel)
-
-        XCTAssertTrue(attachedBrowser.webView.configuration.websiteDataStore === WKWebsiteDataStore.default())
-        XCTAssertTrue(remainingRemoteBrowser.webView.configuration.websiteDataStore === remoteStore)
-        XCTAssertFalse(remainingRemoteBrowser.webView.configuration.websiteDataStore === attachedBrowser.webView.configuration.websiteDataStore)
-    }
-
-    func testNewTerminalSurfaceStaysRemoteWhileBrowserPanelsKeepWorkspaceRemote() throws {
-        let workspace = Workspace()
-        let paneId = try XCTUnwrap(workspace.bonsplitController.allPaneIds.first)
-        let initialTerminalId = try XCTUnwrap(workspace.focusedPanelId)
-        let configuration = WorkspaceRemoteConfiguration(
-            destination: "cmux-macmini",
-            port: nil,
-            identityFile: nil,
-            sshOptions: [],
-            localProxyPort: nil,
-            relayPort: 64000,
-            relayID: "relay-test",
-            relayToken: String(repeating: "a", count: 64),
-            localSocketPath: "/tmp/cmux-test.sock",
-            terminalStartupCommand: "ssh cmux-macmini"
-        )
-
-        workspace.configureRemoteConnection(configuration, autoConnect: false)
-        _ = workspace.newBrowserSurface(inPane: paneId, url: URL(string: "https://example.com"), focus: false)
-
-        workspace.markRemoteTerminalSessionEnded(surfaceId: initialTerminalId, relayPort: configuration.relayPort)
-
-        XCTAssertTrue(workspace.isRemoteWorkspace)
-        XCTAssertEqual(workspace.activeRemoteTerminalSessionCount, 0)
-
-        _ = try XCTUnwrap(workspace.newTerminalSurface(inPane: paneId, focus: false))
-
-        XCTAssertTrue(workspace.isRemoteWorkspace)
-        XCTAssertEqual(workspace.activeRemoteTerminalSessionCount, 1)
-    }
-}
-
 final class WorkspaceRemoteConfigurationTransportKeyTests: XCTestCase {
     func testProxyBrokerTransportKeyIgnoresControlPath() {
         let first = WorkspaceRemoteConfiguration(
@@ -3182,61 +2398,6 @@ final class NotificationBurstCoalescerTests: XCTestCase {
     }
 }
 
-final class RecentlyClosedBrowserStackTests: XCTestCase {
-    func testPopReturnsEntriesInLIFOOrder() {
-        var stack = RecentlyClosedBrowserStack<ClosedBrowserPanelRestoreSnapshot>(capacity: 20)
-        stack.push(makeSnapshot(index: 1))
-        stack.push(makeSnapshot(index: 2))
-        stack.push(makeSnapshot(index: 3))
-
-        XCTAssertEqual(stack.pop()?.originalTabIndex, 3)
-        XCTAssertEqual(stack.pop()?.originalTabIndex, 2)
-        XCTAssertEqual(stack.pop()?.originalTabIndex, 1)
-        XCTAssertNil(stack.pop())
-    }
-
-    func testPushDropsOldestEntriesWhenCapacityExceeded() {
-        var stack = RecentlyClosedBrowserStack<ClosedBrowserPanelRestoreSnapshot>(capacity: 3)
-        for index in 1...5 {
-            stack.push(makeSnapshot(index: index))
-        }
-
-        XCTAssertEqual(stack.pop()?.originalTabIndex, 5)
-        XCTAssertEqual(stack.pop()?.originalTabIndex, 4)
-        XCTAssertEqual(stack.pop()?.originalTabIndex, 3)
-        XCTAssertNil(stack.pop())
-    }
-
-    func testRemoveSnapshotsDropsOnlyEntriesForGivenWorkspaceId() {
-        let workspaceA = UUID()
-        let workspaceB = UUID()
-        var stack = RecentlyClosedBrowserStack<ClosedBrowserPanelRestoreSnapshot>(capacity: 20)
-        stack.push(makeSnapshot(index: 1, workspaceId: workspaceA))
-        stack.push(makeSnapshot(index: 2, workspaceId: workspaceB))
-        stack.push(makeSnapshot(index: 3, workspaceId: workspaceA))
-        stack.push(makeSnapshot(index: 4, workspaceId: workspaceB))
-
-        stack.removeSnapshots(forWorkspaceId: workspaceA)
-
-        XCTAssertEqual(stack.pop()?.originalTabIndex, 4)
-        XCTAssertEqual(stack.pop()?.originalTabIndex, 2)
-        XCTAssertNil(stack.pop())
-    }
-
-    private func makeSnapshot(index: Int, workspaceId: UUID = UUID()) -> ClosedBrowserPanelRestoreSnapshot {
-        ClosedBrowserPanelRestoreSnapshot(
-            workspaceId: workspaceId,
-            url: URL(string: "https://example.com/\(index)"),
-            profileID: nil,
-            originalPaneId: UUID(),
-            originalTabIndex: index,
-            fallbackSplitOrientation: .horizontal,
-            fallbackSplitInsertFirst: false,
-            fallbackAnchorPaneId: UUID()
-        )
-    }
-}
-
 final class SocketControlSettingsTests: XCTestCase {
     func testMigrateModeSupportsExpandedSocketModes() {
         XCTAssertEqual(SocketControlSettings.migrateMode("off"), .off)
@@ -3279,7 +2440,7 @@ final class SocketControlSettingsTests: XCTestCase {
                 "CMUX_TAG": "stray-tag",
                 "CMUX_SOCKET_PATH": "/tmp/cmux-debug-issue-153-tmux-compat.sock",
             ],
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             isDebugBuild: false,
             probeStableDefaultPathEntry: { _ in .missing }
         )
@@ -3292,7 +2453,7 @@ final class SocketControlSettingsTests: XCTestCase {
             environment: [
                 "CMUX_TAG": "my-tag",
             ],
-            bundleIdentifier: "com.cmuxterm.app.debug",
+            bundleIdentifier: "com.comux.app.debug",
             isDebugBuild: true
         )
 
@@ -3305,7 +2466,7 @@ final class SocketControlSettingsTests: XCTestCase {
                 "CMUX_TAG": "my-tag",
                 "CMUX_SOCKET_PATH": "/tmp/cmux-debug-forced.sock",
             ],
-            bundleIdentifier: "com.cmuxterm.app.debug",
+            bundleIdentifier: "com.comux.app.debug",
             isDebugBuild: true
         )
 
@@ -3317,7 +2478,7 @@ final class SocketControlSettingsTests: XCTestCase {
             environment: [
                 "CMUX_SOCKET_PATH": "/tmp/cmux-debug-issue-153-tmux-compat.sock",
             ],
-            bundleIdentifier: "com.cmuxterm.app.nightly",
+            bundleIdentifier: "com.comux.app.nightly",
             isDebugBuild: false,
             probeStableDefaultPathEntry: { _ in .missing }
         )
@@ -3330,7 +2491,7 @@ final class SocketControlSettingsTests: XCTestCase {
             environment: [
                 "CMUX_SOCKET_PATH": "/tmp/cmux-debug-my-tag.sock",
             ],
-            bundleIdentifier: "com.cmuxterm.app.debug.my-tag",
+            bundleIdentifier: "com.comux.app.debug.my-tag",
             isDebugBuild: false
         )
 
@@ -3340,10 +2501,10 @@ final class SocketControlSettingsTests: XCTestCase {
     func testTaggedDebugBundleIgnoresSocketOverrideInheritedFromDifferentCmuxBundle() {
         let path = SocketControlSettings.socketPath(
             environment: [
-                "CMUX_BUNDLE_ID": "com.cmuxterm.app.nightly",
+                "CMUX_BUNDLE_ID": "com.comux.app.nightly",
                 "CMUX_SOCKET_PATH": "/tmp/cmux-nightly.sock",
             ],
-            bundleIdentifier: "com.cmuxterm.app.debug.issue.4355.cmux.themes.set.state.dependent",
+            bundleIdentifier: "com.comux.app.debug.issue.4355.cmux.themes.set.state.dependent",
             isDebugBuild: true
         )
 
@@ -3354,9 +2515,9 @@ final class SocketControlSettingsTests: XCTestCase {
         let path = SocketControlSettings.socketPath(
             environment: [
                 "CMUX_SOCKET_PATH": "/tmp/cmux-nightly.sock",
-                "CMUX_BUNDLE_ID": "com.cmuxterm.app.nightly",
+                "CMUX_BUNDLE_ID": "com.comux.app.nightly",
             ],
-            bundleIdentifier: "com.cmuxterm.app.debug.fix-grok-notifications",
+            bundleIdentifier: "com.comux.app.debug.fix-grok-notifications",
             isDebugBuild: false
         )
 
@@ -3367,10 +2528,10 @@ final class SocketControlSettingsTests: XCTestCase {
         let path = SocketControlSettings.socketPath(
             environment: [
                 "CMUX_SOCKET_PATH": "/tmp/cmux-nightly.sock",
-                "CMUX_BUNDLE_ID": "com.cmuxterm.app.nightly",
+                "CMUX_BUNDLE_ID": "com.comux.app.nightly",
                 "CMUX_ALLOW_SOCKET_OVERRIDE": "1",
             ],
-            bundleIdentifier: "com.cmuxterm.app.debug.fix-grok-notifications",
+            bundleIdentifier: "com.comux.app.debug.fix-grok-notifications",
             isDebugBuild: false
         )
 
@@ -3383,7 +2544,7 @@ final class SocketControlSettingsTests: XCTestCase {
                 "CMUX_SOCKET_PATH": SocketControlSettings.stableDefaultSocketPath,
                 "CMUX_ALLOW_SOCKET_OVERRIDE": "1",
             ],
-            bundleIdentifier: "com.cmuxterm.app.debug.sockguard",
+            bundleIdentifier: "com.comux.app.debug.sockguard",
             isDebugBuild: false
         )
 
@@ -3403,7 +2564,7 @@ final class SocketControlSettingsTests: XCTestCase {
                     "CMUX_SOCKET_PATH": alias,
                     "CMUX_ALLOW_SOCKET_OVERRIDE": "1",
                 ],
-                bundleIdentifier: "com.cmuxterm.app.debug.sockguard",
+                bundleIdentifier: "com.comux.app.debug.sockguard",
                 isDebugBuild: false,
                 currentUserID: 501
             )
@@ -3418,7 +2579,7 @@ final class SocketControlSettingsTests: XCTestCase {
                 "CMUX_SOCKET_PATH": "/private/tmp/cmux.sock",
                 "CMUX_ALLOW_SOCKET_OVERRIDE": "1",
             ],
-            bundleIdentifier: "com.cmuxterm.app.debug.sockguard",
+            bundleIdentifier: "com.comux.app.debug.sockguard",
             isDebugBuild: false
         )
 
@@ -3450,7 +2611,7 @@ final class SocketControlSettingsTests: XCTestCase {
                     "CMUX_SOCKET_PATH": alias,
                     "CMUX_ALLOW_SOCKET_OVERRIDE": "1",
                 ],
-                bundleIdentifier: "com.cmuxterm.app.debug.sockguard",
+                bundleIdentifier: "com.comux.app.debug.sockguard",
                 isDebugBuild: false,
                 currentUserID: 501
             )
@@ -3473,7 +2634,7 @@ final class SocketControlSettingsTests: XCTestCase {
                 "CMUX_SOCKET_PATH": alias,
                 "CMUX_ALLOW_SOCKET_OVERRIDE": "1",
             ],
-            bundleIdentifier: "com.cmuxterm.app.debug.sockguard",
+            bundleIdentifier: "com.comux.app.debug.sockguard",
             isDebugBuild: false
         )
 
@@ -3508,7 +2669,7 @@ final class SocketControlSettingsTests: XCTestCase {
                 "CMUX_SOCKET_PATH": aliases[0],
                 "CMUX_ALLOW_SOCKET_OVERRIDE": "1",
             ],
-            bundleIdentifier: "com.cmuxterm.app.debug.sockguard",
+            bundleIdentifier: "com.comux.app.debug.sockguard",
             isDebugBuild: false
         )
 
@@ -3520,7 +2681,7 @@ final class SocketControlSettingsTests: XCTestCase {
             environment: [
                 "CMUX_SOCKET_PATH": "/tmp/cmux-staging-my-tag.sock",
             ],
-            bundleIdentifier: "com.cmuxterm.app.staging.my-tag",
+            bundleIdentifier: "com.comux.app.staging.my-tag",
             isDebugBuild: false
         )
 
@@ -3533,7 +2694,7 @@ final class SocketControlSettingsTests: XCTestCase {
                 "CMUX_SOCKET_PATH": "/tmp/cmux-debug-forced.sock",
                 "CMUX_ALLOW_SOCKET_OVERRIDE": "1",
             ],
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             isDebugBuild: false,
             probeStableDefaultPathEntry: { _ in .missing }
         )
@@ -3544,7 +2705,7 @@ final class SocketControlSettingsTests: XCTestCase {
     func testDefaultSocketPathByChannel() {
         XCTAssertEqual(
             SocketControlSettings.defaultSocketPath(
-                bundleIdentifier: "com.cmuxterm.app",
+                bundleIdentifier: "com.comux.app",
                 isDebugBuild: false,
                 probeStableDefaultPathEntry: { _ in .missing }
             ),
@@ -3552,7 +2713,7 @@ final class SocketControlSettingsTests: XCTestCase {
         )
         XCTAssertEqual(
             SocketControlSettings.defaultSocketPath(
-                bundleIdentifier: "com.cmuxterm.app.nightly",
+                bundleIdentifier: "com.comux.app.nightly",
                 isDebugBuild: false,
                 probeStableDefaultPathEntry: { _ in .missing }
             ),
@@ -3560,7 +2721,7 @@ final class SocketControlSettingsTests: XCTestCase {
         )
         XCTAssertEqual(
             SocketControlSettings.defaultSocketPath(
-                bundleIdentifier: "com.cmuxterm.app.nightly.tag",
+                bundleIdentifier: "com.comux.app.nightly.tag",
                 isDebugBuild: false,
                 probeStableDefaultPathEntry: { _ in .missing }
             ),
@@ -3568,7 +2729,7 @@ final class SocketControlSettingsTests: XCTestCase {
         )
         XCTAssertEqual(
             SocketControlSettings.defaultSocketPath(
-                bundleIdentifier: "com.cmuxterm.app.debug.tag",
+                bundleIdentifier: "com.comux.app.debug.tag",
                 isDebugBuild: false,
                 probeStableDefaultPathEntry: { _ in .missing }
             ),
@@ -3576,7 +2737,7 @@ final class SocketControlSettingsTests: XCTestCase {
         )
         XCTAssertEqual(
             SocketControlSettings.defaultSocketPath(
-                bundleIdentifier: "com.cmuxterm.app.staging.tag",
+                bundleIdentifier: "com.comux.app.staging.tag",
                 isDebugBuild: false,
                 probeStableDefaultPathEntry: { _ in .missing }
             ),
@@ -3586,7 +2747,7 @@ final class SocketControlSettingsTests: XCTestCase {
 
     func testStableReleaseFallsBackToUserScopedSocketWhenStablePathOwnedByDifferentUser() {
         let path = SocketControlSettings.defaultSocketPath(
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             isDebugBuild: false,
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .socket(ownerUserID: 0) }
@@ -3598,7 +2759,7 @@ final class SocketControlSettingsTests: XCTestCase {
     func testInitialStableLaunchFallsBackToUserScopedSocketWhenSameUserStablePathIsLive() {
         let path = SocketControlSettings.initialSocketPathBeforeListenerStart(
             preferredPath: SocketControlSettings.stableDefaultSocketPath,
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             isDebugBuild: false,
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .socket(ownerUserID: 501) },
@@ -3611,7 +2772,7 @@ final class SocketControlSettingsTests: XCTestCase {
     func testInitialStableLaunchTreatsPrivateTmpLegacyStableAliasAsStablePath() {
         let path = SocketControlSettings.initialSocketPathBeforeListenerStart(
             preferredPath: "/private/tmp/cmux.sock",
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             isDebugBuild: false,
             currentUserID: 501,
             probeStableDefaultPathEntry: { socketPath in
@@ -3628,7 +2789,7 @@ final class SocketControlSettingsTests: XCTestCase {
         var didProbe = false
         let path = SocketControlSettings.initialSocketPathBeforeListenerStart(
             preferredPath: SocketControlSettings.stableDefaultSocketPath,
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             isDebugBuild: false,
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .socket(ownerUserID: 501) },
@@ -3645,7 +2806,7 @@ final class SocketControlSettingsTests: XCTestCase {
     func testInitialStableLaunchKeepsStablePathWhenTransportReclaimsSameUserSocket() {
         let path = SocketControlSettings.initialSocketPathBeforeListenerStart(
             preferredPath: SocketControlSettings.stableDefaultSocketPath,
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             isDebugBuild: false,
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .socket(ownerUserID: 501) },
@@ -3662,7 +2823,7 @@ final class SocketControlSettingsTests: XCTestCase {
         let userScopedPath = SocketControlSettings.userScopedStableSocketPath(currentUserID: 501)
         let path = SocketControlSettings.initialSocketPathBeforeListenerStart(
             preferredPath: userScopedPath,
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             isDebugBuild: false,
             currentUserID: 501,
             probeStableDefaultPathEntry: { socketPath in
@@ -3681,7 +2842,7 @@ final class SocketControlSettingsTests: XCTestCase {
     func testInitialStableLaunchFallsBackToUserScopedSocketWhenMissingStablePathCannotBeReserved() {
         let path = SocketControlSettings.initialSocketPathBeforeListenerStart(
             preferredPath: SocketControlSettings.stableDefaultSocketPath,
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             isDebugBuild: false,
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .missing },
@@ -3698,7 +2859,7 @@ final class SocketControlSettingsTests: XCTestCase {
         let debugPath = "/tmp/cmux-debug-tag.sock"
         let path = SocketControlSettings.initialSocketPathBeforeListenerStart(
             preferredPath: debugPath,
-            bundleIdentifier: "com.cmuxterm.app.debug.tag",
+            bundleIdentifier: "com.comux.app.debug.tag",
             isDebugBuild: false,
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in
@@ -3712,7 +2873,7 @@ final class SocketControlSettingsTests: XCTestCase {
 
     func testStableReleaseFallsBackToUserScopedSocketWhenStablePathIsBlockedByNonSocketEntry() {
         let path = SocketControlSettings.defaultSocketPath(
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             isDebugBuild: false,
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .other(ownerUserID: 501) }
@@ -3725,7 +2886,7 @@ final class SocketControlSettingsTests: XCTestCase {
         XCTAssertTrue(
             SocketControlSettings.shouldBlockUntaggedDebugLaunch(
                 environment: [:],
-                bundleIdentifier: "com.cmuxterm.app.debug",
+                bundleIdentifier: "com.comux.app.debug",
                 isDebugBuild: true
             )
         )
@@ -3735,7 +2896,7 @@ final class SocketControlSettingsTests: XCTestCase {
         XCTAssertFalse(
             SocketControlSettings.shouldBlockUntaggedDebugLaunch(
                 environment: ["CMUX_TAG": "tests-v1"],
-                bundleIdentifier: "com.cmuxterm.app.debug",
+                bundleIdentifier: "com.comux.app.debug",
                 isDebugBuild: true
             )
         )
@@ -3745,7 +2906,7 @@ final class SocketControlSettingsTests: XCTestCase {
         XCTAssertFalse(
             SocketControlSettings.shouldBlockUntaggedDebugLaunch(
                 environment: [:],
-                bundleIdentifier: "com.cmuxterm.app.debug.tests-v1",
+                bundleIdentifier: "com.comux.app.debug.tests-v1",
                 isDebugBuild: true
             )
         )
@@ -3755,7 +2916,7 @@ final class SocketControlSettingsTests: XCTestCase {
         XCTAssertFalse(
             SocketControlSettings.shouldBlockUntaggedDebugLaunch(
                 environment: [:],
-                bundleIdentifier: "com.cmuxterm.app.debug",
+                bundleIdentifier: "com.comux.app.debug",
                 isDebugBuild: false
             )
         )
@@ -3765,7 +2926,7 @@ final class SocketControlSettingsTests: XCTestCase {
         XCTAssertFalse(
             SocketControlSettings.shouldBlockUntaggedDebugLaunch(
                 environment: ["XCTestConfigurationFilePath": "/tmp/fake.xctestconfiguration"],
-                bundleIdentifier: "com.cmuxterm.app.debug",
+                bundleIdentifier: "com.comux.app.debug",
                 isDebugBuild: true
             )
         )
@@ -3775,7 +2936,7 @@ final class SocketControlSettingsTests: XCTestCase {
         XCTAssertFalse(
             SocketControlSettings.shouldBlockUntaggedDebugLaunch(
                 environment: ["XCInjectBundle": "/tmp/fake.xctest"],
-                bundleIdentifier: "com.cmuxterm.app.debug",
+                bundleIdentifier: "com.comux.app.debug",
                 isDebugBuild: true
             )
         )
@@ -3785,7 +2946,7 @@ final class SocketControlSettingsTests: XCTestCase {
         XCTAssertFalse(
             SocketControlSettings.shouldBlockUntaggedDebugLaunch(
                 environment: ["DYLD_INSERT_LIBRARIES": "/usr/lib/libXCTestBundleInject.dylib"],
-                bundleIdentifier: "com.cmuxterm.app.debug",
+                bundleIdentifier: "com.comux.app.debug",
                 isDebugBuild: true
             )
         )
@@ -3797,7 +2958,7 @@ final class SocketControlSettingsTests: XCTestCase {
         XCTAssertFalse(
             SocketControlSettings.shouldBlockUntaggedDebugLaunch(
                 environment: ["CMUX_UI_TEST_MODE": "1"],
-                bundleIdentifier: "com.cmuxterm.app.debug",
+                bundleIdentifier: "com.comux.app.debug",
                 isDebugBuild: true
             )
         )
@@ -5468,12 +4629,9 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
             printf '%s\\n' 'ref: refs/heads/old-cleared' > "$_CMUX_GIT_HEAD_PATH"
             cd "\(repoB.path)"
             _CMUX_PWD_LAST_PWD="$PWD"
-            _CMUX_LAST_PR_ACTION="checkout"
-            _CMUX_LAST_PR_TARGET="feature"
             _cmux_prompt_command
             printf 'HEAD_PATH=%s\\n' "$_CMUX_GIT_HEAD_PATH"
             printf 'HEAD_LAST_PWD=%s\\n' "$_CMUX_GIT_HEAD_LAST_PWD"
-            printf 'LAST_PR_ACTION=%s\\n' "$_CMUX_LAST_PR_ACTION"
             printf 'LOG<<EOF\\n'
             cat "\(logPath.path)"
             printf 'EOF\\n'
@@ -5489,7 +4647,6 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         XCTAssertFalse(result.stdout.contains(repoA.appendingPathComponent(".git/HEAD").path), result.stdout)
         XCTAssertTrue(result.stdout.contains("HEAD_PATH=\n"), result.stdout)
         XCTAssertTrue(result.stdout.contains("HEAD_LAST_PWD=\n"), result.stdout)
-        XCTAssertTrue(result.stdout.contains("LAST_PR_ACTION=\n"), result.stdout)
         XCTAssertFalse(result.stdout.contains("clear_pr"), result.stdout)
         XCTAssertFalse(result.stdout.contains("report_pr_action"), result.stdout)
     }
@@ -5530,12 +4687,9 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
             printf '%s\\n' 'ref: refs/heads/old-cleared' > "$_CMUX_GIT_HEAD_PATH"
             cd "\(repoB.path)"
             _CMUX_PWD_LAST_PWD="$PWD"
-            _CMUX_LAST_PR_ACTION="checkout"
-            _CMUX_LAST_PR_TARGET="feature"
             _cmux_precmd
             printf 'HEAD_PATH=%s\\n' "$_CMUX_GIT_HEAD_PATH"
             printf 'HEAD_LAST_PWD=%s\\n' "$_CMUX_GIT_HEAD_LAST_PWD"
-            printf 'LAST_PR_ACTION=%s\\n' "$_CMUX_LAST_PR_ACTION"
             printf 'LOG<<EOF\\n'
             cat "\(logPath.path)"
             printf 'EOF\\n'
@@ -5551,109 +4705,8 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         XCTAssertFalse(output.contains(repoA.appendingPathComponent(".git/HEAD").path), output)
         XCTAssertTrue(output.contains("HEAD_PATH=\n"), output)
         XCTAssertTrue(output.contains("HEAD_LAST_PWD=\n"), output)
-        XCTAssertTrue(output.contains("LAST_PR_ACTION=\n"), output)
         XCTAssertFalse(output.contains("clear_pr"), output)
         XCTAssertFalse(output.contains("report_pr_action"), output)
-    }
-
-    func testZshNoPullRequestWatchSkipsLegacyGhPRProbe() throws {
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-zsh-no-pr-watch-\(UUID().uuidString)")
-        let repoURL = root.appendingPathComponent("repo", isDirectory: true)
-        let fakeBinURL = root.appendingPathComponent("fake-bin", isDirectory: true)
-        let markerURL = root.appendingPathComponent("gh-pr-invoked", isDirectory: false)
-        let socketPath = root.appendingPathComponent("cmux-test.sock", isDirectory: false)
-
-        try fileManager.createDirectory(at: repoURL.appendingPathComponent(".git"), withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: fakeBinURL, withIntermediateDirectories: true)
-        try "ref: refs/heads/issue-2746-rate-limit\n".write(
-            to: repoURL.appendingPathComponent(".git/HEAD"),
-            atomically: true,
-            encoding: .utf8
-        )
-        try writeExecutableScript(
-            at: fakeBinURL.appendingPathComponent("gh"),
-            contents: """
-            #!/bin/sh
-            printf invoked > "$CMUX_GH_MARKER"
-            printf '2746\\tOPEN\\thttps://github.com/manaflow-ai/cmux/pull/2746\\n'
-            """
-        )
-        let socketFD = try bindUnixSocket(at: socketPath.path)
-        defer {
-            Darwin.close(socketFD)
-            unlink(socketPath.path)
-            try? fileManager.removeItem(at: root)
-        }
-
-        let output = try runInteractiveZsh(
-            cmuxLoadGhosttyIntegration: false,
-            cmuxLoadShellIntegration: true,
-            command: """
-            _cmux_send() { :; }
-            _cmux_send_bg() { :; }
-            _cmux_report_pr_for_path "\(repoURL.path)" || true
-            [[ -e "\(markerURL.path)" ]] && print MARKER=1 || print MARKER=0
-            """,
-            extraEnvironment: [
-                "CMUX_NO_PR_WATCH": "1",
-                "CMUX_GH_MARKER": markerURL.path,
-                "CMUX_SOCKET_PATH": socketPath.path,
-                "PATH": "\(fakeBinURL.path):/usr/bin:/bin",
-            ]
-        )
-
-        XCTAssertTrue(output.contains("MARKER=0"), output)
-    }
-
-    func testBashNoPullRequestWatchSkipsLegacyGhPRProbe() throws {
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-bash-no-pr-watch-\(UUID().uuidString)")
-        let repoURL = root.appendingPathComponent("repo", isDirectory: true)
-        let fakeBinURL = root.appendingPathComponent("fake-bin", isDirectory: true)
-        let markerURL = root.appendingPathComponent("gh-pr-invoked", isDirectory: false)
-        let socketPath = root.appendingPathComponent("cmux-test.sock", isDirectory: false)
-
-        try fileManager.createDirectory(at: repoURL.appendingPathComponent(".git"), withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: fakeBinURL, withIntermediateDirectories: true)
-        try "ref: refs/heads/issue-2746-rate-limit\n".write(
-            to: repoURL.appendingPathComponent(".git/HEAD"),
-            atomically: true,
-            encoding: .utf8
-        )
-        try writeExecutableScript(
-            at: fakeBinURL.appendingPathComponent("gh"),
-            contents: """
-            #!/bin/sh
-            printf invoked > "$CMUX_GH_MARKER"
-            printf '2746\\tOPEN\\thttps://github.com/manaflow-ai/cmux/pull/2746\\n'
-            """
-        )
-        let socketFD = try bindUnixSocket(at: socketPath.path)
-        defer {
-            Darwin.close(socketFD)
-            unlink(socketPath.path)
-            try? fileManager.removeItem(at: root)
-        }
-
-        let result = try runInteractiveBash(
-            cmuxLoadShellIntegration: true,
-            command: """
-            _cmux_send() { :; }
-            _cmux_report_pr_for_path "\(repoURL.path)" || true
-            [[ -e "\(markerURL.path)" ]] && printf 'MARKER=1\\n' || printf 'MARKER=0\\n'
-            """,
-            extraEnvironment: [
-                "CMUX_NO_PR_WATCH": "1",
-                "CMUX_GH_MARKER": markerURL.path,
-                "CMUX_SOCKET_PATH": socketPath.path,
-                "PATH": "\(fakeBinURL.path):/usr/bin:/bin",
-            ]
-        )
-
-        XCTAssertTrue(result.stdout.contains("MARKER=0"), result.stdout)
     }
 
     func testZshPromptResetsTerminalKeyboardProtocols() throws {
@@ -6103,202 +5156,6 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
     }
 }
 
-final class BrowserInstallDetectorTests: XCTestCase {
-    func testDetectInstalledBrowsersUsesBundleIdAndProfileData() throws {
-        let home = makeTemporaryHome()
-        defer { try? FileManager.default.removeItem(at: home) }
-
-        try createFile(
-            at: home
-                .appendingPathComponent("Library/Application Support/Google/Chrome/Default/History"),
-            contents: Data()
-        )
-        try createFile(
-            at: home
-                .appendingPathComponent("Library/Application Support/Firefox/Profiles/dev.default-release/cookies.sqlite"),
-            contents: Data()
-        )
-
-        let detected = BrowserInstalledBrowserDetector(
-            homeDirectoryURL: home,
-            bundleLookup: { bundleIdentifier in
-                if bundleIdentifier == "com.google.Chrome" {
-                    return URL(fileURLWithPath: "/Applications/Google Chrome.app", isDirectory: true)
-                }
-                return nil
-            },
-            applicationSearchDirectories: []
-
-        ).detectInstalledBrowsers()
-
-        guard let chrome = detected.first(where: { $0.descriptor.id == "google-chrome" }) else {
-            XCTFail("Expected Chrome to be detected")
-            return
-        }
-        guard let firefox = detected.first(where: { $0.descriptor.id == "firefox" }) else {
-            XCTFail("Expected Firefox to be detected from profile data")
-            return
-        }
-
-        XCTAssertNotNil(chrome.appURL)
-        XCTAssertEqual(firefox.profileURLs.count, 1)
-        XCTAssertNil(firefox.appURL)
-    }
-
-    func testDetectInstalledBrowsersReturnsEmptyWhenNoSignalsExist() throws {
-        let home = makeTemporaryHome()
-        defer { try? FileManager.default.removeItem(at: home) }
-
-        let detected = BrowserInstalledBrowserDetector(
-            homeDirectoryURL: home,
-            bundleLookup: { _ in nil },
-            applicationSearchDirectories: []
-
-        ).detectInstalledBrowsers()
-
-        XCTAssertTrue(detected.isEmpty)
-    }
-
-    func testUngoogledChromiumRequiresAppSignal() throws {
-        let home = makeTemporaryHome()
-        defer { try? FileManager.default.removeItem(at: home) }
-
-        try createFile(
-            at: home
-                .appendingPathComponent("Library/Application Support/Chromium/Default/History"),
-            contents: Data()
-        )
-
-        let detected = BrowserInstalledBrowserDetector(
-            homeDirectoryURL: home,
-            bundleLookup: { _ in nil },
-            applicationSearchDirectories: []
-
-        ).detectInstalledBrowsers()
-
-        XCTAssertTrue(detected.contains(where: { $0.descriptor.id == "chromium" }))
-        XCTAssertFalse(detected.contains(where: { $0.descriptor.id == "ungoogled-chromium" }))
-    }
-
-    func testDetectInstalledBrowsersDiscoversHeliumProfilesFromChromiumLayout() throws {
-        let home = makeTemporaryHome()
-        defer { try? FileManager.default.removeItem(at: home) }
-
-        let heliumRoot = home.appendingPathComponent("Library/Application Support/net.imput.helium", isDirectory: true)
-        try createFile(
-            at: heliumRoot.appendingPathComponent("Default/History"),
-            contents: Data()
-        )
-        try createFile(
-            at: heliumRoot.appendingPathComponent("Profile 1/Cookies"),
-            contents: Data()
-        )
-        try createFile(
-            at: heliumRoot.appendingPathComponent("Local State"),
-            contents: Data(
-                """
-                {
-                  "profile": {
-                    "info_cache": {
-                      "Default": {
-                        "name": "Personal"
-                      },
-                      "Profile 1": {
-                        "name": "Work"
-                      }
-                    }
-                  }
-                }
-                """.utf8
-            )
-        )
-
-        let detected = BrowserInstalledBrowserDetector(
-            homeDirectoryURL: home,
-            bundleLookup: { _ in nil },
-            applicationSearchDirectories: []
-
-        ).detectInstalledBrowsers()
-
-        guard let helium = detected.first(where: { $0.descriptor.id == "helium" }) else {
-            XCTFail("Expected Helium to be detected")
-            return
-        }
-
-        XCTAssertEqual(helium.family, .chromium)
-        XCTAssertEqual(helium.profiles.map(\.displayName), ["Personal", "Work"])
-        XCTAssertEqual(
-            helium.profiles.map(\.rootURL.lastPathComponent),
-            ["Default", "Profile 1"]
-        )
-    }
-
-    func testDetectInstalledBrowsersDiscoversSafariProfiles() throws {
-        let home = makeTemporaryHome()
-        defer { try? FileManager.default.removeItem(at: home) }
-
-        try createFile(
-            at: home.appendingPathComponent("Library/Safari/History.db"),
-            contents: Data()
-        )
-        try createFile(
-            at: home.appendingPathComponent(
-                "Library/Safari/Profiles/Work/History.db"
-            ),
-            contents: Data()
-        )
-        try createFile(
-            at: home.appendingPathComponent(
-                "Library/Containers/com.apple.Safari/Data/Library/Safari/Profiles/Travel/History.db"
-            ),
-            contents: Data()
-        )
-
-        let detected = BrowserInstalledBrowserDetector(
-            homeDirectoryURL: home,
-            bundleLookup: { _ in nil },
-            applicationSearchDirectories: []
-
-        ).detectInstalledBrowsers()
-
-        guard let safari = detected.first(where: { $0.descriptor.id == "safari" }) else {
-            XCTFail("Expected Safari to be detected")
-            return
-        }
-
-        XCTAssertEqual(Set(safari.profiles.map(\.displayName)), Set(["Default", "Work", "Travel"]))
-        XCTAssertEqual(
-            safari.profiles
-                .map { $0.rootURL.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false) }
-                .sorted(),
-            [
-                home.appendingPathComponent("Library/Safari", isDirectory: true)
-                    .standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false),
-                home.appendingPathComponent("Library/Safari/Profiles/Work", isDirectory: true)
-                    .standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false),
-                home.appendingPathComponent(
-                    "Library/Containers/com.apple.Safari/Data/Library/Safari/Profiles/Travel",
-                    isDirectory: true
-                ).standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false),
-            ].sorted()
-        )
-    }
-
-    private func makeTemporaryHome() -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("cmux-browser-detect-\(UUID().uuidString)")
-    }
-
-    private func createFile(at url: URL, contents: Data) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard FileManager.default.createFile(atPath: url.path, contents: contents) else {
-            throw CocoaError(
-                .fileWriteUnknown,
-                userInfo: [NSFilePathErrorKey: url.path]
-            )
-        }
-    }
-}
-
 @Suite("Ghostty appearance synchronization")
 struct GhosttyAppearanceSynchronizationTests {
     @Test("Appearance transition defers while a configuration reload is active")
@@ -6330,52 +5187,5 @@ struct GhosttyAppearanceSynchronizationTests {
             return
         }
         #expect(colorScheme == .dark)
-    }
-}
-
-final class BrowserImportScopeTests: XCTestCase {
-    func testFromSelectionCookiesOnly() {
-        let scope = BrowserImportScope.fromSelection(
-            includeCookies: true,
-            includeHistory: false,
-            includeAdditionalData: false
-        )
-        XCTAssertEqual(scope, .cookiesOnly)
-    }
-
-    func testFromSelectionHistoryOnly() {
-        let scope = BrowserImportScope.fromSelection(
-            includeCookies: false,
-            includeHistory: true,
-            includeAdditionalData: false
-        )
-        XCTAssertEqual(scope, .historyOnly)
-    }
-
-    func testFromSelectionCookiesAndHistory() {
-        let scope = BrowserImportScope.fromSelection(
-            includeCookies: true,
-            includeHistory: true,
-            includeAdditionalData: false
-        )
-        XCTAssertEqual(scope, .cookiesAndHistory)
-    }
-
-    func testFromSelectionEverything() {
-        let scope = BrowserImportScope.fromSelection(
-            includeCookies: false,
-            includeHistory: false,
-            includeAdditionalData: true
-        )
-        XCTAssertEqual(scope, .everything)
-    }
-
-    func testFromSelectionRejectsEmptySelection() {
-        let scope = BrowserImportScope.fromSelection(
-            includeCookies: false,
-            includeHistory: false,
-            includeAdditionalData: false
-        )
-        XCTAssertNil(scope)
     }
 }

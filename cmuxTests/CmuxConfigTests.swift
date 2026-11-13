@@ -1451,49 +1451,6 @@ final class CmuxConfigDecodingTests: XCTestCase {
         }
     }
 
-    func testDecodeNestedSplits() throws {
-        let json = """
-        {
-          "commands": [{
-            "name": "nested",
-            "workspace": {
-              "layout": {
-                "direction": "horizontal",
-                "children": [
-                  { "pane": { "surfaces": [{ "type": "terminal" }] } },
-                  {
-                    "direction": "vertical",
-                    "children": [
-                      { "pane": { "surfaces": [{ "type": "terminal" }] } },
-                      { "pane": { "surfaces": [{ "type": "browser", "url": "http://localhost:3000" }] } }
-                    ]
-                  }
-                ]
-              }
-            }
-          }]
-        }
-        """
-        let config = try decode(json)
-        let layout = config.commands[0].workspace!.layout!
-        if case .split(let outer) = layout {
-            XCTAssertEqual(outer.direction, .horizontal)
-            if case .split(let inner) = outer.children[1] {
-                XCTAssertEqual(inner.direction, .vertical)
-                if case .pane(let browserPane) = inner.children[1] {
-                    XCTAssertEqual(browserPane.surfaces[0].type, .browser)
-                    XCTAssertEqual(browserPane.surfaces[0].url, "http://localhost:3000")
-                } else {
-                    XCTFail("Expected pane node for inner second child")
-                }
-            } else {
-                XCTFail("Expected split node for outer second child")
-            }
-        } else {
-            XCTFail("Expected split node")
-        }
-    }
-
     // MARK: Surface definitions
 
     func testDecodeTerminalSurfaceAllFields() throws {
@@ -1529,35 +1486,6 @@ final class CmuxConfigDecodingTests: XCTestCase {
             XCTAssertEqual(s.env, ["NODE_ENV": "development", "PORT": "3000"])
             XCTAssertEqual(s.focus, true)
             XCTAssertNil(s.url)
-        } else {
-            XCTFail("Expected pane node")
-        }
-    }
-
-    func testDecodeBrowserSurface() throws {
-        let json = """
-        {
-          "commands": [{
-            "name": "test",
-            "workspace": {
-              "layout": {
-                "pane": {
-                  "surfaces": [{
-                    "type": "browser",
-                    "name": "Preview",
-                    "url": "http://localhost:8080"
-                  }]
-                }
-              }
-            }
-          }]
-        }
-        """
-        let config = try decode(json)
-        if case .pane(let pane) = config.commands[0].workspace!.layout! {
-            let s = pane.surfaces[0]
-            XCTAssertEqual(s.type, .browser)
-            XCTAssertEqual(s.url, "http://localhost:8080")
         } else {
             XCTFail("Expected pane node")
         }
@@ -2103,24 +2031,4 @@ final class CmuxLayoutEncodingTests: XCTestCase {
         }
     }
 
-    func testSplitNodeRoundTrips() throws {
-        let original = CmuxLayoutNode.split(CmuxSplitDefinition(
-            direction: .vertical,
-            split: 0.7,
-            children: [
-                .pane(CmuxPaneDefinition(surfaces: [CmuxSurfaceDefinition(type: .terminal)])),
-                .pane(CmuxPaneDefinition(surfaces: [CmuxSurfaceDefinition(type: .browser, url: "http://localhost")]))
-            ]
-        ))
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(CmuxLayoutNode.self, from: data)
-
-        if case .split(let split) = decoded {
-            XCTAssertEqual(split.direction, .vertical)
-            XCTAssertEqual(split.split, 0.7)
-            XCTAssertEqual(split.children.count, 2)
-        } else {
-            XCTFail("Expected split node after round-trip")
-        }
-    }
 }

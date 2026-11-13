@@ -22,21 +22,6 @@ struct ShortcutActionNumberedDigitTests {
         )
     }
 
-    @Test func diffViewerFileNavigationDefaultsAreMnemonicChords() {
-        #expect(
-            ShortcutAction.diffViewerNextFile.defaultShortcut == StoredShortcut(
-                first: ShortcutStroke(key: "]"),
-                second: ShortcutStroke(key: "f")
-            )
-        )
-        #expect(
-            ShortcutAction.diffViewerPreviousFile.defaultShortcut == StoredShortcut(
-                first: ShortcutStroke(key: "["),
-                second: ShortcutStroke(key: "f")
-            )
-        )
-    }
-
     @Test func fileExplorerOpenSelectionDefaultsMatchKeyboardOpenPolicy() {
         #expect(
             ShortcutAction.fileExplorerOpenSelection.defaultShortcut == StoredShortcut(
@@ -60,9 +45,6 @@ struct ShortcutActionNumberedDigitTests {
             .diffViewerScrollUpEmacs,
             .diffViewerScrollToBottom,
             .diffViewerScrollToTop,
-            .diffViewerOpenFileSearch,
-            .diffViewerNextFile,
-            .diffViewerPreviousFile,
             .fileExplorerOpenSelection,
             .fileExplorerOpenSelectionFinderAlias,
         ]

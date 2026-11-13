@@ -18,7 +18,6 @@ import Carbon.HIToolbox
 import os
 import Bonsplit
 import CMUXAgentLaunch
-import CMUXMobileCore
 import IOSurface
 import UniformTypeIdentifiers
 enum GhosttyStartupAppearancePreviewState {
@@ -67,22 +66,8 @@ private func cmuxRuntimeReadClipboardCallback(
 // CmuxTerminalCore). The process-wide instance is the transitional
 // GhosttyApp.terminalPasteboard composition static below.
 
-/// The app-side conformance injected into ``TerminalLinkRouter``: terminal
-/// links validate hosts and resolve bare domains through the same browser
-/// rules the embedded browser uses.
-struct TerminalBrowserHostNormalizer: BrowserHostNormalizing {
-    func normalizedHost(_ rawHost: String) -> String? {
-        BrowserInsecureHTTPSettings.normalizeHost(rawHost)
-    }
-
-    func navigableWebURL(_ input: String) -> URL? {
-        resolveBrowserNavigableURL(input)
-    }
-}
-
 func resolveTerminalOpenURLTarget(_ rawValue: String) -> TerminalOpenURLTarget? {
-    TerminalLinkRouter(hostNormalizer: TerminalBrowserHostNormalizer())
-        .resolveOpenURLTarget(rawValue)
+    TerminalLinkRouter().resolveOpenURLTarget(rawValue)
 }
 
 private var terminalKeyboardCopyModeIndicatorText: String {
@@ -330,7 +315,7 @@ class GhosttyApp {
         }
     )
 
-    private static let releaseBundleIdentifier = "com.cmuxterm.app"
+    private static let releaseBundleIdentifier = "com.comux.app"
     /// Shared config-file discovery seam. Resolves Ghostty config scan paths,
     /// scans them for font/appearance directives, and decides legacy/CJK/theme
     /// overrides. The C-API config-load methods below call it to decide *what*
@@ -678,16 +663,6 @@ class GhosttyApp {
                 lastReportedUptime: lastScrollLagReportUptime,
                 cooldown: scrollLagReportCooldownSeconds
             ) {
-                sentryCaptureWarning(
-                    "Scroll lag detected",
-                    category: "scroll_lag",
-                    data: [
-                        "samples": samples,
-                        "avg_ms": String(format: "%.2f", avgLag),
-                        "max_ms": String(format: "%.2f", maxLag),
-                        "threshold_ms": threshold
-                    ]
-                )
                 lastScrollLagReportUptime = nowUptime
             }
             // Reset stats
@@ -740,12 +715,6 @@ class GhosttyApp {
         } else {
             initializationLogger.error("\(message, privacy: .public) \(String(describing: data), privacy: .public)")
         }
-        sentryCaptureError(
-            message,
-            category: "terminal",
-            data: data,
-            contextKey: "ghostty.initialization"
-        )
     }
 
     private func initializeGhostty() {
@@ -3642,7 +3611,6 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     }()
     internal enum DropPlan: Equatable {
         case insertText(String)
-        case uploadFiles([URL])
         case reject
     }
 
@@ -7040,24 +7008,6 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         let eventPoint = convert(event.locationInWindow, from: nil)
         trackMousePointIfUsable(eventPoint)
         let point = preferredPointerPoint(from: eventPoint) ?? eventPoint
-#if DEBUG
-        if event.modifierFlags.contains(.command) || selectionActive {
-            runtimeDebugLog(
-                hypothesisID: "h1",
-                name: "flags_changed",
-                expected: "selection active should suppress cmd-hover",
-                actual: suppressCommandPathHover ? "suppressed" : "forwarded",
-                data: [
-                    "flags": debugModifierString(event.modifierFlags),
-                    "selection_active": selectionActive,
-                    "point_x": eventPoint.x,
-                    "point_y": eventPoint.y,
-                    "resolved_point_x": point.x,
-                    "resolved_point_y": point.y
-                ]
-            )
-        }
-#endif
         ghostty_surface_mouse_pos(
             surface,
             point.x,
@@ -7522,42 +7472,6 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             flags.contains(.option) ? "opt" : nil,
         ].compactMap { $0 }.joined(separator: "+")
     }
-
-    private func runtimeDebugLog(
-        hypothesisID: String,
-        name: String,
-        expected: String? = nil,
-        actual: String? = nil,
-        data: [String: Any] = [:]
-    ) {
-        var payload = data
-        payload["surface_id"] = terminalSurface?.id.uuidString ?? "nil"
-        payload["word_path_hover_active"] = wordPathHoverActive
-        CmuxRuntimeDebugCapture.logIfConfigured(
-            hypothesisID: hypothesisID,
-            source: "GhosttyNSView.\(name)",
-            name: name,
-            expected: expected,
-            actual: actual,
-            data: payload
-        )
-    }
-
-    private func runtimeDebugResolutionPayload(_ resolution: WordPathResolution?) -> [String: Any] {
-        guard let resolution else {
-            return [
-                "resolution_source": "none",
-                "resolved_path_basename": "",
-                "raw_token": ""
-            ]
-        }
-
-        return [
-            "resolution_source": resolution.source.rawValue,
-            "resolved_path_basename": URL(fileURLWithPath: resolution.path).lastPathComponent,
-            "raw_token": resolution.rawToken
-        ]
-    }
     #endif
 
     private func requestPointerFocusRecovery() {
@@ -7876,28 +7790,11 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         cmdHeld: Bool,
         suppressPathHover: Bool = false
     ) {
-        let hoverWasActive = wordPathHoverActive
         guard cmdHeld, !suppressPathHover else {
             if wordPathHoverActive {
                 wordPathHoverActive = false
                 NSCursor.pop()
             }
-#if DEBUG
-            if cmdHeld || suppressPathHover || hoverWasActive {
-                runtimeDebugLog(
-                    hypothesisID: "h1",
-                    name: "hover_update",
-                    expected: "cmd-hover off while selection is active",
-                    actual: suppressPathHover ? "suppressed" : "inactive",
-                    data: [
-                        "cmd_held": cmdHeld,
-                        "suppress_path_hover": suppressPathHover,
-                        "hover_active_before": hoverWasActive,
-                        "hover_active_after": wordPathHoverActive
-                    ]
-                )
-            }
-#endif
             return
         }
 
@@ -7911,26 +7808,6 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             wordPathHoverActive = false
             NSCursor.pop()
         }
-#if DEBUG
-        if cmdHeld || hoverWasActive || wordPathHoverActive || resolution != nil {
-            var payload: [String: Any] = [
-                "cmd_held": cmdHeld,
-                "suppress_path_hover": suppressPathHover,
-                "hover_active_before": hoverWasActive,
-                "hover_active_after": wordPathHoverActive
-            ]
-            for (key, value) in runtimeDebugResolutionPayload(resolution) {
-                payload[key] = value
-            }
-            runtimeDebugLog(
-                hypothesisID: resolution == nil ? "h1" : "h2",
-                name: "hover_update",
-                expected: "resolved path only when hover should activate",
-                actual: wordPathHoverActive ? "hover_active" : "hover_inactive",
-                data: payload
-            )
-        }
-#endif
     }
 
     private func resolvedWordPathWorkingDirectory(
@@ -8103,25 +7980,6 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         let ghosttyConsumed = runtimeOutcome != .unhandled
         let resolvedPoint = preferredPointerPoint(from: point)
         guard cmdHeld, !suppressCommandPathHover else {
-#if DEBUG
-            if cmdHeld || suppressCommandPathHover {
-                runtimeDebugLog(
-                    hypothesisID: "h1",
-                    name: "command_click_release",
-                    expected: "cmd-click fallback only when selection is inactive",
-                    actual: suppressCommandPathHover ? "suppressed" : "not_cmd_click",
-                    data: [
-                        "flags": debugModifierString(modifierFlags),
-                        "ghostty_consumed": ghosttyConsumed,
-                        "point_x": point.x,
-                        "point_y": point.y,
-                        "resolved_point_x": resolvedPoint?.x ?? -1,
-                        "resolved_point_y": resolvedPoint?.y ?? -1,
-                        "suppress_path_hover": suppressCommandPathHover
-                    ]
-                )
-            }
-#endif
             return nil
         }
 
@@ -8152,60 +8010,8 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
 
         switch route {
         case .runtimeOpenURL:
-#if DEBUG
-            runtimeDebugLog(
-                hypothesisID: "h3",
-                name: "command_click_release",
-                expected: "a runtime URL action exclusively owns the release",
-                actual: "runtime_open_url_owned",
-                data: [
-                    "flags": debugModifierString(modifierFlags),
-                    "ghostty_consumed": ghosttyConsumed,
-                    "point_x": point.x,
-                    "point_y": point.y
-                ]
-            )
-#endif
             return nil
         case .none:
-#if DEBUG
-            if let resolution = resolvedPath {
-                var payload: [String: Any] = [
-                    "flags": debugModifierString(modifierFlags),
-                    "ghostty_consumed": ghosttyConsumed,
-                    "point_x": point.x,
-                    "point_y": point.y,
-                    "resolved_point_x": resolvedPoint?.x ?? -1,
-                    "resolved_point_y": resolvedPoint?.y ?? -1,
-                    "suppress_path_hover": suppressCommandPathHover
-                ]
-                for (key, value) in runtimeDebugResolutionPayload(resolution) {
-                    payload[key] = value
-                }
-                runtimeDebugLog(
-                    hypothesisID: "h3",
-                    name: "command_click_release",
-                    expected: "ghostty-consumed clicks should only skip fallback for real ghostty targets",
-                    actual: "consumed_quicklook_resolution_skipped",
-                    data: payload
-                )
-            } else {
-                runtimeDebugLog(
-                    hypothesisID: "h2",
-                    name: "command_click_release",
-                    expected: "cmd-click should resolve the token under the pointer",
-                    actual: "no_resolution",
-                    data: [
-                        "flags": debugModifierString(modifierFlags),
-                        "ghostty_consumed": ghosttyConsumed,
-                        "point_x": point.x,
-                        "point_y": point.y,
-                        "resolved_point_x": resolvedPoint?.x ?? -1,
-                        "resolved_point_y": resolvedPoint?.y ?? -1
-                    ]
-                )
-            }
-#endif
             return nil
         case .pathFallback:
             break
@@ -8217,30 +8023,11 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         cmuxDebugLog(
             "link.wordFallback resolved=\(resolution.path) source=\(resolution.source.rawValue) consumed=\(ghosttyConsumed ? 1 : 0)"
         )
-        var payload: [String: Any] = [
-            "flags": debugModifierString(modifierFlags),
-            "ghostty_consumed": ghosttyConsumed,
-            "point_x": point.x,
-            "point_y": point.y,
-            "resolved_point_x": resolvedPoint?.x ?? -1,
-            "resolved_point_y": resolvedPoint?.y ?? -1,
-            "suppress_path_hover": suppressCommandPathHover
-        ]
-        for (key, value) in runtimeDebugResolutionPayload(resolution) {
-            payload[key] = value
-        }
-        runtimeDebugLog(
-            hypothesisID: resolution.source == .snapshot ? "h3" : "h2",
-            name: "command_click_release",
-            expected: "cmd-click should open the resolved path",
-            actual: "opening_resolved_path",
-            data: payload
-        )
         #endif
 
-        // Remote-surface guard runs before shouldRoute so we never stat a local
-        // path on the main thread for a remote workspace. When the cmux route
-        // is applicable but split creation fails, fall back to the preferred
+        // The surface guard runs before shouldRoute so we never stat a local
+        // path on the main thread for a surface that does not run on this Mac.
+        // When the cmux route is applicable but split creation fails, fall back to the preferred
         // editor so the click never silently no-ops.
         if let termSurface = terminalSurface,
            let workspace = termSurface.owningWorkspace(),
@@ -8692,7 +8479,6 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             systemSymbolName: "arrow.trianglehead.2.clockwise",
             accessibilityDescription: nil
         )
-        appendReconnectRemotePaneMenuItem(to: menu)
         if terminalSurface != nil {
             menu.addItem(.separator())
             let identifiersItem = menu.addItem(
@@ -8716,11 +8502,6 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
 
     private func canSplitCurrentSurface() -> Bool {
         guard let surfaceId = terminalSurface?.id else { return false }
-        // Mirror panes are not workspace panels, but their split command routes
-        // to tmux and the resulting layout change rebuilds the mirrored panes.
-        if AppDelegate.shared?.remoteTmuxController.isMirrorPaneSurface(surfaceId) == true {
-            return true
-        }
         guard let tabId,
               let app = AppDelegate.shared,
               let manager = app.tabManagerFor(tabId: tabId) ?? app.tabManager,
@@ -8741,12 +8522,6 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     @discardableResult
     private func splitCurrentSurface(direction: SplitDirection) -> Bool {
         guard let surfaceId = terminalSurface?.id else { return false }
-        // Remote tmux mirror pane: never fall through to a local split. The tmux
-        // command either reaches the live stream, or the action reports false.
-        if let controller = AppDelegate.shared?.remoteTmuxController,
-           controller.isMirrorPaneSurface(surfaceId) {
-            return controller.handleMirrorSplitRequested(surfaceId: surfaceId, vertical: !direction.isHorizontal, focusIntent: .focusCreatedPane)
-        }
         guard let tabId,
               let app = AppDelegate.shared,
               let manager = app.tabManagerFor(tabId: tabId) ?? app.tabManager else {
@@ -9088,75 +8863,37 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     }
 
     static func dropPlanForTesting(
-        pasteboard: NSPasteboard,
-        isRemoteTerminalSurface: Bool
+        pasteboard: NSPasteboard
     ) -> DropPlan {
-        let target: TerminalImageTransferTarget = isRemoteTerminalSurface ? .remote(.workspaceRemote) : .local
         switch TerminalImageTransferPlanner.plan(
             pasteboard: pasteboard,
             mode: .drop,
-            target: target
+            target: .local
         ) {
         case .insertText(let text):
             return .insertText(text)
         case .insertTextSegments(let segments, _):
             return .insertText(segments.joined())
-        case .uploadFiles(let fileURLs, _):
-            return .uploadFiles(fileURLs)
-        case .reject, .pasteCloudImages:
+        case .reject:
             return .reject
-        }
-    }
-
-    static func performRemoteDropUploadForTesting(
-        upload: (@escaping (Result<[String], Error>) -> Void) -> Void,
-        sendText: @escaping (String) -> Void,
-        onFailure: @escaping () -> Void
-    ) {
-        upload { result in
-            switch result {
-            case .success(let remotePaths):
-                let content = remotePaths
-                    .map { Self.escapeDropForShell($0) }
-                    .joined(separator: " ")
-                guard !content.isEmpty else {
-                    onFailure()
-                    return
-                }
-                sendText(content)
-            case .failure:
-                onFailure()
-            }
         }
     }
 
     @discardableResult
     static func handleDropForTesting(
         pasteboard: NSPasteboard,
-        isRemoteTerminalSurface: Bool,
-        uploadRemote: ([URL], @escaping (Result<[String], Error>) -> Void) -> Void,
         sendText: @escaping (String) -> Void,
         onFailure: @escaping () -> Void
     ) -> Bool {
-        let target: TerminalImageTransferTarget = isRemoteTerminalSurface ? .remote(.workspaceRemote) : .local
         let plan = TerminalImageTransferPlanner.plan(
             pasteboard: pasteboard,
             mode: .drop,
-            target: target
+            target: .local
         )
         guard plan != .reject else { return false }
 
         TerminalImageTransferPlanner.execute(
             plan: plan,
-            uploadWorkspaceRemote: { urls, _, finish in
-                uploadRemote(urls) { result in
-                    finish(result)
-                    GhosttyApp.terminalPasteboard.cleanupTransferredTemporaryImageFiles(urls)
-                }
-            },
-            uploadDetectedSSH: { _, _, _, finish in
-                finish(.failure(NSError(domain: "cmux.remote.drop", code: 4)))
-            },
             insertText: sendText,
             onFailure: { _ in onFailure() }
         )
@@ -9170,49 +8907,6 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         onTextCompletion: @escaping () -> Void = {}
     ) -> Bool {
         guard plan != .reject else { return false }
-        if case .pasteCloudImages(let urls) = plan {
-            MainActor.assumeIsolated {
-                guard let terminalSurface else {
-                    GhosttyApp.terminalPasteboard.cleanupTransferredTemporaryImageFiles(urls)
-                    return
-                }
-                let operation = operation ?? TerminalImageTransferOperation()
-                let lease = CloudImagePasteInputLease(view: self, operation: operation)
-                terminalSurface.hostedView.beginImageTransferIndicator(
-                    for: operation,
-                    onCancel: {
-                        lease.finish()
-                        onCancel()
-                    }
-                )
-                let task = Task { @MainActor in
-                    defer {
-                        lease.finish()
-                        terminalSurface.hostedView.endImageTransferIndicator(for: operation)
-                        onTextCompletion()
-                    }
-                    do {
-                        try await terminalSurface.pasteCloudImages(
-                            urls,
-                            operation: operation
-                        )
-                    } catch is CancellationError {
-                        _ = operation.cancel()
-                    } catch {
-                        _ = operation.finish()
-                    }
-                }
-                operation.installCancellationHandler { task.cancel() }
-            }
-            return true
-        }
-        let operation = operation ?? {
-            if case .uploadFiles = plan {
-                return TerminalImageTransferOperation()
-            }
-            return nil
-        }()
-
         if let operation {
             terminalSurface?.hostedView.beginImageTransferIndicator(
                 for: operation,
@@ -9220,40 +8914,9 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             )
         }
 
-        if let operation, handleCustomDropUploadIfMatched(plan: plan, operation: operation) {
-            return true
-        }
-
         TerminalImageTransferPlanner.execute(
             plan: plan,
             operation: operation,
-            uploadWorkspaceRemote: { [weak self] fileURLs, operation, finish in
-                guard let workspace = MainActor.assumeIsolated({
-                    self?.terminalSurface?.owningWorkspace()
-                }) else {
-                    finish(.failure(NSError(domain: "cmux.remote.drop", code: 3)))
-                    GhosttyApp.terminalPasteboard.cleanupTransferredTemporaryImageFiles(fileURLs)
-                    return
-                }
-                workspace.uploadDroppedFilesForRemoteTerminal(
-                    fileURLs,
-                    operation: operation,
-                    completion: { result in
-                        finish(result)
-                        GhosttyApp.terminalPasteboard.cleanupTransferredTemporaryImageFiles(fileURLs)
-                    }
-                )
-            },
-            uploadDetectedSSH: { session, fileURLs, operation, finish in
-                session.uploadDroppedFiles(
-                    fileURLs,
-                    operation: operation,
-                    completion: { result in
-                        finish(result)
-                        GhosttyApp.terminalPasteboard.cleanupTransferredTemporaryImageFiles(fileURLs)
-                    }
-                )
-            },
             insertText: { [weak self] text in
                 let send = {
                     if let operation {
@@ -9285,7 +8948,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
                         NSSound.beep()
                     }
 #if DEBUG
-                    cmuxDebugLog("terminal.remoteDropUpload.failed surface=\(self?.terminalSurface?.id.uuidString.prefix(5) ?? "nil")")
+                    cmuxDebugLog("terminal.dropTransfer.failed surface=\(self?.terminalSurface?.id.uuidString.prefix(5) ?? "nil")")
 #endif
                 }
             }
@@ -9412,9 +9075,6 @@ extension Notification.Name {
     static let ghosttyDefaultBackgroundDidChange = Notification.Name("ghosttyDefaultBackgroundDidChange")
     static let ghosttySurfaceThemeDidChange = Notification.Name("ghosttySurfaceThemeDidChange")
     static let browserSearchFocus = Notification.Name("browserSearchFocus")
-    static let workspaceRemoteConnectionPresentationDidChange = Notification.Name(
-        "cmux.workspaceRemoteConnectionPresentationDidChange"
-    )
 }
 
 private final class TerminalViewportBorderOverlayView: NSView {
@@ -9522,8 +9182,6 @@ final class GhosttySurfaceScrollView: NSView {
     private let notificationRingLayer: CAShapeLayer
     private let flashOverlayView: GhosttyFlashOverlayView
     private let flashLayer: CAShapeLayer
-    let cloudTerminalOverlay = CloudTerminalOverlayCoordinator(dismissalStore: CloudBannerDismissalStore(defaults: .standard))
-    private var cloudTerminalReconnectOverlayView: CloudTerminalReconnectOverlayView? { cloudTerminalOverlay.overlay }
     private var hasVisibilityRevealRefreshScheduled = false
     var isRightSidebarDockSurface: Bool {
         surfaceView.terminalSurface?.focusPlacement == .rightSidebarDock
@@ -10071,13 +9729,6 @@ final class GhosttySurfaceScrollView: NSView {
             self.scheduleAutomaticFirstResponderApply(reason: "surfaceDidBecomeReady")
         })
         observers.append(NotificationCenter.default.addObserver(
-            forName: .workspaceRemoteConnectionPresentationDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            self?.handleWorkspaceRemoteConnectionPresentationDidChange(notification)
-        })
-        observers.append(NotificationCenter.default.addObserver(
             forName: .ghosttyDidReceiveWheelScroll,
             object: surfaceView,
             // Every producer is ``GhosttyNSView.scrollWheel`` on the main
@@ -10177,15 +9828,6 @@ final class GhosttySurfaceScrollView: NSView {
     }
 
     override var safeAreaInsets: NSEdgeInsets { NSEdgeInsetsZero }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        if let overlay = cloudTerminalReconnectOverlayView,
-           overlay.superview === self,
-           let hit = overlay.hitTest(convert(point, to: overlay)) {
-            return hit
-        }
-        return super.hitTest(point)
-    }
 
     // Avoid stealing focus on scroll; focus is managed explicitly by the surface view.
     override var acceptsFirstResponder: Bool { false }
@@ -10332,8 +9974,6 @@ final class GhosttySurfaceScrollView: NSView {
         _ = setFrameIfNeeded(notificationRingOverlayView, to: bounds)
         _ = setFrameIfNeeded(flashOverlayView, to: bounds)
         _ = setFrameIfNeeded(linkHoverIndicatorView, to: contentFrame)
-        if let cloudTerminalReconnectOverlayView { _ = setFrameIfNeeded(cloudTerminalReconnectOverlayView, to: contentFrame) }
-        synchronizeCloudTerminalReconnectOverlay()
         if let overlay = searchOverlayHostingView {
             _ = setFrameIfNeeded(overlay, to: contentFrame)
         }
@@ -10375,45 +10015,6 @@ final class GhosttySurfaceScrollView: NSView {
         guard !Self.rectApproximatelyEqual(view.frame, frame) else { return false }
         view.frame = frame
         return true
-    }
-
-    private func handleWorkspaceRemoteConnectionPresentationDidChange(_ notification: Notification) {
-        guard let terminalSurface = surfaceView.terminalSurface else {
-            synchronizeCloudTerminalReconnectOverlay()
-            return
-        }
-        if let workspace = notification.object as? Workspace,
-           workspace.id != terminalSurface.tabId {
-            return
-        }
-        synchronizeCloudTerminalReconnectOverlay()
-    }
-
-    private func currentCloudTerminalReconnectPresentation() -> CloudTerminalReconnectOverlayPolicy.Presentation? {
-        guard let terminalSurface = surfaceView.terminalSurface,
-              let workspace = terminalSurface.owningWorkspace() else {
-            return nil
-        }
-        return workspace.cloudTerminalReconnectOverlayPresentation(forSurfaceId: terminalSurface.id)
-    }
-
-    func synchronizeCloudTerminalReconnectOverlay() {
-        let legacyPresentation = cloudTerminalOverlay.session == nil ? currentCloudTerminalReconnectPresentation() : nil
-        guard cloudTerminalOverlay.session != nil || legacyPresentation != nil || cloudTerminalOverlay.overlay != nil else { return }
-        cloudTerminalOverlay.synchronize(
-            hostedView: self,
-            contentFrame: sessionContentFrame,
-            legacyPresentation: legacyPresentation,
-            onReconnect: { [weak self] in
-                guard let terminalSurface = self?.surfaceView.terminalSurface,
-                      let workspace = terminalSurface.owningWorkspace() else { return }
-                _ = workspace.reconnectCloudTerminalSurface(surfaceId: terminalSurface.id)
-            }
-        )
-        if let overlay = cloudTerminalReconnectOverlayView, overlay.superview === self {
-            updateKeyboardCopyModeBadgeZOrder(relativeTo: overlay)
-            updateImageTransferIndicatorZOrder(relativeTo: overlay)
-        }
     }
 
     private func sizeApproximatelyEqual(_ lhs: CGSize, _ rhs: CGSize, epsilon: CGFloat = 0.0001) -> Bool {
@@ -10602,7 +10203,6 @@ final class GhosttySurfaceScrollView: NSView {
         // has produced a real host size instead of a transient 1x1 placeholder.
         guard bounds.width > 1, bounds.height > 1 else { return }
         _ = synchronizeGeometryAndContent()
-        synchronizeCloudTerminalReconnectOverlay()
     }
 
     func setFocusHandler(_ handler: (() -> Void)?) {
@@ -11350,7 +10950,6 @@ final class GhosttySurfaceScrollView: NSView {
         surfaceView.setVisibleInUI(visible)
         isHidden = !visible
         surfaceView.terminalSurface?.setRendererPortalVisible(visible)
-        synchronizeCloudTerminalReconnectOverlay()
         if wasVisible != visible, lastRequestedPortalOcclusionVisible != visible {
             lastRequestedPortalOcclusionVisible = visible
             // A portal reveal inside a hidden window (agent/socket-driven

@@ -5,7 +5,7 @@ extension CMUXCLI {
     static let settingsSchemaURL = "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json"
     static let primarySettingsDisplayPath = "~/.config/cmux/cmux.json"
     static let legacySettingsDisplayPath = "~/.config/cmux/settings.json"
-    static let fallbackSettingsDisplayPath = "~/Library/Application Support/com.cmuxterm.app/settings.json"
+    static let fallbackSettingsDisplayPath = "~/Library/Application Support/com.comux.app/settings.json"
     static let ghosttyConfigDisplayPath = "~/.config/ghostty/config"
 
     private struct DocsResource {
@@ -42,14 +42,12 @@ extension CMUXCLI {
         DocsReference(
             topic: "managed-policies",
             aliases: ["mdm", "managed", "policy", "policies", "enterprise", "managed-device-policies"],
-            summary: "MDM-enforceable managed policies: disable the embedded browser, iOS remote control, and Cloud on managed Macs.",
+            summary: "MDM-enforceable managed policies: disable iOS remote control and Cloud on managed Macs.",
             webURL: "https://cmux.com/docs/managed-policies",
             rawResources: [
                 DocsResource(label: "managed device policies", url: "https://raw.githubusercontent.com/manaflow-ai/cmux/main/docs/managed-device-policies.md"),
             ],
-            commands: [
-                "cmux browser status --json",
-            ]
+            commands: []
         ),
         DocsReference(
             topic: "shortcuts",
@@ -78,20 +76,6 @@ extension CMUXCLI {
             commands: [
                 "cmux identify --json",
                 "cmux tree --all",
-            ]
-        ),
-        DocsReference(
-            topic: "browser",
-            aliases: ["browser-automation", "webview"],
-            summary: "Browser panel automation commands and snapshot-driven web interaction.",
-            webURL: "https://cmux.com/docs/browser-automation",
-            rawResources: [
-                DocsResource(label: "browser skill", url: "https://raw.githubusercontent.com/manaflow-ai/cmux/main/skills/cmux-browser/SKILL.md"),
-                DocsResource(label: "browser commands", url: "https://raw.githubusercontent.com/manaflow-ai/cmux/main/skills/cmux-browser/references/commands.md"),
-            ],
-            commands: [
-                "cmux browser --help",
-                "cmux browser snapshot",
             ]
         ),
         DocsReference(
@@ -163,7 +147,7 @@ extension CMUXCLI {
         }
 
         guard args.count == 1 else {
-            throw CLIError(message: "Usage: cmux docs [settings|shortcuts|api|browser|agents|dock|managed-policies]")
+            throw CLIError(message: "Usage: cmux docs [settings|shortcuts|api|agents|dock|managed-policies]")
         }
 
         if topic == "list" || topic == "all" {
@@ -188,7 +172,7 @@ extension CMUXCLI {
 
     func docsUsage() -> String {
         return """
-        Usage: cmux docs [settings|shortcuts|api|browser|agents|dock|managed-policies]
+        Usage: cmux docs [settings|shortcuts|api|agents|dock|managed-policies]
 
         Print the canonical docs URL, raw GitHub resources, and useful commands for a cmux topic.
         This command does not require a running cmux app or socket.
@@ -381,8 +365,8 @@ extension CMUXCLI {
           docs                Print the same output as `cmux docs settings`.
 
         Targets:
-          account, app, terminal, networking, sidebar-appearance,
-          custom-sidebars, automation, browser, browser-import,
+          account, app, terminal, sidebar-appearance,
+          custom-sidebars, automation,
           global-hotkey, keyboard-shortcuts, shortcuts, workspace-colors,
           cmux-json, json, reset
 
@@ -421,12 +405,6 @@ extension CMUXCLI {
             return "customSidebars"
         case "automation":
             return "automation"
-        case "browser":
-            return "browser"
-        case "networking", "network", "iroh":
-            return "networking"
-        case "browser-import", "browserimport", "import-browser-data":
-            return "browserImport"
         case "global-hotkey", "globalhotkey", "hotkey":
             return "globalHotkey"
         case "keyboard-shortcuts", "keyboardshortcuts", "shortcuts", "keys", "keybindings":

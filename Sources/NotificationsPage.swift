@@ -11,18 +11,10 @@ struct NotificationsPage: View {
     @FocusState private var focusedNotificationId: UUID?
     @State private var keyboardShortcutSettingsObserver = KeyboardShortcutSettingsObserver.shared
     @State private var ghosttyBackgroundColor = Color(nsColor: GhosttyBackgroundTheme.currentColor())
-    @State private var phonePushConfigurationState =
-        PhonePushClient.shared.configurationState
-
-    private var phonePushConfiguration: PhonePushConfiguration {
-        phonePushConfigurationState.configuration
-    }
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
-            phoneForwardingRow
             Divider()
 
             if !notificationStore.notificationMenuSnapshot.hasNotifications {
@@ -127,93 +119,6 @@ struct NotificationsPage: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-    }
-
-    private var phoneForwardingRow: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle(isOn: forwardToPhoneBinding) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "notifications.forwardToPhone.title", defaultValue: "Forward notifications to my iPhone"))
-                    Text(String(localized: "notifications.forwardToPhone.subtitle", defaultValue: "Send local agent notifications to cmux on your iPhone. Enabled by default; turn this off to stop this Mac from forwarding them."))
-                        .cmuxFont(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .accessibilityIdentifier("notificationsPage.forwardToPhone")
-            if phonePushConfiguration.forwardingEnabled {
-                VStack(alignment: .leading, spacing: 4) {
-                    Picker(
-                        String(localized: "notifications.forwardToPhone.mode.label", defaultValue: "When to send"),
-                        selection: forwardToPhoneModeBinding
-                    ) {
-                        Text(String(localized: "notifications.forwardToPhone.mode.onlyWhenAway", defaultValue: "Only when away from this Mac"))
-                            .tag(PhoneForwardingMode.onlyWhenAway.rawValue)
-                        Text(String(localized: "notifications.forwardToPhone.mode.always", defaultValue: "Always"))
-                            .tag(PhoneForwardingMode.always.rawValue)
-                    }
-                    .pickerStyle(.menu)
-                    .fixedSize()
-                    .cmuxFont(.caption)
-                    if phonePushConfiguration.mode == .onlyWhenAway {
-                        Text(awayModeExplanation)
-                            .cmuxFont(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.leading, 20)
-                Toggle(isOn: hidePhoneNotificationContentBinding) {
-                    Text(String(localized: "notifications.forwardToPhone.hideContent", defaultValue: "Hide content (send a generic message instead of the terminal text)"))
-                        .cmuxFont(.caption)
-                }
-                .padding(.leading, 20)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-
-    private var forwardToPhoneBinding: Binding<Bool> {
-        Binding(
-            get: { phonePushConfiguration.forwardingEnabled },
-            set: { enabled in
-                PhonePushClient.shared.updateSettings(
-                    forwardingEnabled: enabled
-                )
-            }
-        )
-    }
-
-    private var forwardToPhoneModeBinding: Binding<String> {
-        Binding(
-            get: { phonePushConfiguration.mode.rawValue },
-            set: { rawValue in
-                guard let mode = PhoneForwardingMode(rawValue: rawValue) else {
-                    return
-                }
-                PhonePushClient.shared.updateSettings(
-                    mode: mode
-                )
-            }
-        )
-    }
-
-    private var hidePhoneNotificationContentBinding: Binding<Bool> {
-        Binding(
-            get: { phonePushConfiguration.hideContent },
-            set: { hideContent in
-                PhonePushClient.shared.updateSettings(
-                    hideContent: hideContent
-                )
-            }
-        )
-    }
-
-    private var awayModeExplanation: String {
-        let format = String(
-            localized: "notifications.forwardToPhone.mode.subtitle",
-            defaultValue: "Away means the screen is locked or asleep, the screensaver is running, or there has been no keyboard or mouse input for %lld minutes."
-        )
-        return String(format: format, Int64(MacPresenceMonitor.recentHardwareInputThreshold / 60))
     }
 
     private var emptyState: some View {

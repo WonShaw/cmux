@@ -87,12 +87,12 @@ struct AppDelegatePresentPreferencesWindowTests {
         #expect(activateApplicationCallCount == 1)
     }
 
-    @Test func forwardsBrowserImportNavigationTarget() {
+    @Test func forwardsTerminalNavigationTarget() {
         var receivedNavigationTarget: SettingsNavigationTarget?
         var activateApplicationCallCount = 0
 
         AppDelegate.presentPreferencesWindow(
-            navigationTarget: .browserImport,
+            navigationTarget: .terminal,
             presentSettingsWindow: { navigationTarget in
                 receivedNavigationTarget = navigationTarget
                 return .presented
@@ -102,7 +102,7 @@ struct AppDelegatePresentPreferencesWindowTests {
             }
         )
 
-        #expect(receivedNavigationTarget == .browserImport)
+        #expect(receivedNavigationTarget == .terminal)
         #expect(activateApplicationCallCount == 1)
     }
 

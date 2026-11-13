@@ -22,14 +22,9 @@ extension Workspace {
             }
         }
         let orderedPanelIds = orderedPanelIds ?? sidebarOrderedPanelIds()
-        let pullRequests = sidebarPullRequestsInDisplayOrder(orderedPanelIds: orderedPanelIds)
         return WorkspaceTaskStatusSignals(
             anyAgentNeedsInput: anyAgentNeedsInput,
             anyAgentRunning: anyAgentRunning,
-            anyOpenPullRequest: pullRequests.contains { $0.status == .open },
-            hasPullRequests: !pullRequests.isEmpty,
-            allPullRequestsMergedOrClosed: !pullRequests.isEmpty
-                && pullRequests.allSatisfy { $0.status != .open },
             isGitDirty: sidebarGitBranchesInDisplayOrder(orderedPanelIds: orderedPanelIds).contains { $0.isDirty }
         )
     }

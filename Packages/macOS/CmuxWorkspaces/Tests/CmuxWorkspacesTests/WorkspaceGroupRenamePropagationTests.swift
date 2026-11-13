@@ -88,7 +88,7 @@ private final class RenamePropagationHost: WorkspaceGroupHosting {
         if select { model.selectedTabId = tab.id }
         return tab
     }
-    func createWorkspaceForGroup(title: String?, workingDirectory: String?, initialSurface: NewWorkspaceInitialSurface, initialBrowserURL: URL?, initialBrowserOmnibarVisible: Bool, initialBrowserTransparentBackground: Bool, inheritWorkingDirectory: Bool, select: Bool, applyCreationTitleAsCustomTitle: Bool) -> RenamePropagationStubTab? {
+    func createWorkspaceForGroup(title: String?, workingDirectory: String?, initialSurface: NewWorkspaceInitialSurface, inheritWorkingDirectory: Bool, select: Bool, applyCreationTitleAsCustomTitle: Bool) -> RenamePropagationStubTab? {
         let tab = RenamePropagationStubTab()
         model.tabs.append(tab)
         if select { model.selectedTabId = tab.id }

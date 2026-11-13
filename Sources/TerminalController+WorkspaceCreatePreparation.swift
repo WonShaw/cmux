@@ -122,62 +122,6 @@ extension TerminalController {
 }
 
 extension TerminalController {
-    enum MobileWorkspaceCreateReservationOutcome {
-        case notRequired
-        case accepted
-        case live(TaskCreateWorkspaceResolution)
-        case failure(V2CallResult)
-    }
-
-    func v2ReserveMobileWorkspaceCreate(
-        preparation: WorkspaceCreatePreparation
-    ) async -> MobileWorkspaceCreateReservationOutcome {
-        guard let operationID = preparation.operationID else { return .notRequired }
-        let resolution = {
-            self.taskCreateOperationResolution(
-                operationID: operationID,
-                candidates: self.taskCreateWorkspaceCandidates(requested: preparation.tabManager),
-                idempotencyCache: preparation.idempotencyCache
-            )
-        }
-        switch resolution() {
-        case let .live(workspace):
-            return .live(workspace)
-        case .completed:
-            return .failure(Self.v2MobileCompletedOperationResult(operationID: operationID))
-        case nil:
-            break
-        }
-
-        do {
-            guard try await preparation.idempotencyCache.acceptAsynchronously(
-                operationID: operationID
-            ) else {
-                if case let .live(workspace)? = resolution() { return .live(workspace) }
-                return .failure(Self.v2MobileCompletedOperationResult(operationID: operationID))
-            }
-            guard !preparation.tabManager.isFinalizedForWindowClose else {
-                _ = try await preparation.idempotencyCache
-                    .releaseUnassociatedAcceptanceAsynchronously(operationID: operationID)
-                return .failure(.err(
-                    code: "internal_error",
-                    message: "Failed to create workspace",
-                    data: nil
-                ))
-            }
-            return .accepted
-        } catch {
-            workspaceCreateIdempotencyLogger.error(
-                "Task reservation failed: \(String(describing: error), privacy: .private)"
-            )
-            return .failure(.err(
-                code: "persistence_failed",
-                message: "Workspace task could not be reserved safely",
-                data: nil
-            ))
-        }
-    }
-
     nonisolated static func v2MobileCompletedOperationResult(
         operationID: UUID
     ) -> V2CallResult {

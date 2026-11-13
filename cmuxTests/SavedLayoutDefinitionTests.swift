@@ -88,7 +88,7 @@ import Testing
                         split: 0.66,
                         children: [
                             .pane(CmuxPaneDefinition(surfaces: [
-                                CmuxSurfaceDefinition(type: .browser, name: "Docs", command: nil, cwd: nil, env: nil, url: "https://example.com", focus: nil),
+                                CmuxSurfaceDefinition(type: .terminal, name: "Docs", command: nil, cwd: nil, env: nil, url: nil, focus: nil),
                             ])),
                             .pane(CmuxPaneDefinition(surfaces: [
                                 CmuxSurfaceDefinition(type: .terminal, name: nil, command: nil, cwd: nil, env: nil, url: nil, focus: nil),

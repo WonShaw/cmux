@@ -88,7 +88,7 @@ extension TerminalController {
                 in: .userDomainMask
             ).first ?? FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Library/Application Support", isDirectory: true)
-            let rawBundleID = Bundle.main.bundleIdentifier ?? "com.cmuxterm.app"
+            let rawBundleID = Bundle.main.bundleIdentifier ?? "com.comux.app"
             let bundleID = rawBundleID.map { character in
                 character.isLetter || character.isNumber || character == "." || character == "-"
                     ? character

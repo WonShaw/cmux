@@ -4,8 +4,14 @@ import Foundation
 public enum CmuxSidebarProviderWorkspacePopoverTab: String, Codable, CaseIterable, Equatable, Sendable {
     /// Notes tab.
     case notes
-    /// Browser previews tab.
-    case browser
     /// Pull request details tab.
     case pullRequest
+
+    /// Creates a tab, falling back to `.notes` for raw values this version no
+    /// longer knows (for example the removed browser tab).
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = CmuxSidebarProviderWorkspacePopoverTab(rawValue: rawValue) ?? .notes
+    }
 }

@@ -12,25 +12,6 @@ import Foundation
 ///
 /// Decisions read only the forced-preference resolver. Tests inject a resolver
 /// into the resource owner instead of replacing process-wide policy state.
-enum ManagedRemoteConnectionsPolicy {
-    private static let policy = ManagedDevicePolicy()
-
-    /// Whether a profile forces `DisableRemoteConnections`.
-    static var isDisabled: Bool {
-        return policy.isEnforced(.disableRemoteConnections)
-    }
-
-    static var isEnabled: Bool { !isDisabled }
-
-    /// The message shown wherever a refusal surfaces to the user.
-    static var disabledMessage: String {
-        String(
-            localized: "managedPolicy.remoteConnections.disabled",
-            defaultValue: "Remote connections are disabled by your organization."
-        )
-    }
-}
-
 /// MDM master switch for cmux-mediated file transfer.
 enum ManagedFileTransferPolicy {
     private static let policy = ManagedDevicePolicy()
@@ -49,9 +30,7 @@ enum ManagedFileTransferPolicy {
         )
     }
 
-    /// The failure handed to upload callers. An `NSError` rather than a new
-    /// `RemoteDropUploadError` case, so the shared package enum keeps its
-    /// exhaustive switches intact.
+    /// The failure handed to transfer callers.
     static func refusalError() -> NSError {
         NSError(
             domain: refusalErrorDomain,
@@ -93,82 +72,10 @@ enum ManagedFileTransferPolicy {
     }
 }
 
-/// MDM master switch for cmux Cloud (`DisableCloud`), for the gates that
-/// have no injectable resolver of their own: the action chokepoint, the
-/// non-`vm.*` control-plane socket verbs, and the control-plane clients.
-/// `VMClient`, the tunnel coordinator, and session restore keep their
-/// injected resolvers.
-enum ManagedCloudPolicy {
-    private static let policy = ManagedDevicePolicy()
-
-    /// Whether a profile forces `DisableCloud`.
-    static var isDisabled: Bool {
-        return policy.isEnforced(.disableCloud)
-    }
-
-    static var isEnabled: Bool { !isDisabled }
-
-    /// The stable socket error code every Cloud refusal carries.
-    static let socketErrorCode = "cloud_disabled"
-
-    static var disabledMessage: String {
-        String(
-            localized: "cloud.managed.disabled",
-            defaultValue: "Cloud Machines are disabled by your administrator."
-        )
-    }
-}
-
-/// MDM master switch for uploading local AI credentials (Claude/Codex OAuth
-/// tokens, Anthropic/OpenAI API keys) to the cmux tenant. Independent of
-/// `DisableCloud`, which already refuses the same families.
-enum ManagedAICredentialUploadPolicy {
-    private static let policy = ManagedDevicePolicy()
-
-    /// Whether a profile forces `DisableAICredentialUpload`.
-    static var isDisabled: Bool {
-        return policy.isEnforced(.disableAICredentialUpload)
-    }
-
-    static var isEnabled: Bool { !isDisabled }
-
-    static let socketErrorCode = "ai_credential_upload_disabled"
-
-    static var disabledMessage: String {
-        String(
-            localized: "managedPolicy.aiCredentialUpload.disabled",
-            defaultValue: "Uploading AI account credentials is disabled by your organization."
-        )
-    }
-
-    static func refusalError() -> ManagedPolicyRefusal {
-        ManagedPolicyRefusal(message: disabledMessage)
-    }
-}
-
 /// A managed-policy refusal thrown from a service boundary. Its description
 /// is the user-facing message, so socket and CLI error paths print it as-is.
 struct ManagedPolicyRefusal: Error, CustomStringConvertible, LocalizedError {
     let message: String
     var description: String { message }
     var errorDescription: String? { message }
-}
-
-/// MDM master switch for cmux-managed Iroh networking.
-enum ManagedIrohNetworkingPolicy {
-    private static let policy = ManagedDevicePolicy()
-
-    /// Whether a profile forces `DisableIrohNetworking`.
-    static var isDisabled: Bool {
-        return policy.isEnforced(.disableIrohNetworking)
-    }
-
-    static var isEnabled: Bool { !isDisabled }
-
-    static var disabledMessage: String {
-        String(
-            localized: "managedPolicy.irohNetworking.disabled",
-            defaultValue: "cmux relay networking is disabled by your organization."
-        )
-    }
 }

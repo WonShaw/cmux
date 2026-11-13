@@ -51,8 +51,8 @@ import Testing
         return Fixture(runtime: runtime, defaults: UserDefaults(suiteName: suiteName)!)
     }
 
-    static func makeMountModel(initial: SettingsSectionID = .account) -> SettingsSectionMountModel {
-        SettingsSectionMountModel(initial: initial, order: SettingsWindowRoot.mountOrder(cloudAvailable: false))
+    static func makeMountModel(initial: SettingsSectionID = .app) -> SettingsSectionMountModel {
+        SettingsSectionMountModel(initial: initial, order: SettingsSectionMountModel.displayOrder)
     }
 
     /// AppKit-backed controls (`NSSwitch`, `NSPopUpButton`, `NSStepper`,
@@ -121,7 +121,7 @@ import Testing
         let window = Self.host(SettingsWindowRoot(runtime: fixture.runtime, mountModel: model), in: fixture)
         defer { window.orderOut(nil) }
 
-        #expect(model.mounted == [.account])
+        #expect(model.mounted == [.app])
 
         // Every run-loop turn may add at most one section: sample the
         // mounted set as the chain advances and reject any jump of two.
@@ -164,33 +164,33 @@ import Testing
     @Test func targetedOpenDoesNotRestoreTheLastViewedSection() {
         let fixture = Self.makeFixture()
         // The user last looked at Keyboard Shortcuts; this open targets
-        // Browser Import. The appear-time restore navigation must follow the
+        // Terminal. The appear-time restore navigation must follow the
         // target, or the previous pane gets built in the first pass anyway.
         fixture.defaults.set(SettingsSectionID.keyboardShortcuts.rawValue, forKey: SettingsWindowRoot.selectedSectionDefaultsKey)
         fixture.defaults.set("section:\(SettingsSectionID.keyboardShortcuts.rawValue)", forKey: "selectedSettingsSidebarEntry")
-        let model = Self.makeMountModel(initial: .browserImport)
+        let model = Self.makeMountModel(initial: .terminal)
         let window = Self.host(
-            SettingsWindowRoot(runtime: fixture.runtime, initialSection: .browserImport, mountModel: model),
+            SettingsWindowRoot(runtime: fixture.runtime, initialSection: .terminal, mountModel: model),
             in: fixture
         )
         defer { window.orderOut(nil) }
 
-        #expect(model.mounted == [.browser], "first pass mounted \(model.mounted)")
-        #expect(model.pinnedScroll?.section == .browserImport)
+        #expect(model.mounted == [.terminal], "first pass mounted \(model.mounted)")
+        #expect(model.pinnedScroll?.section == .terminal)
     }
 
     @Test func targetedOpenMountsTheTargetSectionFirst() {
         let fixture = Self.makeFixture()
-        let accountWindow = Self.host(SettingsWindowRoot(runtime: fixture.runtime, initialSection: .account), in: fixture)
+        let accountWindow = Self.host(SettingsWindowRoot(runtime: fixture.runtime, initialSection: .app), in: fixture)
         defer { accountWindow.orderOut(nil) }
         let accountControls = Self.controlCount(in: accountWindow.contentView)
 
-        // `browserImport` is an anchor inside the Browser section, whose
-        // rows carry far more controls than the Account section.
-        let browserWindow = Self.host(SettingsWindowRoot(runtime: fixture.runtime, initialSection: .browserImport), in: fixture)
-        defer { browserWindow.orderOut(nil) }
-        let browserControls = Self.controlCount(in: browserWindow.contentView)
+        // The Terminal section's rows carry far more controls than the
+        // Account section.
+        let terminalWindow = Self.host(SettingsWindowRoot(runtime: fixture.runtime, initialSection: .terminal), in: fixture)
+        defer { terminalWindow.orderOut(nil) }
+        let terminalControls = Self.controlCount(in: terminalWindow.contentView)
 
-        #expect(browserControls > accountControls + 10, "browser: \(browserControls), account: \(accountControls)")
+        #expect(terminalControls > accountControls + 10, "terminal: \(terminalControls), account: \(accountControls)")
     }
 }

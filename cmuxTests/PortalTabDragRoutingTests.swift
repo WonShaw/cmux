@@ -337,20 +337,6 @@ final class PortalTabDragRoutingTests: XCTestCase {
         XCTAssertFalse(BonsplitTabBarPassThrough.isPassThroughPointerEvent(.scrollWheel))
     }
 
-    func testBrowserPortalDragRoutingKeepsAppKitEventsOutOfPassThrough() {
-        let context = WindowInputRoutingContext(eventType: .appKitDefined)
-
-        XCTAssertTrue(context.allowsTabBarPassThroughHitTesting)
-        XCTAssertTrue(context.allowsPaneDropHitTesting)
-        XCTAssertFalse(context.allowsBrowserPortalDragRouting)
-        XCTAssertFalse(
-            DragOverlayRoutingPolicy.shouldPassThroughPortalHitTesting(
-                pasteboardTypes: [DragOverlayRoutingPolicy.bonsplitTabTransferType],
-                eventType: .appKitDefined
-            )
-        )
-    }
-
     func testStaleTabTransferTypeCannotEnablePortalHitTesting() {
         XCTAssertFalse(
             DragOverlayRoutingPolicy.shouldPassThroughPortalHitTesting(
@@ -583,18 +569,6 @@ final class PortalTabDragRoutingTests: XCTestCase {
             sessionId: nextWorkspaceSession.id,
             capabilityValue: nextWorkspaceSession.pasteboardValue
         )
-    }
-
-    func testWindowInputRoutingContextRejectsKeyboardForPointerOnlyRoutes() {
-        let context = WindowInputRoutingContext(eventType: .keyDown)
-
-        XCTAssertFalse(context.allowsFirstResponderHitTesting)
-        XCTAssertFalse(context.allowsPortalPointerHitTesting)
-        XCTAssertFalse(context.allowsPaneDropHitTesting)
-        XCTAssertFalse(context.allowsFileDropOverlayHitTesting)
-        XCTAssertFalse(context.allowsWorkspaceDropOverlayHitTesting)
-        XCTAssertFalse(context.allowsBrowserPortalDragRouting)
-        XCTAssertFalse(context.allowsTerminalPortalDragRouting)
     }
 
     func testWindowInputRoutingContextKeepsScrollOutOfTabBarPassThrough() {

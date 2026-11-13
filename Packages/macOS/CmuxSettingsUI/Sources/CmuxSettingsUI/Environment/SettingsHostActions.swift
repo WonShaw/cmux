@@ -1,12 +1,10 @@
-import CMUXMobileCore
 import CmuxSettings
 import Foundation
 
 /// Host-supplied callbacks the package's section views invoke for
-/// actions that live outside the catalog — clearing browser history,
-/// opening the user's editor on cmux.json, sending feedback, posting
-/// test notifications, restarting the app after a language change,
-/// and launching the browser import workflow.
+/// actions that live outside the catalog — opening the user's editor
+/// on cmux.json, sending feedback, posting test notifications, and
+/// restarting the app after a language change.
 ///
 /// The package doesn't carry these implementations because they
 /// depend on host-app services that have no place in a
@@ -24,10 +22,6 @@ public protocol SettingsHostActions: AnyObject {
     /// Validates and prepares a custom notification sound before a matrix cell
     /// is persisted. Returning `false` keeps the previous cell untouched.
     func validateNotificationSoundFile(path: String) async -> Bool
-
-    /// Deletes the user's browser history (visited-page suggestions,
-    /// omnibar autocomplete cache). Idempotent.
-    func clearBrowserHistory()
 
     /// Opens the cmux JSON config file in the user's preferred
     /// external editor. The package's inline editor still works;
@@ -68,10 +62,6 @@ public protocol SettingsHostActions: AnyObject {
     /// Live-reloads Ghostty after the adaptive-default-theme preference commits.
     func terminalAdaptiveDefaultThemeDidChange()
 
-    /// Launches the host's browser-import flow (Safari / Chrome /
-    /// Firefox source picker + profile selection + cookie prompt).
-    func openBrowserImportFlow()
-
     /// Asks the OS for notification authorization. No-op if the user
     /// has already responded (granted or denied).
     func requestNotificationAuthorization()
@@ -93,20 +83,9 @@ public protocol SettingsHostActions: AnyObject {
     @discardableResult
     func setMenuBarOnly(_ enabled: Bool) -> Bool
 
-    /// Opens the iOS pairing window, which shows a scannable QR code for
-    /// pairing an iPhone with this Mac. The host owns the window so the
-    /// package can't open it directly.
-    func openMobilePairingWindow()
-
     /// Plays the currently configured notification sound so the user
     /// can preview it from the Settings UI.
     func previewNotificationSound(value: String, customFilePath: String)
-
-    /// Returns the current number of saved browser-history entries, or
-    /// `nil` if the host hasn't loaded the history store yet. The
-    /// Browser section uses this to render a dynamic "N saved pages"
-    /// subtitle next to the Clear History button.
-    func browserHistoryEntryCount() -> Int?
 
     /// The current left-sidebar font size with the range + default the
     /// slider should use. Backed by the Ghostty config file, not
@@ -166,55 +145,6 @@ public protocol SettingsHostActions: AnyObject {
     /// (e.g. `12`, `13.5`), trimming trailing zeros.
     func formattedFontSize(_ points: Double) -> String
 
-    /// The current status of the Mac-side iOS pairing host (the actual bound
-    /// port, whether it fell back from the configured port, the active iOS
-    /// connection count, the effective display name, and the routes the phone
-    /// can reach this Mac on), or `nil` when the host has not started the
-    /// mobile service yet (or in previews/tests). The Mobile section renders
-    /// the bound-port indicator and diagnostics from this.
-    ///
-    /// Backed by host-app runtime state, so it lives here rather than in the
-    /// catalog. See ``mobilePairingStatusUpdates()`` for live refresh.
-    func mobilePairingStatus() -> MobilePairingStatusSnapshot?
-
-    /// A stream that yields a fresh ``MobilePairingStatusSnapshot`` whenever the
-    /// pairing host's status changes (listener bound/stopped, bound port
-    /// changed, connection count changed). The Mobile section subscribes so the
-    /// bound-port indicator and connection count stay live without polling.
-    func mobilePairingStatusUpdates() -> AsyncStream<MobilePairingStatusSnapshot>
-
-    /// Cross-platform Iroh and private-network settings controller supplied by
-    /// the host app. `nil` in previews and hosts without the Iroh runtime.
-    func irohSettingsController() -> (any CmxIrohSettingsControlling)?
-
-    /// The Mac's system name (e.g. `Host.current().localizedName`) used as the
-    /// iOS pairing display name when the user sets no override. The Mobile
-    /// section shows it as the display-name field placeholder. Empty when
-    /// unavailable (previews/tests). This is a stable host value, not derived
-    /// from the override, so the placeholder never goes stale as the override
-    /// is edited.
-    func mobilePairingDefaultDisplayName() -> String
-
-    /// Applies an explicitly-requested iOS pairing port, checking availability
-    /// first so a port already in use leaves the running listener untouched. The
-    /// Mobile section calls this from its **Apply** button and renders the
-    /// returned ``MobilePairingPortApplyResult`` as inline feedback; the live
-    /// status stream then reflects the actual bound port.
-    ///
-    /// `async` because the availability check probes a real bind.
-    func applyMobilePairingPort(_ port: Int) async -> MobilePairingPortApplyResult
-
-    /// Current Mac-owned forwarding policy for cmux mobile push notifications.
-    func mobilePhonePushSettings() -> MobilePhonePushSettingsSnapshot
-
-    /// Live forwarding-policy updates from every app entrypoint.
-    func mobilePhonePushSettingsUpdates() -> AsyncStream<MobilePhonePushSettingsSnapshot>
-
-    /// Applies one forwarding-policy field through the host's shared owner.
-    func updateMobilePhonePushSettings(
-        _ mutation: MobilePhonePushSettingsMutation
-    ) -> MobilePhonePushSettingsSnapshot
-
     /// Shows the Sleepy Mode screensaver as a non-locking preview (any key/click
     /// exits, no Touch ID). The host owns the overlay window.
     func sleepyModePreview()
@@ -248,65 +178,6 @@ public protocol SettingsHostActions: AnyObject {
     /// language selection.
     func applyLanguageOverride(_ language: AppLanguage)
 
-    /// Gives the host a chance to refresh computer-use permission state.
-    func refreshComputerUsePermissions() async
-
-    /// Whether the Computer Use helper currently has Accessibility permission.
-    func computerUseAccessibilityGranted() -> Bool
-
-    /// Whether the Computer Use helper currently has Screen Recording permission.
-    func computerUseScreenRecordingGranted() -> Bool
-
-    /// Whether the displayed Computer Use permission values are authoritative.
-    func computerUsePermissionStatusIsKnown() -> Bool
-
-    /// Starts the helper-owned Accessibility permission flow.
-    func requestComputerUseAccessibility()
-
-    /// Starts the helper-owned Screen Recording permission flow.
-    func requestComputerUseScreenRecording()
-
-    /// Opens the Accessibility pane in System Settings.
-    func openComputerUseAccessibilitySettings()
-
-    /// Opens the Screen Recording pane in System Settings.
-    func openComputerUseScreenRecordingSettings()
-
-    /// Whether the host exposes Cloud Machines (persistent cloud VMs). When
-    /// false the Cloud Machines settings section renders nothing.
-    var isCloudMachinesAvailable: Bool { get }
-
-    /// The caller's machine plan: plan name, machines in use, and the plan's
-    /// machine ceiling. `nil` when signed out or the backend is unreachable.
-    func cloudMachinesPlanSummary() async -> CloudMachinesPlanSummary?
-
-    /// Reveals the right-sidebar Machines panel in the active main window.
-    func openCloudMachinesPanel()
-
-    /// Opens the host's plan management / upgrade flow.
-    func openCloudMachinesBilling()
-}
-
-/// Snapshot of the caller's Cloud Machines plan for the settings section.
-public struct CloudMachinesPlanSummary: Equatable, Sendable {
-    public let planLabel: String
-    public let activeMachines: Int
-    /// Active-machine ceiling; nil when the plan has no cap.
-    public let maxMachines: Int?
-    public let isPaidPlan: Bool
-
-    /// Creates a plan summary.
-    /// - Parameters:
-    ///   - planLabel: Display name of the plan, already localized.
-    ///   - activeMachines: Machines currently counted against the plan.
-    ///   - maxMachines: Active-machine ceiling, or nil when the plan has no cap.
-    ///   - isPaidPlan: Whether the plan is one the backend provisions for.
-    public init(planLabel: String, activeMachines: Int, maxMachines: Int?, isPaidPlan: Bool) {
-        self.planLabel = planLabel
-        self.activeMachines = activeMachines
-        self.maxMachines = maxMachines
-        self.isPaidPlan = isPaidPlan
-    }
 }
 
 /// One right-sidebar tab as the Sidebar section's customization card renders
@@ -354,13 +225,6 @@ public extension SettingsHostActions {
         AsyncStream { $0.finish() }
     }
 
-    /// Cloud Machines defaults for previews, tests, and package-only hosts:
-    /// unavailable, no plan, no-op actions.
-    var isCloudMachinesAvailable: Bool { false }
-    func cloudMachinesPlanSummary() async -> CloudMachinesPlanSummary? { nil }
-    func openCloudMachinesPanel() {}
-    func openCloudMachinesBilling() {}
-
     /// Default no-op for package-only settings hosts without Ghostty.
     func terminalAdaptiveDefaultThemeDidChange() {}
 
@@ -383,23 +247,6 @@ public extension SettingsHostActions {
     /// Default no-op for package previews and tests without app-language ownership.
     func applyLanguageOverride(_ language: AppLanguage) {}
 
-    /// Default no-op for hosts without Computer Use permission reporting.
-    func refreshComputerUsePermissions() async {}
-    /// Default denied Accessibility status for hosts without Computer Use.
-    func computerUseAccessibilityGranted() -> Bool { false }
-    /// Default denied Screen Recording status for hosts without Computer Use.
-    func computerUseScreenRecordingGranted() -> Bool { false }
-    /// Default unknown status for hosts without Computer Use permission reporting.
-    func computerUsePermissionStatusIsKnown() -> Bool { false }
-    /// Default no-op for hosts that cannot request Computer Use Accessibility.
-    func requestComputerUseAccessibility() {}
-    /// Default no-op for hosts that cannot request Computer Use Screen Recording.
-    func requestComputerUseScreenRecording() {}
-    /// Default no-op for hosts without a Computer Use Accessibility settings route.
-    func openComputerUseAccessibilitySettings() {}
-    /// Default no-op for hosts without a Computer Use Screen Recording settings route.
-    func openComputerUseScreenRecordingSettings() {}
-    func openMobilePairingWindow() {}
 
     /// Default no-op preview action for hosts without a Sleepy Mode overlay.
     func sleepyModePreview() {}
@@ -411,8 +258,6 @@ public extension SettingsHostActions {
     /// Default no-op for package previews and tests that have no activation-policy host.
     func setMenuBarOnly(_ enabled: Bool) -> Bool { false }
 
-    func browserHistoryEntryCount() -> Int? { nil }
-
     /// Default: unknown permission state, for previews and tests without a host.
     func desktopNotificationAuthorizationStatus() -> DesktopNotificationAuthorizationState { .unknown }
 
@@ -423,39 +268,6 @@ public extension SettingsHostActions {
 
     /// Default: no refresh hook, for previews and tests without a host.
     func refreshDesktopNotificationAuthorizationStatus() {}
-
-    /// Default: no status, for hosts without a live mobile service (previews/tests).
-    func mobilePairingStatus() -> MobilePairingStatusSnapshot? { nil }
-
-    /// Default: an immediately-finished stream, for hosts without a live mobile service.
-    func mobilePairingStatusUpdates() -> AsyncStream<MobilePairingStatusSnapshot> {
-        AsyncStream { $0.finish() }
-    }
-
-    func irohSettingsController() -> (any CmxIrohSettingsControlling)? { nil }
-
-    /// Default: empty, for hosts that cannot resolve the Mac's system name.
-    func mobilePairingDefaultDisplayName() -> String { "" }
-
-    /// Default: save-for-later, for hosts without a live mobile service (previews/tests).
-    func applyMobilePairingPort(_ port: Int) async -> MobilePairingPortApplyResult {
-        (1...65535).contains(port) ? .savedForLater(port: port) : .invalid(requestedPort: port)
-    }
-
-    func mobilePhonePushSettings() -> MobilePhonePushSettingsSnapshot {
-        .defaultValue
-    }
-
-    func mobilePhonePushSettingsUpdates() -> AsyncStream<MobilePhonePushSettingsSnapshot> {
-        AsyncStream { $0.finish() }
-    }
-
-    func updateMobilePhonePushSettings(
-        _ mutation: MobilePhonePushSettingsMutation
-    ) -> MobilePhonePushSettingsSnapshot {
-        _ = mutation
-        return mobilePhonePushSettings()
-    }
 
     func sidebarFontSize() -> SettingsFontSize {
         SettingsFontSize(points: 12.5, minimum: 10, maximum: 20, defaultValue: 12.5)
@@ -486,18 +298,14 @@ public extension SettingsHostActions {
 @MainActor
 public final class NoopSettingsHostActions: SettingsHostActions {
     public init() {}
-    public func clearBrowserHistory() {}
     public func openConfigInExternalEditor() {}
     public func sendFeedback() {}
     public func sendTestNotification() {}
     public func openSystemNotificationSettings() {}
     public func restartApp() {}
-    public func openBrowserImportFlow() {}
     public func requestNotificationAuthorization() {}
     public func openTerminalConfigWindow() {}
-    public func openMobilePairingWindow() {}
     /// No-op notification sound preview used by tests, previews, and
     /// package-only settings hosts.
     public func previewNotificationSound(value: String, customFilePath: String) {}
-    public func browserHistoryEntryCount() -> Int? { nil }
 }

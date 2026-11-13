@@ -20,9 +20,6 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     // MARK: Workspace
     case toggleSidebar
     case newTab
-    case newBrowserWorkspace
-    case newCloudWorkspace
-    case newCloudMachine
     case saveLayoutTemplate
     case openFolder
     case reopenPreviousSession
@@ -30,7 +27,6 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case commandPalette
     case commandPaletteNext
     case commandPalettePrevious
-    case sendFeedback
     case showNotifications
     case jumpToUnread
     case toggleUnread
@@ -45,7 +41,6 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case switchRightSidebarToSessions
     case switchRightSidebarToFeed
     case switchRightSidebarToDock
-    case switchRightSidebarToMachines
     case triggerFlash
 
     // MARK: Navigation
@@ -137,8 +132,6 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case resizePaneUp = "resize-pane-up"
     /// Moves the focused pane's controlling divider down by one resize step.
     case resizePaneDown = "resize-pane-down"
-    case splitBrowserRight
-    case splitBrowserDown
     case toggleRightSidebar = "toggleFileExplorer"
     /// Opens the selected File Explorer item from File Explorer focus.
     case fileExplorerOpenSelection
@@ -162,16 +155,8 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case canvasDistributeHorizontally
     case canvasDistributeVertically
 
-    // MARK: Browser & Find
-    case openDiffViewer
+    // MARK: Viewers & Find
     case saveFilePreview
-    case openBrowser
-    case focusBrowserAddressBar
-    case browserBack
-    case browserForward
-    case browserReload
-    /// Hard refreshes the focused browser pane, bypassing WebKit's cache.
-    case browserHardReload
     case browserZoomIn
     case browserZoomOut
     case browserZoomReset
@@ -184,12 +169,6 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case findPrevious
     case hideFind
     case useSelectionForFind
-    case toggleBrowserDeveloperTools
-    case showBrowserJavaScriptConsole
-    case toggleBrowserFocusMode
-    /// Toggles design-mode editing for the focused browser.
-    case toggleBrowserDesignMode
-    case toggleReactGrab
     /// Scrolls the focused diff viewer down one step.
     case diffViewerScrollDown
     /// Scrolls the focused diff viewer up one step.
@@ -206,12 +185,6 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case diffViewerScrollToBottom
     /// Scrolls the focused diff viewer to the top.
     case diffViewerScrollToTop
-    /// Opens file search inside the focused diff viewer.
-    case diffViewerOpenFileSearch
-    /// Jumps to the next file inside the focused diff viewer.
-    case diffViewerNextFile
-    /// Jumps to the previous file inside the focused diff viewer.
-    case diffViewerPreviousFile
 
     // MARK: Simulator
     /// Presses the Home button in the focused Simulator pane.
@@ -248,8 +221,7 @@ extension ShortcutAction {
     /// Whether the recorder may accept a shortcut whose first stroke has no modifier.
     ///
     /// Most cmux-owned shortcuts require a modifier on the first stroke to avoid
-    /// accidentally stealing plain typing from terminals, editors, and browser
-    /// content. Focus-scoped content shortcuts, such as diff-viewer navigation and
+    /// accidentally stealing plain typing from terminals and editors. Focus-scoped content shortcuts, such as diff-viewer navigation and
     /// file-explorer open, can be rebound to bare first strokes.
     public var allowsBareFirstStroke: Bool {
         switch self {
@@ -261,9 +233,6 @@ extension ShortcutAction {
              .diffViewerScrollUpEmacs,
              .diffViewerScrollToBottom,
              .diffViewerScrollToTop,
-             .diffViewerOpenFileSearch,
-             .diffViewerNextFile,
-             .diffViewerPreviousFile,
              .fileExplorerOpenSelection,
              .fileExplorerOpenSelectionFinderAlias:
             return true
@@ -290,31 +259,23 @@ extension ShortcutAction {
     public var defaultFocusWhenClause: ShortcutWhenClause {
         switch self {
         case .switchRightSidebarToFiles, .switchRightSidebarToFind,
-             .switchRightSidebarToSessions, .switchRightSidebarToFeed, .switchRightSidebarToDock,
-             .switchRightSidebarToMachines:
+             .switchRightSidebarToSessions, .switchRightSidebarToFeed, .switchRightSidebarToDock:
             return .atom(.sidebarFocus)
         case .fileExplorerOpenSelection, .fileExplorerOpenSelectionFinderAlias:
             return .atom(.sidebarFocus)
         case .commandPaletteNext, .commandPalettePrevious:
             return .key(ShortcutContextKnownKey.commandPaletteVisible.rawValue)
         case .renameTab, .renameWorkspace:
-            return .and(.not(.atom(.browserFocus)), .not(.atom(.sidebarFocus)))
+            return .not(.atom(.sidebarFocus))
         case .sendCtrlFToTerminal, .clearScreenKeepScrollback:
-            return .and(.not(.atom(.browserFocus)), .not(.atom(.sidebarFocus)))
-        case .focusHistoryBack, .focusHistoryForward:
-            return .not(.atom(.browserFocus))
-        case .browserBack, .browserForward, .browserReload, .browserHardReload,
-             .toggleBrowserDeveloperTools, .showBrowserJavaScriptConsole, .toggleBrowserFocusMode,
-             .toggleBrowserDesignMode, .diffViewerOpenFileSearch, .diffViewerNextFile,
-             .diffViewerPreviousFile:
-            return .atom(.browserFocus)
+            return .not(.atom(.sidebarFocus))
         case .diffViewerScrollDown, .diffViewerScrollUp,
              .diffViewerScrollHalfPageDown, .diffViewerScrollHalfPageUp,
              .diffViewerScrollDownEmacs, .diffViewerScrollUpEmacs, .diffViewerScrollToBottom,
              .diffViewerScrollToTop:
-            return .or(.atom(.browserFocus), .atom(.markdownFocus))
+            return .atom(.markdownFocus)
         case .browserZoomIn, .browserZoomOut, .browserZoomReset:
-            return .or(.atom(.browserFocus), .atom(.filePreviewTextEditorFocus))
+            return .atom(.filePreviewTextEditorFocus)
         case .markdownZoomIn, .markdownZoomOut, .markdownZoomReset:
             return .atom(.markdownFocus)
         case .simulatorHome, .simulatorRotateLeft, .simulatorRotateRight,
@@ -324,13 +285,10 @@ extension ShortcutAction {
             return .and(
                 .key(ShortcutContextKnownKey.workspaceCanvasLayout.rawValue),
                 .and(
-                    .not(.atom(.browserFocus)),
+                    .not(.atom(.markdownFocus)),
                     .and(
-                        .not(.atom(.markdownFocus)),
-                        .and(
-                            .not(.atom(.filePreviewTextEditorFocus)),
-                            .not(.atom(.simulatorFocus))
-                        )
+                        .not(.atom(.filePreviewTextEditorFocus)),
+                        .not(.atom(.simulatorFocus))
                     )
                 )
             )

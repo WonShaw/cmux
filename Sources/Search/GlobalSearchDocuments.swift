@@ -19,23 +19,15 @@ struct GlobalSearchPanelContext {
     }
 }
 
-struct BrowserPagePayload: Decodable {
-    let title: String
-    let url: String
-    let text: String
-}
-
 @MainActor
 enum GlobalSearchDocuments {
     static func browseHit(for context: GlobalSearchPanelContext) -> SearchIndexHit {
         let kind: GlobalSearchKind
         switch context.panel.panelType {
-        case .browser:
-            kind = .browser
         case .markdown:
             kind = .markdown
         case .terminal, .filePreview, .rightSidebarTool, .customSidebar, .agentSession, .project,
-             .extensionBrowser, .simulator, .workspaceTodo, .notifications, .cloudVMLoading, .mobilePairing, .accountSignIn:
+             .simulator, .workspaceTodo, .notifications:
             kind = .title
         }
 

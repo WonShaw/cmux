@@ -102,16 +102,9 @@ extension AppDelegate {
     /// Mirrors the command palette's gates for the same actions.
     static func isBuiltInActionAvailableInNewWorkspaceMenu(_ action: CmuxSurfaceTabBarBuiltInAction) -> Bool {
         switch action {
-        case .newCloudWorkspace, .newCloudMachine, .cloudVM:
-            return CloudMachinesFeature.isEnabled
-                && AppDelegate.shared?.auth?.accountFlow.isAuthenticated == true
-        case .newBrowser, .newAgentChat:
-            return BrowserAvailabilitySettings.isEnabled()
         case .newSimulator:
             return CmuxFeatureFlags.shared.isSimulatorEnabled
-        case .mobileConnect:
-            return !MobileRemoteControlPolicy.isDisabled
-        case .newWorkspace, .newTerminal, .splitRight, .splitDown:
+        case .newWorkspace, .newAgentChat, .newTerminal, .splitRight, .splitDown:
             return true
         }
     }
@@ -123,10 +116,7 @@ extension AppDelegate {
     private func resolvedBuiltInNewAgentChatAction(
         cmuxConfigStore: CmuxConfigStore
     ) -> CmuxResolvedConfigAction? {
-        // Agent chat opens a browser surface; hide it when browser surfaces
-        // are disabled, matching the command palette's browserDisabled gate.
         guard CmuxFeatureFlags.shared.isAgentChatUIEnabled else { return nil }
-        guard BrowserAvailabilitySettings.isEnabled() else { return nil }
         let actionID = CmuxSurfaceTabBarBuiltInAction.newAgentChat.configID
         let action = cmuxConfigStore.resolvedAction(id: actionID)
             ?? .builtIn(.newAgentChat)

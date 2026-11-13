@@ -1,6 +1,6 @@
 import Foundation
 
-/// Local title ownership; Cloud requests enter the catalog before any UI mutation.
+/// Local title ownership.
 extension Workspace {
     /// Sets, replaces, or clears (empty/nil `title`) a panel custom title.
     ///
@@ -11,15 +11,9 @@ extension Workspace {
     func setPanelCustomTitle(
         panelId: UUID,
         title: String?,
-        source: CustomTitleSource = .user,
-        propagateToRemoteTmux: Bool = true,
-        propagateToCloud: Bool = true
+        source: CustomTitleSource = .user
     ) -> Bool {
         guard panels[panelId] != nil else { return false }
-        if propagateToCloud, source != .remote,
-           let submitted = SurfaceCatalog.shared.submitCloudPanelRename(
-               workspace: self, panelID: panelId, title: title, source: source
-           ) { return submitted }
         let previousWorkspaceTitle = self.title
         defer {
             if self.title != previousWorkspaceTitle {
@@ -29,7 +23,7 @@ extension Workspace {
         let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let previous = panelCustomTitles[panelId]
         if source == .auto {
-            guard !trimmed.isEmpty, cloudProjectedResource(forPanel: panelId) == nil else { return false }
+            guard !trimmed.isEmpty else { return false }
             if previous != nil, (panelCustomTitleSources[panelId] ?? .user) != .auto { return false }
         }
         var sameText = false
@@ -66,12 +60,6 @@ extension Workspace {
             title: resolvedPanelTitle(panelId: panelId, fallback: baseTitle),
             hasCustomTitle: panelCustomTitles[panelId] != nil
         )
-        // A remote tmux mirror tab rename propagates to `rename-window`.
-        if propagateToRemoteTmux, isRemoteTmuxMirror {
-            AppDelegate.shared?.remoteTmuxController.handleMirrorWindowRenamed(
-                workspaceId: id, panelId: panelId, title: trimmed
-            )
-        }
         return true
     }
 

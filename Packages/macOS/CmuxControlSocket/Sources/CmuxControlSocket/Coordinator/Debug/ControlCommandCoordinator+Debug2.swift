@@ -2,51 +2,10 @@
 internal import Foundation
 
 /// The debug/test-only domain, continued from
-/// `ControlCommandCoordinator+Debug.swift` (500-line budget): browser, right
+/// `ControlCommandCoordinator+Debug.swift` (500-line budget): right
 /// sidebar, terminal, layout/portal counters, flash, panel-snapshot, and
 /// screenshot methods.
 extension ControlCommandCoordinator {
-    func debugRemoteTmuxSizingSettled() -> ControlCallResult {
-        .ok(debugContext?.controlDebugRemoteTmuxSizingSettled() ?? .object(["windows": .array([])]))
-    }
-
-    // MARK: - debug.browser.*
-
-    /// `debug.browser.address_bar_focused` — which surface's browser address
-    /// bar has focus.
-    func debugBrowserAddressBarFocused(_ params: [String: JSONValue]) -> ControlCallResult {
-        let requestedSurfaceID = uuid(params, "surface_id") ?? uuid(params, "panel_id")
-        let focusedSurfaceID = debugContext?.controlDebugFocusedBrowserAddressBarSurfaceID()
-
-        var payload: [String: JSONValue] = [
-            "focused_surface_id": orNull(focusedSurfaceID?.uuidString),
-            "focused_surface_ref": ref(.surface, focusedSurfaceID),
-            "focused_panel_id": orNull(focusedSurfaceID?.uuidString),
-            "focused_panel_ref": ref(.surface, focusedSurfaceID),
-            "focused": .bool(focusedSurfaceID != nil),
-        ]
-
-        if let requestedSurfaceID {
-            payload["surface_id"] = .string(requestedSurfaceID.uuidString)
-            payload["surface_ref"] = ref(.surface, requestedSurfaceID)
-            payload["panel_id"] = .string(requestedSurfaceID.uuidString)
-            payload["panel_ref"] = ref(.surface, requestedSurfaceID)
-            payload["focused"] = .bool(focusedSurfaceID == requestedSurfaceID)
-        }
-
-        return .ok(.object(payload))
-    }
-
-    /// `debug.browser.favicon` — the browser panel's favicon PNG. A documented
-    /// passthrough: the body resolves its panel through the still-shared
-    /// `v2BrowserWithPanel` helper (the whole `browser.*` domain's resolver),
-    /// so params cross the seam whole and the app builds the result. The
-    /// fallback is the legacy body's initial (unreachable) value.
-    func debugBrowserFavicon(_ params: [String: JSONValue]) -> ControlCallResult {
-        debugContext?.controlDebugBrowserFavicon(params: params)
-            ?? .err(code: "internal_error", message: "Browser operation failed", data: nil)
-    }
-
     // MARK: - debug.right_sidebar.focus / debug.sidebar.visible
 
     /// `debug.right_sidebar.focus` — reveal and focus the right sidebar.

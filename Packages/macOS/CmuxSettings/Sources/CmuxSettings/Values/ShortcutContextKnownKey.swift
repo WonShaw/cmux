@@ -12,7 +12,7 @@ import Foundation
 /// accepts any bareword and an absent key evaluates to `false`, matching VS Code.
 /// This catalog is what tooling (docs, autocomplete) advertises as supported.
 ///
-/// The focus keys (``sidebarFocus``, ``browserFocus``, ``markdownFocus``,
+/// The focus keys (``sidebarFocus``, ``markdownFocus``,
 /// ``filePreviewTextEditorFocus``, ``simulatorFocus``, ``terminalFocus``) are
 /// also expressed as ``ShortcutFocusAtom`` cases; a clause referencing one of
 /// those names parses to ``ShortcutWhenClause/atom(_:)`` rather than
@@ -20,8 +20,6 @@ import Foundation
 public enum ShortcutContextKnownKey: String, CaseIterable, Sendable {
     /// The right sidebar (vault/files/find/feed/dock) owns focus.
     case sidebarFocus
-    /// A browser panel owns focus.
-    case browserFocus
     /// A markdown preview viewer owns focus.
     case markdownFocus
     /// A file-preview text editor owns focus.
@@ -46,7 +44,7 @@ public enum ShortcutContextKnownKey: String, CaseIterable, Sendable {
     /// The static value kind this key carries.
     public var valueType: ShortcutContextValueType {
         switch self {
-        case .sidebarFocus, .browserFocus, .markdownFocus, .filePreviewTextEditorFocus, .terminalFocus,
+        case .sidebarFocus, .markdownFocus, .filePreviewTextEditorFocus, .terminalFocus,
              .simulatorFocus,
              .commandPaletteVisible, .terminalFindVisible, .workspaceCanvasLayout:
             return .bool

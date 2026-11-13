@@ -38,22 +38,6 @@ final class InactivePaneFirstClickFocusTests: XCTestCase {
         XCTAssertFalse(view.acceptsFirstMouse(for: nil))
     }
 
-    func testBrowserViewAcceptsFirstMouseWhenSettingEnabled() {
-        UserDefaults.standard.set(true, forKey: settingsKey)
-
-        let view = CmuxWebView(frame: .zero, configuration: WKWebViewConfiguration())
-
-        XCTAssertTrue(view.acceptsFirstMouse(for: nil))
-    }
-
-    func testBrowserViewRejectsFirstMouseWhenSettingDisabled() {
-        UserDefaults.standard.set(false, forKey: settingsKey)
-
-        let view = CmuxWebView(frame: .zero, configuration: WKWebViewConfiguration())
-
-        XCTAssertFalse(view.acceptsFirstMouse(for: nil))
-    }
-
     func testMarkdownWebViewAcceptsFirstMouseWhenSettingEnabled() {
         UserDefaults.standard.set(true, forKey: settingsKey)
 

@@ -10,8 +10,8 @@ import SwiftUI
 /// cmux, Terminal Config link, Open Markdown in cmux Viewer,
 /// Markdown Viewer typography, iMessage Mode, Reorder on Notification, Dock Badge, Menu Bar
 /// Only, Show in Menu Bar, Unread Pane Ring, Pane Flash, Desktop
-/// Notifications, Notification Sound, Notification Command, Send
-/// anonymous telemetry, Warn Before Quit, Warn Before Closing Tab /
+/// Notifications, Notification Sound, Notification Command,
+/// Warn Before Quit, Warn Before Closing Tab /
 /// X Button / Hide Tab Close Button, Rename Selects Existing Name,
 /// Command Palette Searches All Surfaces.
 @MainActor
@@ -64,7 +64,6 @@ public struct AppSection: View {
     @State private var soundOverrides: DefaultsValueModel<String>
     @State private var soundOverridesModel: NotificationSoundOverridesModel
     @State private var soundAgents: [NotificationSoundAgentOption] = []
-    @State private var telemetry: DefaultsValueModel<Bool>
     @State private var confirmQuit: DefaultsValueModel<ConfirmQuitMode>
     @State private var warnCloseTab: DefaultsValueModel<Bool>
     @State private var warnCloseX: DefaultsValueModel<Bool>
@@ -75,10 +74,6 @@ public struct AppSection: View {
     @State private var languageAtAppear: AppLanguage?
     // Sticky: a picker change can rewrite the OS AppleLanguages override even when the selection returns to its starting value (clearing a preserved foreign override via an explicit pick, then System), so the restart hint must not rely on the value comparison alone.
     @State private var languageOverrideTouched = false
-    @State private var telemetryAtAppear: Bool?
-    /// `DisableTelemetry` (MDM): the opt-in is moot while a profile forces
-    /// telemetry off, so the row says so and locks; re-read on change signals.
-    @State private var telemetryManagedByPolicy = ManagedDevicePolicy().isEnforced(.disableTelemetry)
 
     public init(
         defaultsStore: UserDefaultsSettingsStore,
@@ -130,7 +125,6 @@ public struct AppSection: View {
         _soundOverridesModel = State(initialValue: NotificationSoundOverridesModel(
             initialJSON: defaultsStore.initialValue(for: catalog.notifications.soundOverrides)
         ))
-        _telemetry = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.app.sendAnonymousTelemetry))
         _confirmQuit = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.app.confirmQuitMode))
         _warnCloseTab = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.app.warnBeforeClosingTab))
         _warnCloseX = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.app.warnBeforeClosingTabXButton))
@@ -158,16 +152,11 @@ public struct AppSection: View {
             mainCard
         }
         .task {
-            startSettingsObservation([language, appearance, appIcon, placement, inheritDir, minimalMode, keepWorkspaceOpen, firstClick, focusHistoryIncludesPanesAndTabs, fileDrop, preferredEditor, openSupported, openMarkdown, globalFontMagnification, markdownFontSize, markdownFontFamily, markdownMaxWidth, canvasPaneGap, canvasSnapping, fileEditorWordWrap, fileEditorSyntaxHighlighting, fileEditorLineNumbers, fileEditorIndentGuides, fileEditorCurrentLineHighlight, fileEditorTabWidth, iMessage, reorder, dockBadge, menuBarOnly, showInMenuBar, paneRing, paneFlash, desktopNotifications, agentPermissionPrompt, agentTurnComplete, agentIdleReminder, soundName, soundCommand, customSoundFile, soundOverrides, telemetry, confirmQuit, warnCloseTab, warnCloseX, hideCloseButton, renameSelects, paletteAllSurfaces])
+            startSettingsObservation([language, appearance, appIcon, placement, inheritDir, minimalMode, keepWorkspaceOpen, firstClick, focusHistoryIncludesPanesAndTabs, fileDrop, preferredEditor, openSupported, openMarkdown, globalFontMagnification, markdownFontSize, markdownFontFamily, markdownMaxWidth, canvasPaneGap, canvasSnapping, fileEditorWordWrap, fileEditorSyntaxHighlighting, fileEditorLineNumbers, fileEditorIndentGuides, fileEditorCurrentLineHighlight, fileEditorTabWidth, iMessage, reorder, dockBadge, menuBarOnly, showInMenuBar, paneRing, paneFlash, desktopNotifications, agentPermissionPrompt, agentTurnComplete, agentIdleReminder, soundName, soundCommand, customSoundFile, soundOverrides, confirmQuit, warnCloseTab, warnCloseX, hideCloseButton, renameSelects, paletteAllSurfaces])
             if soundAgents.isEmpty {
                 soundAgents = await hostActions.notificationSoundAgentOptions()
             }
-            if languageAtAppear == nil { languageAtAppear = language.current }; if telemetryAtAppear == nil { telemetryAtAppear = telemetry.current }
-        }
-        .task {
-            for await _ in ManagedDevicePolicy.changeSignals() {
-                telemetryManagedByPolicy = ManagedDevicePolicy().isEnforced(.disableTelemetry)
-            }
+            if languageAtAppear == nil { languageAtAppear = language.current }
         }
         .onChange(of: soundOverrides.current) { _, newValue in
             soundOverridesModel.accept(newValue)
@@ -805,23 +794,6 @@ public struct AppSection: View {
                 )
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 200)
-            }
-            SettingsCardDivider()
-
-            // Telemetry
-            SettingsCardRow(
-                configurationReview: .json("app.sendAnonymousTelemetry"),
-                String(localized: "settings.app.telemetry", defaultValue: "Send anonymous telemetry"),
-                subtitle: telemetryManagedByPolicy
-                    ? String(localized: "settings.managedByOrganization", defaultValue: "Managed by your organization")
-                    : (telemetryAtAppear != nil && telemetry.current != telemetryAtAppear)
-                        ? String(localized: "settings.app.telemetry.subtitleChanged", defaultValue: "Change takes effect on next launch.")
-                        : String(localized: "settings.app.telemetry.subtitle", defaultValue: "Share anonymized crash and usage data to help improve cmux.")
-            ) {
-                Toggle("", isOn: Binding(get: { telemetry.current && !telemetryManagedByPolicy }, set: { telemetry.set($0) }))
-                    .labelsHidden()
-                    .controlSize(.small)
-                    .disabled(telemetryManagedByPolicy)
             }
             SettingsCardDivider()
 

@@ -101,7 +101,6 @@ struct WorkspaceCanvasHostView: View {
     static func defaultIcon(for panelType: PanelType) -> String {
         switch panelType {
         case .terminal: return "terminal"
-        case .browser: return "globe"
         case .markdown: return "doc.richtext"
         case .filePreview: return "doc.text.magnifyingglass"
         case .rightSidebarTool: return "sidebar.right"
@@ -109,12 +108,8 @@ struct WorkspaceCanvasHostView: View {
         case .simulator: return "iphone.gen3"
         case .agentSession: return "sparkles"
         case .project: return "folder"
-        case .extensionBrowser: return "puzzlepiece.extension"
         case .workspaceTodo: return "checklist"
         case .notifications: return "bell"
-        case .cloudVMLoading: return "cloud.fill"
-        case .mobilePairing: return "iphone"
-        case .accountSignIn: return "person.crop.circle"
         }
     }
 
@@ -157,12 +152,6 @@ struct WorkspaceCanvasHostView: View {
             customSidebarTabManager: workspace?.owningTabManager,
             onRequestPanelFocus: { [weak workspace] in
                 workspace?.focusPanel(panel.id)
-            },
-            onRequestDeferredBrowserMaterialization: { [weak workspace] in
-                workspace?.requestDeferredBrowserMaterialization(
-                    panelId: panel.id,
-                    isVisibleInUI: isWorkspaceVisible
-                )
             }
         )
         let hosted = NSHostingView(rootView: AnyView(content))
@@ -214,48 +203,6 @@ private struct CanvasRootRepresentable: NSViewRepresentable {
                 onLayoutChanged: { [weak workspace] in
                     guard let workspace else { return }
                     workspace.noteCanvasLayoutChanged()
-                    workspace.syncCanvasBrowserPortalZOrder()
-                },
-                onViewportGeometryChanged: { [weak workspace] window in
-                    // Window-portal-hosted content (browser webviews) tracks
-                    // anchor geometry; canvas scrolls/zooms/drags move anchors
-                    // without any split-layout event. Sync each browser anchor
-                    // synchronously so webviews track pane geometry within the
-                    // same frame, then schedule the coalesced settle-up pass.
-                    if let workspace {
-                        for panel in workspace.panels.values {
-                            guard let browserPanel = panel as? BrowserPanel,
-                                  !browserPanel.canvasInlineHostingActive else { continue }
-                            BrowserWindowPortalRegistry.synchronizeForAnchor(browserPanel.portalAnchorView)
-                        }
-                    }
-                    guard let window else { return }
-                    BrowserWindowPortalRegistry.scheduleExternalGeometrySynchronize(for: window)
-                },
-                onViewportSettled: { [weak workspace] window in
-                    // Gesture end: force-refresh every portal-hosted browser so
-                    // content can never rest at a stale frame, and re-derive
-                    // portal z-priorities from canvas z-order so front panes'
-                    // webviews stack above back panes'.
-                    guard let workspace else { return }
-                    let zOrder = workspace.canvasModel.layout.paneIDs
-                    for panel in workspace.panels.values {
-                        guard let browserPanel = panel as? BrowserPanel,
-                              !browserPanel.canvasInlineHostingActive else { continue }
-                        if let paneID = workspace.canvasModel.paneID(containing: browserPanel.id),
-                           let z = zOrder.firstIndex(of: paneID) {
-                            BrowserWindowPortalRegistry.updateEntryVisibility(
-                                for: browserPanel.webView,
-                                visibleInUI: true,
-                                zPriority: 2 + z
-                            )
-                        }
-                        BrowserWindowPortalRegistry.refresh(
-                            webView: browserPanel.webView,
-                            reason: "canvas.viewportSettled"
-                        )
-                    }
-                    _ = window
                 }
             ),
             themeProvider: {

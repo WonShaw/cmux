@@ -4,8 +4,8 @@ public import Foundation
 /// `v2SurfaceSplit` body's param parsing.
 ///
 /// The coordinator parses the raw tokens; the app maps `directionRaw` →
-/// `SplitDirection`, `typeRaw` → `PanelType`, and `urlRaw` → `URL` (so Bonsplit /
-/// PanelType / URL-availability stay app-side). The coordinator pre-validates and
+/// `SplitDirection` and `typeRaw` → `PanelType` (so Bonsplit / PanelType stay
+/// app-side). The coordinator pre-validates and
 /// clamps the divider, and pre-validates the agent-session rejection only as far as
 /// the type token; the app rejects `agent-session` against its real `PanelType`.
 public struct ControlSurfaceSplitInputs: Sendable, Equatable {
@@ -13,8 +13,6 @@ public struct ControlSurfaceSplitInputs: Sendable, Equatable {
     public let directionRaw: String
     /// The raw `type` token, or `nil` (defaults to terminal).
     public let typeRaw: String?
-    /// The raw `url` string, or `nil`.
-    public let urlRaw: String?
     /// The requested source `surface_id`, or `nil` to split the focused surface.
     public let requestedSourceSurfaceID: UUID?
     /// The trimmed-non-empty `working_directory`, or `nil`.
@@ -25,14 +23,10 @@ public struct ControlSurfaceSplitInputs: Sendable, Equatable {
     public let initialInput: String?
     /// The trimmed-non-empty `tmux_start_command`, or `nil`.
     public let tmuxStartCommand: String?
-    /// The trimmed-non-empty `remote_pty_session_id`, or `nil`.
-    public let remotePTYSessionID: String?
     /// The raw `remote_context` token (`inherit`/`local`/`cloud`), or `nil`.
     public let remoteContextRaw: String?
     /// The startup environment (`startup_environment`/`initial_env`), `[:]` if none.
     public let startupEnvironment: [String: String]
-    /// Options the caller already knows a routed remote tmux split cannot honor.
-    public let clientUnsupportedRemoteTmuxOptions: [String]
     /// Whether the request asked to focus the new split.
     public let requestedFocus: Bool
     /// The clamped `[0.1, 0.9]` initial divider position, or `nil`.
@@ -42,31 +36,25 @@ public struct ControlSurfaceSplitInputs: Sendable, Equatable {
     public init(
         directionRaw: String,
         typeRaw: String?,
-        urlRaw: String?,
         requestedSourceSurfaceID: UUID?,
         workingDirectory: String?,
         initialCommand: String?,
         initialInput: String? = nil,
         tmuxStartCommand: String?,
-        remotePTYSessionID: String?,
         remoteContextRaw: String?,
         startupEnvironment: [String: String],
-        clientUnsupportedRemoteTmuxOptions: [String],
         requestedFocus: Bool,
         initialDividerPosition: Double?
     ) {
         self.directionRaw = directionRaw
         self.typeRaw = typeRaw
-        self.urlRaw = urlRaw
         self.requestedSourceSurfaceID = requestedSourceSurfaceID
         self.workingDirectory = workingDirectory
         self.initialCommand = initialCommand
         self.initialInput = initialInput
         self.tmuxStartCommand = tmuxStartCommand
-        self.remotePTYSessionID = remotePTYSessionID
         self.remoteContextRaw = remoteContextRaw
         self.startupEnvironment = startupEnvironment
-        self.clientUnsupportedRemoteTmuxOptions = clientUnsupportedRemoteTmuxOptions
         self.requestedFocus = requestedFocus
         self.initialDividerPosition = initialDividerPosition
     }

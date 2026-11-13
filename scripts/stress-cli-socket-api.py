@@ -57,7 +57,6 @@ TOP_LEVEL_COMMANDS = {
     "fork",
     "restore-session",
     "open",
-    "feedback",
     "feed",
     "themes",
     "claude-teams",
@@ -200,8 +199,6 @@ SKIPPED_SOCKET_METHODS = {
     "vm.attach_info": "requires a real VM id",
     "vm.ssh_info": "requires a real VM id",
     "settings.open": "opens UI only, covered through CLI help",
-    "feedback.open": "opens UI only",
-    "feedback.submit": "can send external feedback",
     "browser.import.dialog": "opens an interactive import UI",
     "browser.import.cookies": "reads browser cookie stores",
     "feed.push": "mutates feed state",
@@ -557,7 +554,7 @@ class StressContext:
         env["CMUX_CLAUDE_HOOK_SENTRY_DISABLED"] = "1"
         if self.tag:
             env["CMUX_TAG"] = self.tag
-            env["CMUX_BUNDLE_ID"] = f"com.cmuxterm.app.debug.{self.tag.replace('-', '.')}"
+            env["CMUX_BUNDLE_ID"] = f"com.comux.app.debug.{self.tag.replace('-', '.')}"
         env.pop("CMUX_SOCKET", None)
         env.pop("CMUX_SOCKET_PASSWORD", None)
         env.pop("CMUX_WORKSPACE_ID", None)
@@ -885,7 +882,6 @@ def build_cli_cases(ctx: StressContext) -> list[CliCase]:
         CliCase("restore-help", argv("restore", "--help"), no_socket=True, covered_command="restore"),
         CliCase("fork-help", argv("fork", "--help"), no_socket=True, covered_command="fork"),
         CliCase("restore-session-help", argv("restore-session", "--help"), no_socket=True, covered_command="restore-session"),
-        CliCase("feedback-help", argv("feedback", "--help"), no_socket=True, covered_command="feedback"),
         CliCase("feed-help", argv("feed", "--help"), no_socket=True, covered_command="feed"),
         CliCase("themes-list", argv("themes", "list"), no_socket=True, expect_codes=any_code, covered_command="themes"),
         CliCase("claude-teams-help", argv("claude-teams", "--help"), no_socket=True, covered_command="claude-teams"),

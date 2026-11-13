@@ -4,8 +4,6 @@ import Foundation
 public enum CmuxSidebarSurfaceKind: String, Codable, CaseIterable, Equatable, Sendable {
     /// A terminal surface backed by the embedded terminal emulator.
     case terminal
-    /// A browser surface.
-    case browser
     /// A markdown preview surface.
     case markdown
     /// A file preview surface.

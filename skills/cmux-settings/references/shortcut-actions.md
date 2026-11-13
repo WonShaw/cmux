@@ -24,7 +24,6 @@ Values for `shortcuts.bindings.<action>`:
 ## Tabs
 
 - `shortcuts.bindings.newTab`
-- `shortcuts.bindings.newBrowserWorkspace`
 - `shortcuts.bindings.reopenPreviousSession`
 - `shortcuts.bindings.renameTab`
 - `shortcuts.bindings.closeTab`
@@ -129,20 +128,11 @@ Values for `shortcuts.bindings.<action>`:
 - `shortcuts.bindings.nextSidebarTabInGroup`
 - `shortcuts.bindings.prevSidebarTabInGroup`
 
-## Browser
+## Zoom
 
-- `shortcuts.bindings.splitBrowserRight`
-- `shortcuts.bindings.splitBrowserDown`
-- `shortcuts.bindings.openBrowser`
-- `shortcuts.bindings.focusBrowserAddressBar`
-- `shortcuts.bindings.browserBack`
-- `shortcuts.bindings.browserForward`
-- `shortcuts.bindings.browserReload`
 - `shortcuts.bindings.browserZoomIn`
 - `shortcuts.bindings.browserZoomOut`
 - `shortcuts.bindings.browserZoomReset`
-- `shortcuts.bindings.toggleBrowserDeveloperTools`
-- `shortcuts.bindings.showBrowserJavaScriptConsole`
 
 ## Find
 
@@ -157,4 +147,3 @@ Values for `shortcuts.bindings.<action>`:
 
 - `shortcuts.bindings.toggleFileExplorer`
 - `shortcuts.bindings.saveFilePreview`
-- `shortcuts.bindings.toggleReactGrab`

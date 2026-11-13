@@ -2,21 +2,10 @@ import AppKit
 import Foundation
 
 extension MenuBarProfilingProgressWindowController {
-    func configureEmailField() {
-        emailField.placeholderString = String(localized: "statusMenu.profiling.emailPlaceholder", defaultValue: "you@example.com")
-        emailField.stringValue = UserDefaults.standard.string(forKey: feedbackSettings.storedEmailKey) ?? ""
-        emailField.delegate = self
-        emailField.controlSize = .large
-        emailField.font = .systemFont(ofSize: 13)
-        emailErrorLabel.font = .systemFont(ofSize: 12)
-        emailErrorLabel.textColor = .systemRed
-        emailErrorLabel.isHidden = true
-    }
-
-    func configureTextView(_ textView: NSTextView, editable: Bool) {
-        textView.isEditable = editable
+    func configureTextView(_ textView: NSTextView) {
+        textView.isEditable = false
         textView.isSelectable = true
-        textView.font = editable ? .systemFont(ofSize: 13) : .monospacedSystemFont(ofSize: 11, weight: .regular)
+        textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
         textView.textColor = .labelColor
         textView.backgroundColor = .textBackgroundColor
         textView.textContainerInset = NSSize(width: 8, height: 8)
@@ -46,13 +35,5 @@ extension MenuBarProfilingProgressWindowController {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.heightAnchor.constraint(equalToConstant: height).isActive = true
         return scrollView
-    }
-
-}
-
-extension MenuBarProfilingProgressWindowController: NSTextFieldDelegate {
-    func controlTextDidChange(_ notification: Notification) {
-        updatePreview()
-        updateSubmitState()
     }
 }

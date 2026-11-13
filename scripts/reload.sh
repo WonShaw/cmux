@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/lib/mobile-attach.sh"
 source "$SCRIPT_DIR/lib/dev-secrets.sh"
 
 APP_NAME="cmux DEV"
-BUNDLE_ID="com.cmuxterm.app.debug"
+BUNDLE_ID="com.comux.app.debug"
 BASE_APP_NAME="cmux DEV"
 DERIVED_DATA=""
 NAME_SET=0
@@ -32,7 +32,6 @@ PROD_AUTH=0
 AUTH_CREDENTIALS_FILE=""
 AUTH_PROFILE=""
 AUTH_EXPECTED_ACCOUNT=""
-CMUX_TUI_CLIENT_MANIFEST_URL_VALUE=""
 CLI_PATH=""
 NO_GLOBAL_CLI_LINKS="${CMUX_RELOAD_NO_GLOBAL_CLI_LINKS:-0}"
 # Matches CmuxStateDirectory (non-TCC ~/.local/state/cmux) where the app/CLI now
@@ -400,12 +399,12 @@ derive_socket_marker_names() {
   CMUX_RELOAD_MARKER_NAME="last-socket-path"
   CMUX_RELOAD_TMP_MARKER="/tmp/cmux-last-socket-path"
   case "$bundle_id" in
-    com.cmuxterm.app.nightly)
+    com.comux.app.nightly)
       CMUX_RELOAD_MARKER_NAME="nightly-last-socket-path"
       CMUX_RELOAD_TMP_MARKER="/tmp/cmux-nightly-last-socket-path"
       ;;
-    com.cmuxterm.app.nightly.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.nightly.}")"
+    com.comux.app.nightly.*)
+      variant_slug="$(sanitize_path "${bundle_id#com.comux.app.nightly.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="nightly-${variant_slug}-last-socket-path"
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-nightly-${variant_slug}-last-socket-path"
@@ -414,12 +413,12 @@ derive_socket_marker_names() {
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-nightly-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.rc)
+    com.comux.app.rc)
       CMUX_RELOAD_MARKER_NAME="rc-last-socket-path"
       CMUX_RELOAD_TMP_MARKER="/tmp/cmux-rc-last-socket-path"
       ;;
-    com.cmuxterm.app.rc.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.rc.}")"
+    com.comux.app.rc.*)
+      variant_slug="$(sanitize_path "${bundle_id#com.comux.app.rc.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="rc-${variant_slug}-last-socket-path"
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-rc-${variant_slug}-last-socket-path"
@@ -428,12 +427,12 @@ derive_socket_marker_names() {
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-rc-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.staging)
+    com.comux.app.staging)
       CMUX_RELOAD_MARKER_NAME="staging-last-socket-path"
       CMUX_RELOAD_TMP_MARKER="/tmp/cmux-staging-last-socket-path"
       ;;
-    com.cmuxterm.app.staging.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.staging.}")"
+    com.comux.app.staging.*)
+      variant_slug="$(sanitize_path "${bundle_id#com.comux.app.staging.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="staging-${variant_slug}-last-socket-path"
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-staging-${variant_slug}-last-socket-path"
@@ -442,7 +441,7 @@ derive_socket_marker_names() {
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-staging-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.debug)
+    com.comux.app.debug)
       variant_slug="$(sanitize_path "$tag_slug")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="dev-${variant_slug}-last-socket-path"
@@ -452,8 +451,8 @@ derive_socket_marker_names() {
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-dev-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.debug.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.debug.}")"
+    com.comux.app.debug.*)
+      variant_slug="$(sanitize_path "${bundle_id#com.comux.app.debug.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="dev-${variant_slug}-last-socket-path"
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-dev-${variant_slug}-last-socket-path"
@@ -906,8 +905,6 @@ Options:
   --expected-account <email>
                          Fail before building unless the selected profile/file
                          resolves to this normalized account.
-  --cmux-tui-manifest-url <url>
-                         Install the cmux-tui client from this immutable manifest.
   --name <app name>      Override app display/bundle name.
   --bundle-id <id>       Override bundle identifier.
   --derived-data <path>  Override derived data path.
@@ -1163,14 +1160,6 @@ while [[ $# -gt 0 ]]; do
       [[ -n "$AUTH_EXPECTED_ACCOUNT" ]] || { echo "error: --expected-account requires an email" >&2; exit 1; }
       shift 2
       ;;
-    --cmux-tui-manifest-url)
-      CMUX_TUI_CLIENT_MANIFEST_URL_VALUE="${2:-}"
-      [[ -n "$CMUX_TUI_CLIENT_MANIFEST_URL_VALUE" ]] \
-        || { echo "error: --cmux-tui-manifest-url requires a URL" >&2; exit 1; }
-      [[ "$CMUX_TUI_CLIENT_MANIFEST_URL_VALUE" == https://* ]] \
-        || { echo "error: --cmux-tui-manifest-url requires HTTPS" >&2; exit 1; }
-      shift 2
-      ;;
     --derived-data)
       DERIVED_DATA="${2:-}"
       if [[ -z "$DERIVED_DATA" ]]; then
@@ -1210,26 +1199,6 @@ if [[ -z "$TAG" ]]; then
   exit 1
 fi
 
-# A tagged launch is a dogfood surface, so it must have an explicit identity
-# before the app is started.  Keeping this gate here covers agents that call
-# reload.sh directly instead of the higher-level dev-setup wrapper.
-if [[ "$LAUNCH" -eq 1 && -n "$TAG" && -z "$AUTH_PROFILE" ]]; then
-  AUTH_PROFILE="personal"
-  if [[ -z "$AUTH_CREDENTIALS_FILE" ]]; then
-    for candidate in "${HOME:-}/.secrets/cmuxterm-dev.env" "${HOME:-}/.secrets/cmux.env"; do
-      if [[ -f "$candidate" ]]; then
-        AUTH_CREDENTIALS_FILE="$candidate"
-        break
-      fi
-    done
-  fi
-  if [[ -z "$AUTH_CREDENTIALS_FILE" || ! -f "$AUTH_CREDENTIALS_FILE" ]]; then
-    echo "error: tagged launches require authenticated dev credentials" >&2
-    echo "error: configure ~/.secrets/cmuxterm-dev.env with scripts/setup-team-dev.sh" >&2
-    exit 2
-  fi
-fi
-
 if [[ -n "$AUTH_CREDENTIALS_FILE" ]]; then
   cmux_dev_secrets_validate_file "$AUTH_CREDENTIALS_FILE"
   AUTH_CREDENTIALS_FILE="$(cd "$(dirname "$AUTH_CREDENTIALS_FILE")" && pwd -P)/$(basename "$AUTH_CREDENTIALS_FILE")"
@@ -1262,7 +1231,7 @@ if [[ -n "$TAG" ]]; then
     APP_NAME="cmux DEV ${TAG_SLUG}"
   fi
   if [[ "$BUNDLE_SET" -eq 0 ]]; then
-    BUNDLE_ID="com.cmuxterm.app.debug.${TAG_ID}"
+    BUNDLE_ID="com.comux.app.debug.${TAG_ID}"
   fi
   if [[ "$DERIVED_SET" -eq 0 ]]; then
     DERIVED_DATA="$(tagged_derived_data_path "$TAG_SLUG")"
@@ -1439,10 +1408,6 @@ if [[ -z "$TAG" ]]; then
   )
 fi
 XCODEBUILD_ARGS+=(PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID")
-# The helper is assembled before Xcode emits the host's processed Info.plist.
-# Pass the final tagged display name explicitly so its TCC entry matches the
-# app the user is dogfooding instead of falling back to the untagged product.
-XCODEBUILD_ARGS+=(CMUX_CUA_HELPER_DISPLAY_NAME="cmux Computer Use")
 if [[ "$PROD_AUTH" -eq 1 ]]; then
   XCODEBUILD_ARGS+=(-xcconfig "$SCRIPT_DIR/../config/IrohRelayPolicyProduction.xcconfig")
 fi
@@ -1730,7 +1695,6 @@ if [[ -n "$TAG" && "$APP_NAME" != "$SEARCH_APP_NAME" ]]; then
       set_plist_env "$INFO_PLIST" CMUX_AUTH_WWW_ORIGIN "$CMUX_AUTH_WWW_ORIGIN_VALUE"
       set_plist_env "$INFO_PLIST" CMUX_WWW_ORIGIN "$CMUX_WWW_ORIGIN_VALUE"
       set_plist_env "$INFO_PLIST" CMUX_API_BASE_URL "$CMUX_DEV_API_BASE_URL_VALUE"
-      set_plist_env "$INFO_PLIST" CMUX_VM_API_BASE_URL "$CMUX_DEV_API_BASE_URL_VALUE"
       set_plist_env "$INFO_PLIST" CMUX_IROH_BROKER_BASE_URL "$CMUX_IROH_BROKER_BASE_URL_VALUE"
       set_plist_env "$INFO_PLIST" CMUX_IROH_V2_ENVIRONMENT "$CMUX_IROH_V2_ENVIRONMENT_VALUE"
       set_plist_env "$INFO_PLIST" CMUX_IROH_V2_BASE_URL "$CMUX_IROH_V2_BASE_URL_VALUE"
@@ -1776,36 +1740,11 @@ if [[ -d "$PWD/ghostty" ]]; then
   fi
 fi
 BIN_DIR="$APP_PATH/Contents/Resources/bin"
-CMUX_CUA_DEST="$BIN_DIR/cmux-cua"
-if [[ -x "$CMUX_CUA_DEST" ]]; then
-  echo "Preserving Xcode-built cmux Computer Use client at $CMUX_CUA_DEST"
-else
-  mkdir -p "$BIN_DIR"
-  "$PWD/scripts/build-cmux-cua.sh" --output "$CMUX_CUA_DEST"
-fi
 if [[ -x "$CMUXD_SRC" ]]; then
   BIN_DIR="$APP_PATH/Contents/Resources/bin"
   mkdir -p "$BIN_DIR"
   cp "$CMUXD_SRC" "$BIN_DIR/cmuxd"
   chmod +x "$BIN_DIR/cmuxd"
-fi
-# The cmux-tui client the Machines panel uses for cloud sessions ships inside the
-# bundle like the Ghostty helper. Dev builds take the rolling latest manifest (or
-# CMUX_TUI_CLIENT_MANIFEST_URL / CMUX_TUI_CLIENT_LOCAL); CMUX_SKIP_CMUX_TUI_CLIENT=1
-# leaves an existing copy alone for offline reloads.
-if [[ "${CMUX_SKIP_CMUX_TUI_CLIENT:-}" == "1" && -x "$APP_PATH/Contents/Resources/bin/cmux-tui" ]]; then
-  echo "Preserving bundled cmux-tui client (CMUX_SKIP_CMUX_TUI_CLIENT=1)"
-else
-  cmux_tui_install_args=(
-    "$APP_PATH"
-    --require-capability wireguard-hub
-  )
-  if [[ -n "$CMUX_TUI_CLIENT_MANIFEST_URL_VALUE" ]]; then
-    cmux_tui_install_args+=(
-      --manifest-url "$CMUX_TUI_CLIENT_MANIFEST_URL_VALUE"
-    )
-  fi
-  "$PWD/scripts/install-cmux-tui-client.sh" "${cmux_tui_install_args[@]}"
 fi
 if command -v xattr >/dev/null 2>&1; then
   xattr -cr "$APP_PATH" || true
@@ -1962,7 +1901,6 @@ if [[ "$LAUNCH" -eq 1 ]]; then
     CMUX_AUTH_WWW_ORIGIN="$CMUX_AUTH_WWW_ORIGIN_VALUE"
     CMUX_WWW_ORIGIN="$CMUX_WWW_ORIGIN_VALUE"
     CMUX_API_BASE_URL="$CMUX_DEV_API_BASE_URL_VALUE"
-    CMUX_VM_API_BASE_URL="$CMUX_DEV_API_BASE_URL_VALUE"
     CMUX_IROH_BROKER_BASE_URL="$CMUX_IROH_BROKER_BASE_URL_VALUE"
     CMUX_IROH_V2_ENVIRONMENT="$CMUX_IROH_V2_ENVIRONMENT_VALUE"
     CMUX_IROH_V2_BASE_URL="$CMUX_IROH_V2_BASE_URL_VALUE"

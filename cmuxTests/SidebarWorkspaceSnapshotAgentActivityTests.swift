@@ -20,7 +20,7 @@ extension SidebarWorkspaceSnapshotRefreshPolicyTests {
             defaults.removePersistentDomain(forName: suiteName)
         }
 
-        let flags = CmuxFeatureFlags(defaults: defaults, remoteFlagValueProvider: { _ in nil })
+        let flags = CmuxFeatureFlags(defaults: defaults)
 
         #expect(!flags.effectiveValue(for: definition))
     }

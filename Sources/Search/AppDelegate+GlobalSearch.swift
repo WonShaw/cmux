@@ -183,20 +183,9 @@ extension AppDelegate {
 
         if let panelID = hit.panelID, workspace.panels[panelID] != nil {
             tabManager.focusSurface(tabId: workspace.id, surfaceId: panelID)
-            if let browserPanel = workspace.browserPanel(for: panelID) {
-                applyBrowserInlineSearch(query: query, hit: hit, to: browserPanel)
-            } else if let markdownPanel = workspace.markdownPanel(for: panelID) {
+            if let markdownPanel = workspace.markdownPanel(for: panelID) {
                 applyMarkdownInlineSearch(query: query, hit: hit, to: markdownPanel)
             }
-        }
-    }
-
-    private func applyBrowserInlineSearch(query: String, hit: SearchIndexHit, to panel: BrowserPanel) {
-        guard let needle = GlobalSearchInlineSearch.browserNeedle(for: query, hit: hit) else { return }
-        if let searchState = panel.searchState {
-            searchState.needle = needle
-        } else {
-            panel.searchState = BrowserSearchState(needle: needle)
         }
     }
 
@@ -207,10 +196,6 @@ extension AppDelegate {
 }
 
 enum GlobalSearchInlineSearch {
-    static func browserNeedle(for query: String, hit: SearchIndexHit) -> String? {
-        needle(for: query, hit: hit)
-    }
-
     static func needle(for query: String, hit: SearchIndexHit) -> String? {
         let tokens = SearchIndex.queryTokens(for: query)
         guard !tokens.isEmpty else { return nil }

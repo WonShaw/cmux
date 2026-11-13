@@ -58,11 +58,9 @@ extension TerminalController {
             includeProcessDetails: true,
             maximumAge: 2
         )
-        let browserPIDOccurrences = v2TopBrowserPIDOccurrences(in: windowNodes)
         _ = v2AnnotateTopWindows(
             &windowNodes,
             processSnapshot: processSnapshot,
-            browserPIDOccurrences: browserPIDOccurrences,
             includeProcesses: false
         )
         payload["sample"] = processSnapshot.samplePayload()

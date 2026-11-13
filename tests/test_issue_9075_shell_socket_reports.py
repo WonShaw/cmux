@@ -111,7 +111,6 @@ def base_environment(
     environment = {
         "CMUX_FISH_USER_CONFIG_ALREADY_LOADED": "1",
         "CMUX_NO_GIT_WATCH": "1",
-        "CMUX_NO_PR_WATCH": "1",
         "CMUX_SHELL_INTEGRATION": "1",
         "CMUX_SOCKET_CAPABILITY": CAPABILITY,
         "CMUX_TEST_INTEGRATION": str(integration),

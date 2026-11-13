@@ -103,20 +103,17 @@ extension ContentView {
     }
 
     func registerIdentifierCopyCommandHandlers(
-        _ registry: inout CommandPaletteHandlerRegistry,
-        dockTarget: BrowserActionTarget? = nil
+        _ registry: inout CommandPaletteHandlerRegistry
     ) {
         registry.register(commandId: "palette.copyWorkspaceID") { copySelectedWorkspaceIdentifiers(includeRefs: false) }
         registry.register(commandId: "palette.copyWorkspaceIDAndRef") { copySelectedWorkspaceIdentifiers(includeRefs: true) }
         registry.register(commandId: "palette.copyWorkspaceLink") { copySelectedWorkspaceLink() }
-        registry.register(commandId: "palette.copyPaneID") { copyFocusedPaneIdentifier(dockTarget: dockTarget) }
-        registry.register(commandId: "palette.copyPaneLink") { copyFocusedPaneLink(dockTarget: dockTarget) }
-        registry.register(commandId: "palette.copySurfaceID") { copyFocusedSurfaceIdentifier(dockTarget: dockTarget) }
-        registry.register(commandId: "palette.copySurfaceLink") { copyFocusedSurfaceLink(dockTarget: dockTarget) }
+        registry.register(commandId: "palette.copyPaneID") { copyFocusedPaneIdentifier() }
+        registry.register(commandId: "palette.copyPaneLink") { copyFocusedPaneLink() }
+        registry.register(commandId: "palette.copySurfaceID") { copyFocusedSurfaceIdentifier() }
+        registry.register(commandId: "palette.copySurfaceLink") { copyFocusedSurfaceLink() }
         registry.register(commandId: "palette.copyIdentifiers") {
-            copyFocusedWorkspacePaneSurfaceIdentifiers(
-                dockTarget: dockTarget
-            )
+            copyFocusedWorkspacePaneSurfaceIdentifiers()
         }
     }
 
@@ -139,20 +136,7 @@ extension ContentView {
         )
     }
 
-    private func focusedPanelIdentifierContext(
-        dockTarget: BrowserActionTarget? = nil
-    ) -> (workspaceId: UUID, paneId: UUID?, surfaceId: UUID)? {
-        if let dockTarget,
-           let dock = AppDelegate.shared?.dock(
-               resolving: dockTarget
-           ),
-           dock.panels[dockTarget.panelId] != nil {
-            return (
-                workspaceId: dock.workspaceId,
-                paneId: dock.paneId(forPanelId: dockTarget.panelId)?.id,
-                surfaceId: dockTarget.panelId
-            )
-        }
+    private func focusedPanelIdentifierContext() -> (workspaceId: UUID, paneId: UUID?, surfaceId: UUID)? {
         guard let panelContext = focusedPanelContext else { return nil }
         return (
             workspaceId: panelContext.workspace.id,
@@ -161,25 +145,15 @@ extension ContentView {
         )
     }
 
-    private func copyFocusedPaneIdentifier(
-        dockTarget: BrowserActionTarget? = nil
-    ) {
-        guard let paneId = focusedPanelIdentifierContext(
-            dockTarget: dockTarget
-        )?.paneId else {
+    private func copyFocusedPaneIdentifier() {
+        guard let paneId = focusedPanelIdentifierContext()?.paneId else {
             NSSound.beep()
             return
         }
         WorkspaceSurfaceIdentifierClipboardText.copy(WorkspaceSurfaceIdentifierClipboardText.makePane(paneId: paneId))
     }
 
-    private func copyFocusedPaneLink(
-        dockTarget: BrowserActionTarget? = nil
-    ) {
-        if dockTarget != nil {
-            NSSound.beep()
-            return
-        }
+    private func copyFocusedPaneLink() {
         guard let panelContext = focusedPanelContext,
               let paneId = panelContext.workspace.paneId(forPanelId: panelContext.panelId)?.id else {
             NSSound.beep()
@@ -195,25 +169,15 @@ extension ContentView {
         )
     }
 
-    private func copyFocusedSurfaceIdentifier(
-        dockTarget: BrowserActionTarget? = nil
-    ) {
-        guard let context = focusedPanelIdentifierContext(
-            dockTarget: dockTarget
-        ) else {
+    private func copyFocusedSurfaceIdentifier() {
+        guard let context = focusedPanelIdentifierContext() else {
             NSSound.beep()
             return
         }
         WorkspaceSurfaceIdentifierClipboardText.copy(WorkspaceSurfaceIdentifierClipboardText.makeSurface(surfaceId: context.surfaceId))
     }
 
-    private func copyFocusedSurfaceLink(
-        dockTarget: BrowserActionTarget? = nil
-    ) {
-        if dockTarget != nil {
-            NSSound.beep()
-            return
-        }
+    private func copyFocusedSurfaceLink() {
         guard let panelContext = focusedPanelContext,
               let link = WorkspaceSurfaceIdentifierClipboardText.makeSurfaceLink(
                 workspace: panelContext.workspace,
@@ -225,12 +189,8 @@ extension ContentView {
         WorkspaceSurfaceIdentifierClipboardText.copy(link)
     }
 
-    private func copyFocusedWorkspacePaneSurfaceIdentifiers(
-        dockTarget: BrowserActionTarget? = nil
-    ) {
-        guard let context = focusedPanelIdentifierContext(
-            dockTarget: dockTarget
-        ) else {
+    private func copyFocusedWorkspacePaneSurfaceIdentifiers() {
+        guard let context = focusedPanelIdentifierContext() else {
             NSSound.beep()
             return
         }

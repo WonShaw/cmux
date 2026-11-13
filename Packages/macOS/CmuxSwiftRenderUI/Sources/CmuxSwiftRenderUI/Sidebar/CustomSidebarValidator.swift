@@ -185,8 +185,7 @@ public struct CustomSidebarValidator {
                 "progress": .string(""),
                 "latestMessage": .string(""),
                 "latestPrompt": .string(""),
-                "latestAt": .string(""),
-                "remote": .string("")
+                "latestAt": .string("")
             ])
         ]),
         "groups": .array([

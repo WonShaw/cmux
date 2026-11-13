@@ -22,15 +22,6 @@ struct SidebarWorkspaceSnapshotBuilder {
         var directory: String? { directoryCandidates.first }
     }
 
-    struct PullRequestDisplay: Identifiable, Equatable {
-        let id: String
-        let number: Int
-        let label: String
-        let url: URL
-        let status: SidebarPullRequestStatus
-        let isStale: Bool
-    }
-
     struct Snapshot: Equatable {
         let presentationKey: PresentationKey
         let title: String
@@ -39,13 +30,6 @@ struct SidebarWorkspaceSnapshotBuilder {
         /// Whether any workspace-scoped notification mute is active.
         let isMuted: Bool
         let customColorHex: String?
-        /// Stable Cloud identity, independent of connection status and detail visibility.
-        let cloudWorkspaceLabel: String?
-        let remoteWorkspaceSidebarText: String?
-        let remoteConnectionStatusText: String
-        let remoteStateHelpText: String
-        let showsRemoteReconnectAffordance: Bool
-        let copyableSidebarSSHError: String?
         let latestConversationMessage: String?
         let metadataEntries: [SidebarStatusEntry]
         let metadataBlocks: [SidebarMetadataBlock]
@@ -57,10 +41,8 @@ struct SidebarWorkspaceSnapshotBuilder {
         let compactBranchDirectoryCandidates: [String]
         let branchDirectoryLines: [VerticalBranchDirectoryLine]
         let branchLinesContainBranch: Bool
-        let pullRequestRows: [PullRequestDisplay]
         let listeningPorts: [Int]
         let finderDirectoryPath: String?
-        let mediaActivity: BrowserMediaActivity
         // Workspace todo status/checklist; taskStatus is nil when the
         // workspace opted out of status display or the remote todo-controls
         // flag is off. Manual status draws a compact row indicator, while
@@ -79,7 +61,7 @@ struct SidebarWorkspaceSnapshotBuilder {
                 localized: "accessibility.workspacePosition",
                 defaultValue: "\(title), workspace \(index + 1) of \(workspaceCount)"
             )
-            return [position, cloudWorkspaceLabel].compactMap { $0 }.joined(separator: ", ")
+            return position
         }
     }
 }

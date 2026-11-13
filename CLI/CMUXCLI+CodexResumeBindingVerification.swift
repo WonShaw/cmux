@@ -269,23 +269,13 @@ extension CMUXCLI {
         reason: String,
         sessionId: String,
         incoming: AgentResumeEvidenceProvenance?,
-        existing: AgentResumeEvidenceProvenance?,
-        telemetry: CLISocketSentryTelemetry?
+        existing: AgentResumeEvidenceProvenance?
     ) {
         let shortSessionID = String(sessionId.prefix(12))
         let incomingValue = incoming?.logValue ?? "none"
         let existingValue = existing?.logValue ?? "none"
         codexResumeBindingLogger.notice(
             "Codex resume binding publish rejected reason=\(reason, privacy: .public) session=\(shortSessionID, privacy: .private(mask: .hash)) incoming=\(incomingValue, privacy: .public) existing=\(existingValue, privacy: .public)"
-        )
-        telemetry?.breadcrumb(
-            "codex-resume-binding.publish-rejected",
-            data: [
-                "reason": reason,
-                "incoming_provenance": incomingValue,
-                "existing_provenance": existingValue,
-                "has_session_id": !sessionId.isEmpty,
-            ]
         )
     }
 }

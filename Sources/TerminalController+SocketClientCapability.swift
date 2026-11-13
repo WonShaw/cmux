@@ -14,7 +14,7 @@ extension TerminalController {
         bundleIdentifier: String? = Bundle.main.bundleIdentifier
     ) -> SocketClientCapabilityAuthority {
         let audience = bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
-            .nonEmpty ?? "com.cmuxterm.app"
+            .nonEmpty ?? "com.comux.app"
         let store = SocketClientCapabilitySecretStore(
             service: "\(audience).socket-client-capability"
         )

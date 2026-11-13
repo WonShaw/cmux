@@ -7,31 +7,15 @@ import Foundation
 extension DockSplitStore {
     /// Restores Dock topology and panel state from a persisted split snapshot.
     ///
-    /// Browser panels can remain lightweight until their host reports visibility;
-    /// terminal restore ownership is still validated through the supplied agent index.
+    /// Terminal restore ownership is validated through the supplied agent index.
+    /// Panels of kinds that no longer exist (legacy browser panes) are skipped.
     @discardableResult
     func restoreSessionSnapshot(
         _ snapshot: SessionSplitContainerSnapshot,
         excludingStableIdentities: Set<UUID> = [],
-        deferBrowserPanels: Bool = false,
         sourceWorkspaceResolver: (UUID) -> Workspace? = { _ in nil }
     ) -> [UUID: UUID] {
         guard !isRetired else { return [:] }
-        sessionRestoreDepth += 1
-        defer {
-            sessionRestoreDepth = max(sessionRestoreDepth - 1, 0)
-            if sessionRestoreDepth == 0 {
-                let pendingPanelIds = pendingDeferredBrowserMaterializationPanelIds
-                pendingDeferredBrowserMaterializationPanelIds.removeAll()
-                for panelId in pendingPanelIds {
-                    _ = requestDeferredBrowserMaterialization(
-                        panelId: panelId,
-                        isVisibleInUI: panelIsSelectedInVisibleDockPane(panelId),
-                        reason: "dock.sessionRestore.complete"
-                    )
-                }
-            }
-        }
         cancelConfigurationTasks()
         removeAllPanels()
         hasLoadedConfiguration = true
@@ -60,7 +44,6 @@ extension DockSplitStore {
                           sourceSnapshotWorkspaceId:
                             snapshot.sourceWorkspaceIdsByPanelId?[oldPanelId],
                           sourceWorkspaceResolver: sourceWorkspaceResolver,
-                          deferBrowserPanel: deferBrowserPanels,
                           restorableAgentIndex: restorableAgentIndex
                       ) else {
                     continue
@@ -143,11 +126,9 @@ extension DockSplitStore {
         sourceWorkspaceId: UUID?,
         sourceSnapshotWorkspaceId: UUID?,
         sourceWorkspaceResolver: (UUID) -> Workspace?,
-        deferBrowserPanel: Bool = false,
         restorableAgentIndex: RestorableAgentSessionIndex? = nil
     ) -> UUID? {
-        if (!deferBrowserPanel || snapshot.type != .browser),
-           let sourceWorkspaceId,
+        if let sourceWorkspaceId,
            let sourceWorkspace = sourceWorkspaceResolver(sourceWorkspaceId),
            let detached = sourceWorkspace.detachedSurfaceForDockSessionRestore(
                snapshot,
@@ -166,14 +147,10 @@ extension DockSplitStore {
                 let cancelledRestore = sourceWorkspace
                     .terminalStartupRestoreCoordinator
                     .cancelPendingRestore(panelID: detached.panelId)
-                // Browser and other non-startup transfers have no restore transaction.
+                // Non-startup transfers have no restore transaction.
                 if !cancelledRestore { detached.panel.close() }
             }
             return restoredPanelId
-        }
-        if sourceWorkspaceId != nil,
-           snapshot.terminal?.isRemoteTerminal == true {
-            return nil
         }
         switch snapshot.type {
         case .terminal:
@@ -182,34 +159,6 @@ extension DockSplitStore {
                 inPane: paneId,
                 excludingStableIdentities: excludingStableIdentities,
                 restorableAgentIndex: restorableAgentIndex
-            )
-        case .browser:
-            if deferBrowserPanel,
-               snapshot.browser != nil,
-               isBrowserAvailable() {
-                let restoredPanelId = panels[snapshot.id] == nil ? snapshot.id : UUID()
-                let deferredPanel = DeferredBrowserPanel(
-                    id: restoredPanelId,
-                    workspaceId: workspaceId,
-                    snapshot: snapshot
-                )
-                guard attachSessionRestoredPanel(
-                    deferredPanel,
-                    snapshot: snapshot,
-                    inPane: paneId
-                ) != nil else {
-                    return nil
-                }
-                if let stableSurfaceId = snapshot.stableSurfaceId,
-                   !excludingStableIdentities.contains(stableSurfaceId) {
-                    deferredPanel.adoptStableSurfaceId(stableSurfaceId)
-                }
-                return restoredPanelId
-            }
-            return restoreSessionBrowser(
-                from: snapshot,
-                inPane: paneId,
-                excludingStableIdentities: excludingStableIdentities
             )
         case .filePreview:
             return restoreSessionFilePreview(
@@ -395,9 +344,7 @@ extension DockSplitStore {
             : nil
         let liveOwnerNoticeInput = liveSessionOwner.map {
             AgentRestoreLiveOwnerNotice(processID: $0.processID).startupInput(
-                dialect: terminalSnapshot.isRemoteTerminal == true
-                    ? .remoteHost
-                    : .loginShell
+                dialect: .loginShell
             )
         }
         // Build the candidate before arming the gate. A binding that is
@@ -554,8 +501,6 @@ extension DockSplitStore {
                     stablePanelID: snapshot.id,
                     restorableAgent: restorableAgent,
                     resumeBinding: resumeBinding,
-                    restoresRemoteWorkspaceTerminalSnapshot: false,
-                    remoteResumeContext: resumeBinding?.launchFlavor.remoteContext,
                     workingDirectory: workingDirectory,
                     resumeWorkingDirectory: resumeSessionWorkingDirectory
                 )
@@ -569,90 +514,6 @@ extension DockSplitStore {
             )
         }
         return terminal.id
-    }
-
-    private func restoreSessionBrowser(
-        from snapshot: SessionPanelSnapshot,
-        inPane paneId: PaneID,
-        excludingStableIdentities: Set<UUID>
-    ) -> UUID? {
-        guard let browserSnapshot = snapshot.browser, isBrowserAvailable() else {
-            return nil
-        }
-        let browser = makeBrowserPanel(
-            url: nil,
-            preferredProfileID: browserSnapshot.profileID,
-            transparentBackground: browserSnapshot.transparentBackground ?? false
-        )
-        guard attachSessionRestoredPanel(browser, snapshot: snapshot, inPane: paneId) != nil else {
-            return nil
-        }
-        if let stableSurfaceId = snapshot.stableSurfaceId,
-           !excludingStableIdentities.contains(stableSurfaceId) {
-            browser.adoptStableSurfaceId(stableSurfaceId)
-        }
-        let pageZoom = CGFloat(max(0.25, min(5, browserSnapshot.pageZoom)))
-        if pageZoom.isFinite { _ = browser.setPageZoomFactor(pageZoom) }
-        browser.restoreSessionSnapshot(browserSnapshot)
-        if browserSnapshot.developerToolsVisible {
-            _ = browser.showDeveloperTools()
-            browser.requestDeveloperToolsRefreshAfterNextAttach(reason: "session_restore")
-        } else {
-            _ = browser.hideDeveloperTools()
-        }
-        return browser.id
-    }
-
-    /// Materializes a browser that was kept as a lightweight restore placeholder.
-    @discardableResult
-    func materializeDeferredBrowserPanel(_ deferredPanel: DeferredBrowserPanel) -> BrowserPanel? {
-        guard panels[deferredPanel.id] === deferredPanel,
-              let browserSnapshot = deferredPanel.sessionPanelSnapshot.browser,
-              !isRetired else {
-            return panels[deferredPanel.id] as? BrowserPanel
-        }
-
-        let browser = makeBrowserPanel(
-            id: deferredPanel.id,
-            url: nil,
-            preferredProfileID: browserSnapshot.profileID,
-            renderInitialNavigation: false,
-            chromeVisibility: browserSnapshot.chromeVisibility ?? .visible,
-            transparentBackground: browserSnapshot.transparentBackground ?? false
-        )
-        browser.adoptStableSurfaceId(deferredPanel.stableSurfaceIdentity.id)
-        panels[deferredPanel.id] = browser
-        let pageZoom = CGFloat(max(0.25, min(5, browserSnapshot.pageZoom)))
-        if pageZoom.isFinite {
-            _ = browser.setPageZoomFactor(pageZoom)
-        }
-        browser.restoreSessionSnapshot(browserSnapshot)
-        if browserSnapshot.developerToolsVisible {
-            _ = browser.showDeveloperTools()
-            browser.requestDeveloperToolsRefreshAfterNextAttach(reason: "session_restore")
-        } else {
-            _ = browser.hideDeveloperTools()
-        }
-        installSubscription(for: browser)
-        if let tabId = surfaceId(forPanelId: deferredPanel.id) {
-            bonsplitController.updateTab(
-                tabId,
-                icon: .some(browser.displayIcon),
-                kind: .some(Self.surfaceKind(for: browser)),
-                isLoading: browser.isLoading,
-                isAudioMuted: browser.isMuted,
-                isAudioPlaying: browser.isPlayingAudio
-            )
-        }
-        applyVisibility(to: browser)
-        scheduleDockPortalReconcile(reason: "dock.browserMaterialize")
-#if DEBUG
-        cmuxDebugLog(
-            "session.restore.dockBrowser.materialize dock=\(workspaceId.uuidString.prefix(8)) " +
-                "panel=\(deferredPanel.id.uuidString.prefix(8))"
-        )
-#endif
-        return browser
     }
 
     /// Recreates one persisted file-preview panel in its restored Dock pane.
@@ -693,7 +554,6 @@ extension DockSplitStore {
         }
         panels[panel.id] = panel
         let title = snapshot.customTitle ?? snapshot.title ?? panel.displayTitle
-        let isAudioMuted = resolvedAudioMuted(for: panel)
         guard let tabId = bonsplitController.createTab(
             title: title,
             hasCustomTitle: snapshot.customTitle != nil,
@@ -701,8 +561,8 @@ extension DockSplitStore {
             kind: Self.surfaceKind(for: panel),
             isDirty: panel.isDirty,
             showsNotificationBadge: snapshot.isManuallyUnread,
-            isLoading: (panel as? BrowserPanel)?.isLoading ?? false,
-            isAudioMuted: isAudioMuted,
+            isLoading: false,
+            isAudioMuted: false,
             isPinned: snapshot.isPinned,
             inPane: paneId
         ) else {

@@ -34,18 +34,6 @@ struct CmuxAgentChatConfigTests {
 
     @MainActor
     private func withBrowserDisabled(_ body: () throws -> Void) rethrows {
-        let defaults = UserDefaults.standard
-        let previous = defaults.object(forKey: BrowserAvailabilitySettings.disabledKey) as? Bool
-        let hadPrevious = defaults.object(forKey: BrowserAvailabilitySettings.disabledKey) != nil
-        BrowserAvailabilitySettings.setDisabled(true)
-        defer {
-            if hadPrevious, let previous {
-                BrowserAvailabilitySettings.setDisabled(previous)
-            } else {
-                defaults.removeObject(forKey: BrowserAvailabilitySettings.disabledKey)
-                NotificationCenter.default.post(name: BrowserAvailabilitySettings.didChangeNotification, object: nil)
-            }
-        }
         try body()
     }
 
@@ -448,7 +436,7 @@ struct CmuxAgentChatConfigTests {
         let defaultsName = "cmux-agent-chat-flag-defaults-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: defaultsName))
         defer { defaults.removePersistentDomain(forName: defaultsName) }
-        let flags = CmuxFeatureFlags(defaults: defaults, remoteFlagValueProvider: { _ in nil })
+        let flags = CmuxFeatureFlags(defaults: defaults)
 
         #expect(!flags.isAgentChatUIEnabled)
     }

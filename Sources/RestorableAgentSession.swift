@@ -58,14 +58,6 @@ enum TerminalStartupShellDialect: Equatable {
     static var loginShell: TerminalStartupShellDialect {
         forShellPath(ProcessInfo.processInfo.environment["SHELL"])
     }
-
-    /// Dialect for input typed into a remote host's shell after attach.
-    /// cmux does not (yet) know the remote login shell — the SSH bootstrap
-    /// resolves `$SHELL` on the host at runtime and nothing reports it back —
-    /// so remote input stays POSIX, which is what cmux has always sent to
-    /// remotes. If the bootstrap ever reports the remote shell, this is the
-    /// single seam to replace with real detection.
-    static let remoteHost: TerminalStartupShellDialect = .posix
 }
 
 /// Final rendering step for cmux-generated POSIX one-liners that get typed
@@ -77,9 +69,7 @@ struct TerminalStartupTypedShellCommand {
     /// Dialect of the shell that will parse the rendered input.
     let dialect: TerminalStartupShellDialect
 
-    /// Defaults to the login shell cmux spawns local surfaces with; pass
-    /// ``TerminalStartupShellDialect/remoteHost`` when the input is typed
-    /// into a remote host's shell instead.
+    /// Defaults to the login shell cmux spawns local surfaces with.
     init(dialect: TerminalStartupShellDialect = .loginShell) {
         self.dialect = dialect
     }
@@ -809,8 +799,7 @@ struct SessionRestorableAgentSnapshot: Codable, Sendable {
     }
 
     /// Input that forks this agent conversation when typed into a shell.
-    /// `dialect` must match the shell that will parse it — `.remoteHost` for
-    /// remote forks.
+    /// `dialect` must match the shell that will parse it.
     func forkStartupInput(
         fileManager: FileManager = .default,
         temporaryDirectory: URL = FileManager.default.temporaryDirectory,
@@ -828,11 +817,7 @@ struct SessionRestorableAgentSnapshot: Codable, Sendable {
     }
 
     /// `dialect` describes the shell that will parse the returned input. Local
-    /// surfaces type into the user's login shell (`.loginShell` default);
-    /// remote workspaces type into the remote host's shell after attach, which
-    /// cmux treats as POSIX regardless of the local `$SHELL` — pass `.posix`
-    /// there so a local nushell login never leaks `^/bin/sh -c "…"` to a
-    /// remote zsh/bash.
+    /// surfaces type into the user's login shell (`.loginShell` default).
     private func startupInput(
         command: String?,
         workingDirectory: String?,
@@ -3574,73 +3559,23 @@ struct DeferredAgentResumeRestore: Sendable {
     let stablePanelID: UUID
     let restorableAgent: SessionRestorableAgentSnapshot?
     let resumeBinding: SurfaceResumeBindingSnapshot?
-    let restoresRemoteWorkspaceTerminalSnapshot: Bool
-    /// The persistent-SSH owner captured for deferred admission, if any.
-    let remoteResumeContext: SurfaceResumeRemoteContext?
-    /// Whether the resume command is embedded in the remote PTY attach script.
-    let remoteResumeCommandEmbedded: Bool
     let workingDirectory: String?
     let resumeWorkingDirectory: String?
-
-    /// The shell dialect used for notices typed into this deferred restore.
-    var noticeDialect: TerminalStartupShellDialect {
-        restoresRemoteWorkspaceTerminalSnapshot ? .remoteHost : .loginShell
-    }
 
     init(
         stablePanelID: UUID,
         restorableAgent: SessionRestorableAgentSnapshot?,
         resumeBinding: SurfaceResumeBindingSnapshot?,
-        restoresRemoteWorkspaceTerminalSnapshot: Bool,
-        remoteResumeContext: SurfaceResumeRemoteContext? = nil,
-        remoteResumeCommandEmbedded: Bool = false,
         workingDirectory: String?,
         resumeWorkingDirectory: String?
     ) {
         self.stablePanelID = stablePanelID
         self.restorableAgent = restorableAgent
         self.resumeBinding = resumeBinding
-        self.restoresRemoteWorkspaceTerminalSnapshot = restoresRemoteWorkspaceTerminalSnapshot
-        self.remoteResumeContext = remoteResumeContext
-        self.remoteResumeCommandEmbedded = remoteResumeCommandEmbedded
         self.workingDirectory = workingDirectory
         self.resumeWorkingDirectory = resumeWorkingDirectory
     }
 
-    /// Retargets a transferred persistent-SSH restore after its binding has
-    /// been adopted by the destination workspace.
-    func retargetingRemoteOwner(
-        _ destinationContext: SurfaceResumeRemoteContext?
-    ) -> Self {
-        guard restoresRemoteWorkspaceTerminalSnapshot,
-              let sourceContext = remoteResumeContext,
-              let destinationContext,
-              sourceContext.surfaceID == destinationContext.surfaceID,
-              sourceContext.persistentPTYSessionID
-                  .trimmingCharacters(in: .whitespacesAndNewlines)
-                  == destinationContext.persistentPTYSessionID
-                      .trimmingCharacters(in: .whitespacesAndNewlines) else {
-            return self
-        }
-        let retargetedBinding = resumeBinding?.retargetingRemoteOwner(
-            expectedWorkspaceID: sourceContext.workspaceID,
-            expectedSurfaceID: sourceContext.surfaceID,
-            workspaceID: destinationContext.workspaceID,
-            surfaceID: destinationContext.surfaceID,
-            persistentPTYSessionID: destinationContext.persistentPTYSessionID
-        )
-        return Self(
-            stablePanelID: stablePanelID,
-            restorableAgent: restorableAgent,
-            resumeBinding: retargetedBinding,
-            restoresRemoteWorkspaceTerminalSnapshot:
-                restoresRemoteWorkspaceTerminalSnapshot,
-            remoteResumeContext: destinationContext,
-            remoteResumeCommandEmbedded: remoteResumeCommandEmbedded,
-            workingDirectory: workingDirectory,
-            resumeWorkingDirectory: resumeWorkingDirectory
-        )
-    }
 }
 
 private extension CmuxTopProcessArguments {

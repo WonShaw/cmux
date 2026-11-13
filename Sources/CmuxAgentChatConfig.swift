@@ -57,10 +57,11 @@ struct CmuxAgentChatConfigDefinition: Codable, Sendable, Hashable {
               let scheme = components.scheme?.lowercased(),
               scheme == "http" || scheme == "https",
               components.host?.isEmpty == false,
-              URL(string: value) != nil else {
+              let url = URL(string: value) else {
             return false
         }
-        return true
+        // Offline fork: the agent chat server must be on this machine.
+        return agentSessionIsLoopbackURL(url)
     }
 }
 
@@ -157,8 +158,11 @@ struct CmuxAgentChatConfiguration: Sendable, Hashable {
             source = .defaults
         }
         let rawURL = definition?.url ?? Self.defaultURLString
+        // Offline fork: never talk to a non-loopback agent chat server, even if
+        // a config file names one.
+        let resolvedURL = URL(string: rawURL).flatMap { agentSessionIsLoopbackURL($0) ? $0 : nil }
         return CmuxAgentChatConfiguration(
-            url: URL(string: rawURL) ?? Self.default.url,
+            url: resolvedURL ?? Self.default.url,
             startCommand: definition?.startCommand,
             source: source,
             hasExplicitURL: definition?.url != nil
@@ -236,7 +240,7 @@ struct AgentChatSidecarStateFileStore: Sendable {
         ).first else {
             return nil
         }
-        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.cmuxterm.app"
+        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.comux.app"
         return AgentChatSidecarStateFileStore(
             directoryURL: appSupport
             .appendingPathComponent(bundleIdentifier, isDirectory: true)

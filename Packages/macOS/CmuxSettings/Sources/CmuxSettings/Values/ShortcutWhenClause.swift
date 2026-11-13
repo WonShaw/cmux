@@ -23,7 +23,7 @@ import Foundation
 ///
 /// ```swift
 /// ShortcutWhenClause.parse("!sidebarFocus")                  // everywhere but the sidebar
-/// ShortcutWhenClause.parse("terminalFocus || browserFocus")
+/// ShortcutWhenClause.parse("terminalFocus || markdownFocus")
 /// ShortcutWhenClause.parse("commandPaletteVisible && paneCount > 1")
 /// ShortcutWhenClause.parse("sidebarMode == 'find'")
 /// ```
@@ -110,7 +110,7 @@ public indirect enum ShortcutWhenClause: Equatable, Sendable {
 
         let focusStates = usesFocus
             ? ShortcutFocusState.realizableStates
-            : [ShortcutFocusState(browser: false, markdown: false, sidebar: false)]
+            : [ShortcutFocusState(markdown: false, sidebar: false)]
         for state in focusStates {
             for mask in 0..<(1 << terms.count) {
                 var assignment: [String: Bool] = [:]

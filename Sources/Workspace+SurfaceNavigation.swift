@@ -5,31 +5,12 @@ import Foundation
 
 /// Surface navigation and sidebar status helpers extracted from `Workspace.swift`, which sits at its file-length budget.
 extension Workspace {
-    /// Synchronizes a nested remote-tmux pane with its outer workspace pane
-    /// without reactivating an already-selected container's hidden surface.
-    func focusRemoteTmuxContainerPaneIfNeeded(_ paneId: PaneID) {
-        guard bonsplitController.focusedPaneId != paneId else { return }
-        bonsplitController.focusPane(paneId)
-    }
-
-    /// Moves keyboard focus through the rendered pane hierarchy. A selected
-    /// remote-tmux window owns a nested split tree, so it gets first refusal;
-    /// an edge with no inner neighbor falls through to the workspace tree.
+    /// Moves keyboard focus through the rendered pane hierarchy.
     func moveFocus(direction: NavigationDirection) {
         if layoutMode == .canvas {
             moveCanvasFocus(direction: direction)
             return
         }
-        if let focusedPanelId,
-           let mirror = remoteTmuxWindowMirror(forPanelId: focusedPanelId) {
-            switch mirror.navigateFocus(direction: direction) {
-            case .moved, .invalid:
-                return
-            case .edge:
-                break
-            }
-        }
-
         let previousFocusedPanelId = focusedPanelId
         if let previousFocusedPanelId, let previous = panels[previousFocusedPanelId] {
             previous.unfocus()
@@ -66,7 +47,6 @@ extension Workspace {
         allowMissingDestinationSplit: Bool = true
     ) -> Bool {
         guard layoutMode != .canvas,
-              !isRemoteTmuxMirror,
               panels[panelId] != nil,
               let sourcePaneId = paneId(forPanelId: panelId) else {
             return false
@@ -185,8 +165,6 @@ extension Workspace {
         switch panelType {
         case .terminal:
             return SurfaceKind.terminal.rawValue
-        case .browser:
-            return SurfaceKind.browser.rawValue
         case .markdown:
             return SurfaceKind.markdown.rawValue
         case .filePreview:
@@ -201,18 +179,10 @@ extension Workspace {
             return SurfaceKind.agentSession.rawValue
         case .project:
             return SurfaceKind.project.rawValue
-        case .extensionBrowser:
-            return SurfaceKind.extensionBrowser.rawValue
         case .workspaceTodo:
             return SurfaceKind.todo.rawValue
         case .notifications:
             return SurfaceKind.notifications.rawValue
-        case .cloudVMLoading:
-            return SurfaceKind.cloudVMLoading.rawValue
-        case .mobilePairing:
-            return SurfaceKind.mobilePairing.rawValue
-        case .accountSignIn:
-            return SurfaceKind.accountSignIn.rawValue
         }
     }
 
@@ -306,6 +276,20 @@ extension Workspace {
         guard finalIndex != currentIndex else { return true }
         let insertionIndex = finalIndex > currentIndex ? finalIndex + 1 : finalIndex
         return reorderSurface(panelId: panelId, toIndex: insertionIndex)
+    }
+
+    /// Moves one surface to an absolute tab index inside its pane.
+    @discardableResult
+    func reorderSurface(panelId: UUID, toIndex index: Int, focus: Bool = true) -> Bool {
+        guard let tabId = surfaceIdFromPanelId(panelId) else { return false }
+        guard bonsplitController.reorderTab(tabId, toIndex: index) else { return false }
+        if focus, let paneId = paneId(forPanelId: panelId) {
+            applyTabSelection(tabId: tabId, inPane: paneId)
+        } else {
+            scheduleFocusReconcile()
+        }
+        scheduleTerminalGeometryReconcile()
+        return true
     }
 
     /// Select a surface by index in the currently focused split pane, or in

@@ -1,7 +1,6 @@
 import AppKit
 import Bonsplit
 import CMUXAgentLaunch
-import CmuxRemoteSession
 import CmuxTerminal
 import Testing
 

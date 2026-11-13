@@ -68,9 +68,7 @@ public final class ControlCommandCoordinator {
     /// - Parameter request: The decoded request envelope.
     /// - Returns: The command result, or `nil` if not owned here.
     public func handle(_ request: ControlRequest) -> ControlCallResult? {
-        if let error = context?.controlRemoteRelayDispatchError(method: request.method, params: request.params) {
-            return error
-        }
+
         // Each domain's handler (in its own `+<Domain>.swift` extension) owns its
         // methods and returns `nil` for anything else, so the chain falls through
         // to the next domain and finally to the legacy app-side dispatcher.
@@ -83,18 +81,13 @@ public final class ControlCommandCoordinator {
         if let result = handleWorkspaceTodo(request) { return result }
         if let result = handlePane(request) { return result }
         if let result = handleCanvas(request) { return result }
-        if let result = handleMobileHost(request) { return result }
         if let result = handleWorkspace(request) { return result }
         if let result = handleSurface(request) { return result }
         if let result = handleSystem(request) { return result }
         if let result = handleProject(request) { return result }
         if let result = handleDebug(request) { return result }
-        // The v2 browser.* domain stays app-side: PR 5778 moved its
-        // JS-evaluating methods onto the socket-worker lane (nonisolated
-        // bodies + v2MainSync), which the @MainActor coordinator seam cannot
-        // host; re-lift it against that architecture in a follow-up.
-        // handleSidebarV1 / handleBrowserPanelV1 are V1 string-command handlers;
-        // the app's v1 dispatcher calls them directly with (command:args:).
+        // handleSidebarV1 is the V1 string-command handler;
+        // the app's v1 dispatcher calls it directly with (command:args:).
         return nil
     }
 
@@ -132,16 +125,7 @@ public final class ControlCommandCoordinator {
             return workspaceList(request.params, context: context)
         case "workspace.current":
             return workspaceCurrent(request.params, context: context)
-        case "workspace.remote.terminal_session_launching":
-            return workspaceRemoteTerminalSessionLaunching(
-                request.params,
-                context: context
-            )
-        case "workspace.remote.terminal_session_connected":
-            return workspaceRemoteTerminalSessionConnected(
-                request.params,
-                context: context
-            )
+
         case "window.list":
             return windowList(context: context)
         case "window.current":
@@ -288,9 +272,8 @@ public final class ControlCommandCoordinator {
             surfaceID: uuid(params, "surface_id")
                 ?? uuid(params, "terminal_id")
                 ?? uuid(params, "tab_id"),
-            paneID: uuid(params, "pane_id"),
-            remoteRelayOwnerWorkspaceID: uuid(params, "_cmux_remote_workspace_id"),
-            remoteRelayConnectionID: uuid(params, "_cmux_remote_connection_id")
+            paneID: uuid(params, "pane_id")
         )
+
     }
 }

@@ -54,12 +54,6 @@
       3
     ]
   },
-  "cli.comments.list.header.other": {
-    "source": "%1$lld review comments (repo: %2$@)",
-    "arguments": [
-      1
-    ]
-  },
   "cli.ios.error.ambiguousTargets": {
     "source": "Found %lld iOS Simulator panes; pass --surface <ref> or --all",
     "arguments": [
@@ -628,12 +622,6 @@
   },
   "taskManager.killProcess.message.other": {
     "source": "Ask %lld processes to terminate gracefully. cmux will force-kill remaining processes after a short grace period. PIDs: %@.",
-    "arguments": [
-      1
-    ]
-  },
-  "textbox.diffComments.many": {
-    "source": "%d comments",
     "arguments": [
       1
     ]

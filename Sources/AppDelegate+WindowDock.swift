@@ -50,8 +50,7 @@ extension AppDelegate.MainWindowContext {
     func restoreWindowDockSessionSnapshot(
         _ snapshot: SessionWindowSnapshot?,
         notificationStore: TerminalNotificationStore?,
-        excludingStableIdentities: Set<UUID> = [],
-        deferBrowserPanels: Bool = false
+        excludingStableIdentities: Set<UUID> = []
     ) {
         let promptBatch = SurfaceResumeRunPromptBatch.shared
         promptBatch.beginRestorePass()
@@ -61,7 +60,6 @@ extension AppDelegate.MainWindowContext {
         windowDockStore(notificationStore: notificationStore).restoreSessionSnapshot(
             dockSnapshot,
             excludingStableIdentities: excludingStableIdentities,
-            deferBrowserPanels: deferBrowserPanels,
             sourceWorkspaceResolver: { [tabManager] originalId in
                 tabManager.restoredSessionWorkspace(
                     originalId: originalId,
@@ -86,7 +84,7 @@ extension AppDelegate.MainWindowContext {
         )
     }
 
-    /// Tears down this context's Dock, closing any live terminals/browsers and
+    /// Tears down this context's Dock, closing any live terminals and
     /// their portals, so no Dock panel outlives its window.
     func teardownWindowDock() {
         workspaceTerminalFontSizeCoordinator.cancelWindowOwnedWork()
@@ -114,15 +112,13 @@ extension AppDelegate {
     func restoreWindowDockSessionSnapshot(
         forWindowId windowId: UUID,
         from snapshot: SessionWindowSnapshot?,
-        excludingStableIdentities: Set<UUID>,
-        deferBrowserPanels: Bool = false
+        excludingStableIdentities: Set<UUID>
     ) {
         mainWindowContexts.values.first(where: { $0.windowId == windowId })?
             .restoreWindowDockSessionSnapshot(
                 snapshot,
                 notificationStore: notificationStore,
-                excludingStableIdentities: excludingStableIdentities,
-                deferBrowserPanels: deferBrowserPanels
+                excludingStableIdentities: excludingStableIdentities
             )
     }
 
@@ -275,12 +271,3 @@ extension AppDelegate {
     }
 }
 
-extension SessionWindowSnapshot {
-    @MainActor
-    func omitsRemoteMirrorOnlyWindow(liveWorkspaces: [Workspace]) -> Bool {
-        tabManager.workspaces.isEmpty &&
-            dock == nil &&
-            !liveWorkspaces.isEmpty &&
-            liveWorkspaces.allSatisfy { $0.isRemoteTmuxMirror }
-    }
-}

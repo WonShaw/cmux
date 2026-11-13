@@ -30,19 +30,4 @@ extension ControlCommandCoordinator {
             "type": .string(typeRawValue),
         ]))
     }
-
-    /// `invalid_params` for options the routed tmux command cannot honor.
-    /// The app rejects these BEFORE the remote session is mutated, so an error
-    /// from this path always means "nothing happened" — safe to retry without
-    /// the offending options.
-    func mirrorUnsupportedOptionsResult(_ unsupported: [String]) -> ControlCallResult {
-        .err(
-            code: "invalid_params",
-            message: "Not supported when targeting a remote tmux mirror workspace (the request is routed to tmux and these options cannot be applied): \(unsupported.joined(separator: ", "))",
-            data: .object([
-                "unsupported": .array(unsupported.map { .string($0) }),
-                "routed_target": .string("remote-tmux"),
-            ])
-        )
-    }
 }

@@ -120,12 +120,6 @@ struct SettingsSearchIndexTests {
     }
 
     @Test(arguments: [
-        ("browser settings", [
-            "setting:browser:search-engine",
-            "setting:browser:terminal-links",
-            "setting:browser:http-allowlist",
-            "setting:browser:url-allowlist",
-        ]),
         ("notification settings", [
             "setting:app:dock-badge",
             "setting:app:desktop-notifications",
@@ -134,9 +128,6 @@ struct SettingsSearchIndexTests {
         ]),
         ("shortcut split right", [
             "setting:keyboardShortcuts:shortcuts",
-        ]),
-        ("browzer lniks", [
-            "setting:browser:terminal-links",
         ]),
         ("canvas", [
             "setting:app:canvas-pane-gap",

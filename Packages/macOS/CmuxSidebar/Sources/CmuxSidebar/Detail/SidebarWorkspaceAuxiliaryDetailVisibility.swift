@@ -2,10 +2,10 @@ public import Foundation
 
 /// Resolved visibility of the auxiliary detail rows under a sidebar
 /// workspace row (metadata pills, log line, progress, branch/directory,
-/// pull requests, ports).
+/// ports).
 ///
 /// The master "hide all details" switch wins over every individual toggle;
-/// ``resolved(showMetadata:showLog:showProgress:showBranchDirectory:showPullRequests:showPorts:hideAllDetails:)``
+/// ``resolved(showMetadata:showLog:showProgress:showBranchDirectory:showPorts:hideAllDetails:)``
 /// applies exactly that legacy precedence.
 public struct SidebarWorkspaceAuxiliaryDetailVisibility: Equatable, Sendable {
     /// Whether custom metadata pills are shown.
@@ -16,8 +16,6 @@ public struct SidebarWorkspaceAuxiliaryDetailVisibility: Equatable, Sendable {
     public let showsProgress: Bool
     /// Whether the branch/directory line is shown.
     public let showsBranchDirectory: Bool
-    /// Whether pull-request badges are shown.
-    public let showsPullRequests: Bool
     /// Whether forwarded-port rows are shown.
     public let showsPorts: Bool
 
@@ -25,12 +23,7 @@ public struct SidebarWorkspaceAuxiliaryDetailVisibility: Equatable, Sendable {
     /// row is visible. Callers combine this with the user's master
     /// `watchGitStatus` preference.
     public var requiresGitMetadata: Bool {
-        showsBranchDirectory || showsPullRequests
-    }
-
-    /// GitHub polling is useful only while the pull-request row is visible.
-    public var requiresPullRequestPolling: Bool {
-        showsPullRequests
+        showsBranchDirectory
     }
 
     /// Creates a visibility value with each row's flag as given.
@@ -39,14 +32,12 @@ public struct SidebarWorkspaceAuxiliaryDetailVisibility: Equatable, Sendable {
         showsLog: Bool,
         showsProgress: Bool,
         showsBranchDirectory: Bool,
-        showsPullRequests: Bool,
         showsPorts: Bool
     ) {
         self.showsMetadata = showsMetadata
         self.showsLog = showsLog
         self.showsProgress = showsProgress
         self.showsBranchDirectory = showsBranchDirectory
-        self.showsPullRequests = showsPullRequests
         self.showsPorts = showsPorts
     }
 
@@ -56,7 +47,6 @@ public struct SidebarWorkspaceAuxiliaryDetailVisibility: Equatable, Sendable {
         showsLog: false,
         showsProgress: false,
         showsBranchDirectory: false,
-        showsPullRequests: false,
         showsPorts: false
     )
 
@@ -68,7 +58,6 @@ public struct SidebarWorkspaceAuxiliaryDetailVisibility: Equatable, Sendable {
         showLog: Bool,
         showProgress: Bool,
         showBranchDirectory: Bool,
-        showPullRequests: Bool,
         showPorts: Bool,
         hideAllDetails: Bool
     ) -> Self {
@@ -78,7 +67,6 @@ public struct SidebarWorkspaceAuxiliaryDetailVisibility: Equatable, Sendable {
             showsLog: showLog,
             showsProgress: showProgress,
             showsBranchDirectory: showBranchDirectory,
-            showsPullRequests: showPullRequests,
             showsPorts: showPorts
         )
     }

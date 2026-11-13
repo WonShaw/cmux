@@ -20,12 +20,12 @@ import Foundation
 ///
 /// ```swift
 /// let policy = ManagedDevicePolicy()
-/// if policy.isEnforced(.disableEmbeddedBrowser) { /* refuse to create a pane */ }
+/// if policy.isEnforced(.disableCloud) { /* refuse to start Cloud discovery */ }
 /// ```
 public struct ManagedDevicePolicy: Sendable {
     /// The preference domain administrators target with a configuration
     /// profile: the release app's bundle identifier.
-    public static let releasePayloadDomain = "com.cmuxterm.app"
+    public static let releasePayloadDomain = "com.comux.app"
 
     /// Posted (on the default `NotificationCenter`) by the app's policy
     /// enforcement whenever the enforced state of any
@@ -142,7 +142,7 @@ public struct ManagedDevicePolicy: Sendable {
     /// ```swift
     /// .task {
     ///     for await _ in ManagedDevicePolicy.changeSignals() {
-    ///         managed = ManagedDevicePolicy().isEnforced(.disableEmbeddedBrowser)
+    ///         managed = ManagedDevicePolicy().isEnforced(.disableCloud)
     ///     }
     /// }
     /// ```
@@ -162,21 +162,6 @@ public struct ManagedDevicePolicy: Sendable {
         }
     }
 
-    /// Whether the embedded-browser disable is management-locked: the
-    /// dedicated ``ManagedDevicePolicyKey/disableEmbeddedBrowser`` policy is
-    /// enforced, or the user-level browser-disabled key itself is forced to
-    /// `true` by a profile. Every entrypoint (runtime gate, Settings badge,
-    /// palette, CLI) composes the check through this single definition.
-    ///
-    /// - Parameter browserDisabledUserDefaultsKey: The user-level key
-    ///   (`browserDisabledOverride`) from the settings catalog.
-    public func isBrowserDisableLocked(browserDisabledUserDefaultsKey: String) -> Bool {
-        if isEnforced(.disableEmbeddedBrowser) {
-            return true
-        }
-        return forcedBool(forUserDefaultsKey: browserDisabledUserDefaultsKey) == true
-    }
-
     /// Whether a profile forces `userDefaultsKey` in the app's *own* domain.
     ///
     /// This is the write-suppression check: stores that write to
@@ -187,22 +172,5 @@ public struct ManagedDevicePolicy: Sendable {
     /// domain.
     public func isKeyForcedInAppDomain(_ userDefaultsKey: String) -> Bool {
         forcedObject(defaults, userDefaultsKey) != nil
-    }
-
-    /// Whether the embedded-browser URL allowlist is locked by MDM.
-    ///
-    /// The dedicated policy key and the user-level key are checked across the
-    /// app and release domains. This lets channel builds honor a
-    /// release-domain profile without creating a write loop in their private
-    /// preference suite.
-    public func isBrowserURLAllowlistLocked(userDefaultsKey: String) -> Bool {
-        forcedBrowserURLAllowlistObject(userDefaultsKey: userDefaultsKey) != nil
-    }
-
-    /// Returns the forced value that owns the effective browser URL allowlist.
-    /// The dedicated policy key wins over a directly forced user key.
-    public func forcedBrowserURLAllowlistObject(userDefaultsKey: String) -> Any? {
-        forcedObject(forUserDefaultsKey: ManagedDevicePolicyKey.browserURLAllowlist.rawValue)
-            ?? forcedObject(forUserDefaultsKey: userDefaultsKey)
     }
 }

@@ -36,7 +36,6 @@ extension Workspace {
         let isLoading: Bool
         let isPinned: Bool
         let directory: String?
-        let directoryIsTrustedRemoteReport: Bool
         let directoryDisplayLabel: String?
         var ttyName: String?
         var ttyNameWasReportedByCurrentRuntime: Bool = false
@@ -62,15 +61,6 @@ extension Workspace {
         /// process-detected binding.
         let managedAgentResumeBinding: SurfaceResumeBindingSnapshot?
         var agentRuntime: DetachedAgentRuntimeState?
-        let isRemoteTerminal: Bool
-        var remoteTerminalSessionPhase: WorkspaceRemoteTerminalSessionPhase? = nil
-        var remoteTerminalAuthority: WorkspaceRemoteTerminalAuthority? = nil
-        var remoteTerminalLifecycleID: UUID? = nil
-        var remoteTerminalAttemptID: UUID? = nil
-        let remoteRelayPort: Int?
-        var remoteRelayNamespaceConfiguration: WorkspaceRemoteConfiguration? = nil
-        let remotePTYSessionID: String?
-        let remoteCleanupConfiguration: WorkspaceRemoteConfiguration?
 
         var sessionRestoreWorkspaceId: UUID {
             sessionRestoreSourceWorkspaceId ?? sourceWorkspaceId
@@ -82,54 +72,6 @@ extension Workspace {
             } ?? resumeBinding.flatMap {
                 $0.hasCompleteManagedSessionIdentity ? $0 : nil
             }
-        }
-
-        func withRemoteCleanupConfiguration(_ configuration: WorkspaceRemoteConfiguration?) -> Self {
-            Self(
-                sourceWorkspaceId: sourceWorkspaceId,
-                sessionRestoreSourceWorkspaceId: sessionRestoreSourceWorkspaceId,
-                panelId: panelId,
-                panel: panel,
-                surfaceMachine: surfaceMachine,
-                origin: origin,
-                title: title,
-                icon: icon,
-                iconImageData: iconImageData,
-                kind: kind,
-                isLoading: isLoading,
-                isPinned: isPinned,
-                directory: directory,
-                directoryIsTrustedRemoteReport: directoryIsTrustedRemoteReport,
-                directoryDisplayLabel: directoryDisplayLabel,
-                ttyName: ttyName,
-                ttyNameWasReportedByCurrentRuntime: ttyNameWasReportedByCurrentRuntime,
-                ttyReportRuntimeSurfaceGeneration: ttyReportRuntimeSurfaceGeneration,
-                cachedTitle: cachedTitle,
-                customTitle: customTitle,
-                customTitleSource: customTitleSource,
-                manuallyUnread: manuallyUnread,
-                restoredUnreadIndicator: restoredUnreadIndicator,
-                restorableAgent: restorableAgent,
-                restorableAgentResumeState: restorableAgentResumeState,
-                restoredAgentCompletedGeneration: restoredAgentCompletedGeneration,
-                shellActivityState: shellActivityState,
-                restoredPanelTitleBoundary: restoredPanelTitleBoundary,
-                restoredResumeSessionWorkingDirectory: restoredResumeSessionWorkingDirectory,
-                restoredStartupInput: restoredStartupInput,
-                resumeBinding: resumeBinding,
-                deferredAgentResumeRestore: deferredAgentResumeRestore,
-                managedAgentResumeBinding: managedAgentResumeBinding,
-                agentRuntime: agentRuntime,
-                isRemoteTerminal: isRemoteTerminal,
-                remoteTerminalSessionPhase: remoteTerminalSessionPhase,
-                remoteTerminalAuthority: remoteTerminalAuthority,
-                remoteTerminalLifecycleID: remoteTerminalLifecycleID,
-                remoteTerminalAttemptID: remoteTerminalAttemptID,
-                remoteRelayPort: remoteRelayPort,
-                remoteRelayNamespaceConfiguration: remoteRelayNamespaceConfiguration,
-                remotePTYSessionID: remotePTYSessionID,
-                remoteCleanupConfiguration: configuration
-            )
         }
     }
 }

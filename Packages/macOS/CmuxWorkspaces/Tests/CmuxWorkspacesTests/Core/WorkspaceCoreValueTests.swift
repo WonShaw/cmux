@@ -6,7 +6,6 @@ import Testing
     /// against bonsplit tab kinds; the values are a frozen wire format.
     @Test func kindStringsAreFrozenWireValues() {
         #expect(SurfaceKind.terminal.rawValue == "terminal")
-        #expect(SurfaceKind.browser.rawValue == "browser")
         #expect(SurfaceKind.markdown.rawValue == "markdown")
         #expect(SurfaceKind.filePreview.rawValue == "filePreview")
         #expect(SurfaceKind.rightSidebarTool.rawValue == "rightSidebarTool")
@@ -14,8 +13,6 @@ import Testing
         #expect(SurfaceKind.simulator.rawValue == "simulator")
         #expect(SurfaceKind.agentSession.rawValue == "agentSession")
         #expect(SurfaceKind.project.rawValue == "project")
-        #expect(SurfaceKind.extensionBrowser.rawValue == "extensionBrowser")
-        #expect(SurfaceKind.cloudVMLoading.rawValue == "cloudVMLoading")
     }
 }
 

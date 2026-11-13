@@ -20,12 +20,6 @@ import Foundation
 extension DefaultsKey {
     func decodedValue(in defaults: UserDefaults) -> Value? {
         let rawValue = defaults.object(forKey: userDefaultsKey)
-        if userDefaultsKey == BrowserExternalURLPolicy.userDefaultsKey,
-           let normalized = BrowserExternalURLPatternMatcher(rawValue: rawValue)
-               .legacyArrayStringValue(from: rawValue),
-           let value = normalized as? Value {
-            return value
-        }
         return Value.decodeFromUserDefaults(rawValue)
     }
 

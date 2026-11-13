@@ -276,7 +276,7 @@ jobs:
           # bands on unpainted cells. Force cmux to a dark appearance for the
           # screenshots (temporary CI setup) BEFORE launch so it reads it at start.
           # System-wide dark mode + the app's own appearance override, both best-effort.
-          defaults write com.cmuxterm.app.debug.cistream appearanceMode dark 2>/dev/null || true
+          defaults write com.comux.app.debug.cistream appearanceMode dark 2>/dev/null || true
           defaults write -g AppleInterfaceStyle Dark 2>/dev/null || true
           open "$MAC_APP"
           for i in $(seq 1 60); do CMUX_TAG=cistream ./scripts/cmux-debug-cli.sh identify >/dev/null 2>&1 && break; sleep 2; done

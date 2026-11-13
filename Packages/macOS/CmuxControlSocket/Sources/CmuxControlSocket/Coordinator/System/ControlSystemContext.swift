@@ -2,7 +2,7 @@ public import Foundation
 
 /// The system/misc-domain slice of the control-command seam (a constituent of
 /// the ``ControlCommandContext`` umbrella): `system.identify`, `system.tree`,
-/// `auth.login`, `session.restore_previous`, `settings.open`, `feedback.open`,
+/// `auth.login`, `session.restore_previous`, `settings.open`,
 /// `extension.sidebar.snapshot`, `workspace.action`, `surface.action` /
 /// `tab.action`, `surface.drag_to_split` / `surface.split_off`, and the
 /// DEBUG-only `mobile.dev_stack_auth.configure`.
@@ -56,15 +56,6 @@ public protocol ControlSystemContext: AnyObject {
     /// - Returns: The open resolution.
     func controlSettingsOpen(targetRaw: String?, requestedActivate: Bool) -> ControlSettingsOpenResolution
 
-    /// Schedules the feedback composer for `feedback.open`.
-    ///
-    /// - Parameters:
-    ///   - workspaceID: The explicit `workspace_id`, if any.
-    ///   - windowID: The explicit `window_id`, if any.
-    ///   - requestedActivate: The requested `activate` flag (the app applies
-    ///     the focus-allowance policy).
-    func controlFeedbackOpen(workspaceID: UUID?, windowID: UUID?, requestedActivate: Bool)
-
     /// Snapshots the routed window's workspaces for
     /// `extension.sidebar.snapshot`.
     ///
@@ -87,7 +78,6 @@ public protocol ControlSystemContext: AnyObject {
     ///   - routing: The routing selectors.
     ///   - actionKey: The normalized action key, or `nil` when missing.
     ///   - title: The trimmed `title` param, if any.
-    ///   - rawURL: The trimmed `url` param, if any.
     ///   - surfaceID: The explicit `surface_id` / `tab_id`, if any.
     ///   - requestedFocus: The requested `focus` flag (the app applies the
     ///     focus-allowance policy).
@@ -98,7 +88,6 @@ public protocol ControlSystemContext: AnyObject {
         routing: ControlRoutingSelectors,
         actionKey: String?,
         title: String?,
-        rawURL: String?,
         surfaceID: UUID?,
         requestedFocus: Bool,
         moveParams: [String: JSONValue]
@@ -124,12 +113,4 @@ public protocol ControlSystemContext: AnyObject {
     /// - Parameter params: The raw command params.
     /// - Returns: The fully shaped call result.
     func controlSurfaceSplitOff(params: [String: JSONValue]) -> ControlCallResult
-
-    #if DEBUG
-    /// Configures (or clears, with `nil`) the accepted dev Stack auth token
-    /// for the DEBUG-only `mobile.dev_stack_auth.configure`.
-    ///
-    /// - Parameter token: The token to accept, or `nil` to disable.
-    func controlMobileDevStackAuthSetToken(_ token: String?)
-    #endif
 }

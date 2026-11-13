@@ -42,19 +42,17 @@ public struct SettingsSectionScrollTarget: Equatable, Sendable {
 @MainActor
 @Observable
 public final class SettingsSectionMountModel {
-    /// Detail-stack order of the sections that own a slot. `browserImport`
-    /// is an anchor inside the Browser section rather than a section of
-    /// its own, so it never appears here.
+    /// Detail-stack order of the sections that own a slot.
     public static let displayOrder: [SettingsSectionID] = [
-        .account, .app, .terminal, .textBox, .sleepyMode, .mobile, .cloudMachines,
-        .networking, .sidebarAppearance, .customSidebars, .betaFeatures, .automation,
-        .computerUse, .browser, .globalHotkey, .keyboardShortcuts, .workspaceColors,
+        .app, .terminal, .textBox, .sleepyMode,
+        .sidebarAppearance, .customSidebars, .betaFeatures, .automation,
+        .globalHotkey, .keyboardShortcuts, .workspaceColors,
         .settingsJSON, .reset,
     ]
 
     /// The slot that hosts `section`'s content.
     public static func hostSection(for section: SettingsSectionID) -> SettingsSectionID {
-        section == .browserImport ? .browser : section
+        section
     }
 
     /// Sections mounted progressively, in detail-stack order. Sections

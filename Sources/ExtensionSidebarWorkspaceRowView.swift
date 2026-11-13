@@ -2,7 +2,6 @@ import CmuxFoundation
 import AppKit
 import CmuxSidebarProviderKit
 import SwiftUI
-import WebKit
 
 struct CmuxExtensionSidebarWorkspaceRowView: View, Equatable {
     let row: CmuxSidebarProviderRow
@@ -63,8 +62,7 @@ struct CmuxExtensionSidebarWorkspaceRowView: View, Equatable {
                 Button {
                     if inspectorDraft == nil {
                         inspectorDraft = CmuxExtensionWorkspaceInspectorDraft.initial(
-                            workspace: workspace,
-                            selectedTab: accessory.defaultTab
+                            workspace: workspace
                         )
                     }
                     showsInspector = true
@@ -81,8 +79,7 @@ struct CmuxExtensionSidebarWorkspaceRowView: View, Equatable {
                         draft: Binding(
                             get: {
                                 inspectorDraft ?? CmuxExtensionWorkspaceInspectorDraft.initial(
-                                    workspace: workspace,
-                                    selectedTab: accessory.defaultTab
+                                    workspace: workspace
                                 )
                             },
                             set: { inspectorDraft = $0 }
@@ -123,22 +120,12 @@ struct CmuxExtensionSidebarWorkspaceRowView: View, Equatable {
 }
 
 struct CmuxExtensionWorkspaceInspectorDraft: Equatable {
-    var selectedTab: CmuxSidebarProviderWorkspacePopoverTab
     var notes: String
-    var address: String
-    var committedAddress: String
 
     static func initial(
-        workspace: CmuxSidebarProviderWorkspace,
-        selectedTab: CmuxSidebarProviderWorkspacePopoverTab = .notes
+        workspace: CmuxSidebarProviderWorkspace
     ) -> CmuxExtensionWorkspaceInspectorDraft {
-        let initialAddress = workspace.pullRequestURLs.first ?? "https://github.com/"
-        return CmuxExtensionWorkspaceInspectorDraft(
-            selectedTab: selectedTab,
-            notes: "",
-            address: initialAddress,
-            committedAddress: initialAddress
-        )
+        CmuxExtensionWorkspaceInspectorDraft(notes: "")
     }
 }
 
@@ -186,11 +173,9 @@ struct CmuxExtensionWorkspaceInspectorView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Picker("", selection: $draft.selectedTab) {
-                    Text(String(localized: "sidebar.extension.notesTab", defaultValue: "Notes")).tag(CmuxSidebarProviderWorkspacePopoverTab.notes)
-                    Text(String(localized: "sidebar.extension.browserTab", defaultValue: "Browser")).tag(CmuxSidebarProviderWorkspacePopoverTab.browser)
-                }
-                .pickerStyle(.segmented)
+                Text(String(localized: "sidebar.extension.notesTab", defaultValue: "Notes"))
+                    .cmuxFont(size: 12, weight: .medium)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Button(action: onOpenWindow) {
                     Image(systemName: "macwindow")
@@ -203,37 +188,11 @@ struct CmuxExtensionWorkspaceInspectorView: View {
 
             Divider()
 
-            switch draft.selectedTab {
-            case .notes:
-                TextEditor(text: $draft.notes)
-                    .cmuxFont(size: 13)
-                    .scrollContentBackground(.hidden)
-                    .padding(8)
-                    .accessibilityIdentifier("ExtensionSidebarNotesEditor")
-            case .browser, .pullRequest:
-                VStack(spacing: 0) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.secondary)
-                        TextField(
-                            String(localized: "sidebar.extension.browserAddress", defaultValue: "Search or enter URL"),
-                            text: $draft.address
-                        )
-                        .textFieldStyle(.plain)
-                        .onSubmit {
-                            let normalized = CmuxExtensionWorkspaceInspectorBrowserView.normalizedAddress(draft.address)
-                            draft.address = normalized
-                            draft.committedAddress = normalized
-                        }
-                    }
-                    .cmuxFont(size: 12)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 7)
-                    .background(Color(nsColor: .controlBackgroundColor))
-
-                    CmuxExtensionWorkspaceInspectorBrowserView(address: draft.committedAddress)
-                }
-            }
+            TextEditor(text: $draft.notes)
+                .cmuxFont(size: 13)
+                .scrollContentBackground(.hidden)
+                .padding(8)
+                .accessibilityIdentifier("ExtensionSidebarNotesEditor")
         }
     }
 }
@@ -258,44 +217,6 @@ struct CmuxExtensionWorkspaceInspectorWindowContentView: View {
             draft: $draft,
             onOpenWindow: onOpenWindow
         )
-    }
-}
-
-struct CmuxExtensionWorkspaceInspectorBrowserView: NSViewRepresentable {
-    let address: String
-
-    final class Coordinator {
-        var loadedAddress: String?
-    }
-
-    static func normalizedAddress(_ rawValue: String) -> String {
-        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "https://github.com/" }
-        if trimmed.contains("://") { return trimmed }
-        if trimmed.contains(".") && !trimmed.contains(" ") { return "https://\(trimmed)" }
-        let query = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
-        return "https://www.google.com/search?q=\(query)"
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    func makeNSView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        let webView = CmuxUndoableWebView(frame: .zero, configuration: configuration)
-        webView.setValue(false, forKey: "drawsBackground")
-        return webView
-    }
-
-    func updateNSView(_ webView: WKWebView, context: Context) {
-        let normalized = Self.normalizedAddress(address)
-        guard context.coordinator.loadedAddress != normalized,
-              let url = URL(string: normalized) else {
-            return
-        }
-        context.coordinator.loadedAddress = normalized
-        webView.load(URLRequest(url: url))
     }
 }
 

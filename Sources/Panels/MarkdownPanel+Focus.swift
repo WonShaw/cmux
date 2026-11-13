@@ -1,5 +1,4 @@
 import AppKit
-import CmuxBrowser
 import Foundation
 
 extension MarkdownPanel {

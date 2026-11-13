@@ -2,7 +2,7 @@ import AppKit
 import os
 
 private let terminalPasteboardTransactionLogger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "com.cmuxterm.app",
+    subsystem: Bundle.main.bundleIdentifier ?? "com.comux.app",
     category: "PasteboardTransaction"
 )
 

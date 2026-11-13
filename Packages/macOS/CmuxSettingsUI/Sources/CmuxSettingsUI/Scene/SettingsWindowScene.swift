@@ -25,7 +25,6 @@ public struct SettingsWindowRoot: View {
     @State var mountModel: SettingsSectionMountModel
 
     static let selectedSectionDefaultsKey = "selectedSettingsSection"
-    static let cloudMachinesBetaDefaultsKey = "cloud.beta.machines.enabled"
 
     /// - Parameters:
     ///   - runtime: Catalog, stores, and host actions shared by every section.
@@ -47,19 +46,12 @@ public struct SettingsWindowRoot: View {
         // that pass runs inside `NSWindow(contentViewController:)`.
         let defaults = UserDefaults.standard
         let restoredSection = defaults.string(forKey: Self.selectedSectionDefaultsKey)
-            .flatMap(SettingsSectionID.init(rawValue:)) ?? .account
-        let betaEnabled = defaults.object(forKey: Self.cloudMachinesBetaDefaultsKey) as? Bool
-            ?? BetaFeaturesCatalogSection().cloudMachines.defaultValue
-        let cloudAvailable = !ManagedDevicePolicy().isEnforced(.disableCloud)
-            && runtime.hostActions.isCloudMachinesAvailable
-            && betaEnabled
+            .flatMap(SettingsSectionID.init(rawValue:)) ?? .app
         _mountModel = State(initialValue: mountModel ?? SettingsSectionMountModel(
             initial: initialSection ?? restoredSection,
-            order: Self.mountOrder(cloudAvailable: cloudAvailable)
+            order: SettingsSectionMountModel.displayOrder
         ))
     }
-    @State private var cloudDisabledByPolicy = ManagedDevicePolicy().isEnforced(.disableCloud)
-    @State private var cloudFeatureFlagRevision = 0
     @State private var searchText: String = ""
     // Legacy SettingsRootView persists two distinct pieces of state:
     // `selectedSettingsSection` (the top-level section pane shown in
@@ -71,13 +63,8 @@ public struct SettingsWindowRoot: View {
     // sibling hits inside one section must each be selectable.
     // @AppStorage (not @SceneStorage): the window is AppKit-hosted, so
     // there is no SwiftUI scene to store into (cmux issue #7777).
-    @AppStorage(SettingsWindowRoot.selectedSectionDefaultsKey) private var selectedSectionRaw: String = SettingsSectionID.account.rawValue
-    @AppStorage("selectedSettingsSidebarEntry") private var selectedSidebarEntryID: String = "section:\(SettingsSectionID.account.rawValue)"
-    // Mirrors BetaFeaturesCatalogSection.cloudMachines so flipping the Beta
-    // Features toggle shows/hides the Cloud sidebar row without reopening
-    // Settings; the host folds in the remote rollout flag.
-    @AppStorage(SettingsWindowRoot.cloudMachinesBetaDefaultsKey)
-    private var cloudMachinesBetaEnabled = BetaFeaturesCatalogSection().cloudMachines.defaultValue
+    @AppStorage(SettingsWindowRoot.selectedSectionDefaultsKey) private var selectedSectionRaw: String = SettingsSectionID.app.rawValue
+    @AppStorage("selectedSettingsSidebarEntry") private var selectedSidebarEntryID: String = "section:\(SettingsSectionID.app.rawValue)"
     // Legacy `SettingsRootView` binds `NavigationSplitView`'s
     // `columnVisibility` so the user can collapse the sidebar via the
     // toolbar button (or the SidebarCommands menu) and have that state
@@ -111,19 +98,11 @@ public struct SettingsWindowRoot: View {
     var secretStore: SecretFileStore { runtime.secretStore }
     var catalog: SettingCatalog { runtime.catalog }
     var hostActions: SettingsHostActions { runtime.hostActions }
-    var accountFlow: AccountFlow? { runtime.accountFlow }
-    /// Whether the Cloud section (and its sidebar row) is offered at all. The
-    /// host owns the remote flag and managed-policy decision; this local value
-    /// keeps the section responsive to the Beta Features toggle as well.
-    var isCloudSectionAvailable: Bool {
-        _ = cloudFeatureFlagRevision
-        return !cloudDisabledByPolicy && hostActions.isCloudMachinesAvailable && cloudMachinesBetaEnabled
-    }
     /// Resolves the selected section pane from the persisted raw value,
-    /// defaulting to ``SettingsSectionID/account`` when the stored value
+    /// defaulting to ``SettingsSectionID/app`` when the stored value
     /// is unrecognized (e.g., after dropping a case).
     private var selectedSection: SettingsSectionID {
-        SettingsSectionID(rawValue: selectedSectionRaw) ?? .account
+        SettingsSectionID(rawValue: selectedSectionRaw) ?? .app
     }
     /// Whether the user currently has a non-empty search query. When
     /// false the sidebar should track section selection only; when true
@@ -160,17 +139,6 @@ public struct SettingsWindowRoot: View {
         // so the package window can shrink to the same lower bound.
         .frame(minWidth: 820, minHeight: 540)
         .settingsErrorAlert(log: runtime.errorLog)
-        .task {
-            let signals = ManagedDevicePolicy.changeSignals()
-            cloudDisabledByPolicy = ManagedDevicePolicy().isEnforced(.disableCloud)
-            // A profile installed before this window opened: the persisted
-            // selection may still point at the hidden Cloud section.
-            leaveCloudSectionIfDisabledByPolicy()
-            for await _ in signals {
-                cloudDisabledByPolicy = ManagedDevicePolicy().isEnforced(.disableCloud)
-                leaveCloudSectionIfDisabledByPolicy()
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: Self.navigationRequestName)) { notification in
             applyNavigationRequest(notification)
         }
@@ -179,10 +147,6 @@ public struct SettingsWindowRoot: View {
             // reach the split view; the host app routes its sidebar-toggle
             // menu command here when the Settings window is key.
             columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("cmuxFeatureFlagsDidChange"))) { _ in
-            cloudFeatureFlagRevision &+= 1
-            leaveCloudSectionIfDisabledByPolicy()
         }
         .onChange(of: searchText) { _, newValue in
             // Legacy SettingsRootView resyncs the sidebar entry to the
@@ -222,34 +186,10 @@ public struct SettingsWindowRoot: View {
         navigate(to: target, preferSectionSelection: !shouldPreserveSearchSelection)
     }
 
-    /// Moves a selection that rests on an unavailable Cloud section to Account,
-    /// both at first render and on a transition.
-    private func leaveCloudSectionIfDisabledByPolicy() {
-        if !isCloudSectionAvailable {
-            // If the Cloud slot is the outstanding progressive mount, its
-            // intentionally empty content has no onAppear to advance the
-            // queue. Skip it explicitly so later sections still mount.
-            _ = mountModel.skip(.cloudMachines)
-        }
-        if !isCloudSectionAvailable && selectedSection == .cloudMachines {
-            navigate(to: .account)
-        }
-    }
-
-    private func isEntryVisible(_ entry: SettingsSearchIndex.Entry) -> Bool {
-        guard !isCloudSectionAvailable else { return true }
-        switch entry.kind {
-        case .section:
-            return entry.id != "section:\(SettingsSectionID.cloudMachines.rawValue)"
-        case .setting(let parent):
-            return parent != .cloudMachines
-        }
-    }
-
     @ViewBuilder
     private var sidebar: some View {
         List(selection: sidebarSelectionBinding) {
-            let matches = sidebarEntries(matching: searchText).filter { isEntryVisible($0) }
+            let matches = sidebarEntries(matching: searchText)
             if matches.isEmpty {
                 Text(String(localized: "settings.search.noResults", defaultValue: "No Results"))
                     .foregroundStyle(.secondary)
@@ -379,12 +319,12 @@ public struct SettingsWindowRoot: View {
     private func parentSection(for entryID: String) -> SettingsSectionID {
         if entryID.hasPrefix("section:") {
             let raw = String(entryID.dropFirst("section:".count))
-            return SettingsSectionID(rawValue: raw) ?? .account
+            return SettingsSectionID(rawValue: raw) ?? .app
         }
         if let entry = searchIndex.entries.first(where: { $0.id == entryID }) {
             if case .setting(let parent) = entry.kind { return parent }
         }
-        return .account
+        return .app
     }
 
     @ViewBuilder

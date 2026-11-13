@@ -5,9 +5,8 @@
 - macOS 14+
 - Xcode 26 (the pinned toolchain); Xcode 16.2 on Intel Macs running macOS 14 also builds the macOS app (best effort)
 - [Zig](https://ziglang.org/) (install via `brew install zig`)
-- [Rust](https://rustup.rs) — `scripts/setup.sh` requires `rustup`, and every app build compiles
-  the bundled `cmux-cua` engine with `cargo`. The official installer puts both in `~/.cargo/bin`,
-  which is where `setup.sh` looks:
+- [Rust](https://rustup.rs) — `scripts/setup.sh` requires `rustup`. The official installer puts
+  it in `~/.cargo/bin`, which is where `setup.sh` looks:
 
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh

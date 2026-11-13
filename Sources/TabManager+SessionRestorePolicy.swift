@@ -1,21 +1,10 @@
 import Foundation
 
 extension TabManager {
-    static func isCloudVMSessionRestoreWorkspace(_ snapshot: SessionWorkspaceSnapshot) -> Bool {
-        isManagedCloudVMSessionRestoreWorkspace(snapshot)
-    }
-
-    static func isManagedCloudVMSessionRestoreWorkspace(_ snapshot: SessionWorkspaceSnapshot) -> Bool {
-        guard let managedCloudVMID = snapshot.remote?.managedCloudVMID else { return false }
-        return !managedCloudVMID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    /// Any workspace that hosts a Cloud machine through either transport: the
-    /// legacy managed remote (`managedCloudVMID`) or the cmux-tui binding
-    /// (`cloudVM`). `DisableCloud` drops every one of these from restore; the
-    /// one-machine normalization above deliberately keeps cmux-tui workspaces.
-    static func isCloudVMWorkspaceSnapshotForManagedPolicy(_ snapshot: SessionWorkspaceSnapshot) -> Bool {
-        isManagedCloudVMSessionRestoreWorkspace(snapshot) || snapshot.cloudVM != nil
+    /// A snapshot written by an older build for an ssh/remote workspace. This
+    /// build has no remote workspaces, so such a snapshot is never restored.
+    static func isLegacyRemoteSessionRestoreWorkspace(_ snapshot: SessionWorkspaceSnapshot) -> Bool {
+        snapshot.remote != nil
     }
 
     /// Reconciles task-create provenance only when the caller owns a cache.

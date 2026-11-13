@@ -5,8 +5,7 @@ public import Foundation
 ///
 /// The coordinator parses each value from the request params with its helpers
 /// (mirroring the legacy `v2*` parsing exactly); the seam runs the app-coupled
-/// work (direction parsing, panel-type resolution, browser availability, the
-/// split creation). No app types cross the seam.
+/// work (direction parsing, panel-type resolution, the split creation). No app types cross the seam.
 public struct ControlPaneCreateInputs: Sendable, Equatable {
     /// The trimmed `direction` string, if present (legacy `v2String`). The seam
     /// parses it to a split direction and rejects a missing or unknown value.
@@ -14,18 +13,6 @@ public struct ControlPaneCreateInputs: Sendable, Equatable {
     /// The trimmed `type` string, if present (legacy `v2String`). The seam
     /// resolves it to a panel type, defaulting to terminal when absent/unknown.
     public let typeRaw: String?
-    /// The raw `url` string, if present (legacy `v2String`), used for the URL
-    /// and the browser-disabled error data.
-    public let urlRaw: String?
-    /// The trimmed browser profile selector from `profile`, `profile_id`, or
-    /// `profile_name`, if present.
-    public let profileRaw: String?
-    /// Whether any non-null browser profile selector had a non-string or empty
-    /// value and must be rejected instead of treated as an omitted selector.
-    public let hasInvalidProfileParam: Bool
-    /// Whether more than one non-null browser profile selector alias was
-    /// supplied.
-    public let hasMultipleProfileParams: Bool
     /// The trimmed-non-empty `working_directory`, if any (legacy
     /// `v2OptionalTrimmedRawString`).
     public let workingDirectory: String?
@@ -60,10 +47,6 @@ public struct ControlPaneCreateInputs: Sendable, Equatable {
     /// - Parameters:
     ///   - directionRaw: The trimmed `direction` string, if present.
     ///   - typeRaw: The trimmed `type` string, if present.
-    ///   - urlRaw: The raw `url` string, if present.
-    ///   - profileRaw: The browser profile UUID or display name, if present.
-    ///   - hasInvalidProfileParam: Whether a supplied selector was malformed.
-    ///   - hasMultipleProfileParams: Whether multiple selector aliases were supplied.
     ///   - workingDirectory: The trimmed-non-empty working directory, if any.
     ///   - initialCommand: The trimmed-non-empty initial command, if any.
     ///   - initialInput: The nonblank raw initial input, if any.
@@ -77,10 +60,6 @@ public struct ControlPaneCreateInputs: Sendable, Equatable {
     public init(
         directionRaw: String?,
         typeRaw: String?,
-        urlRaw: String?,
-        profileRaw: String? = nil,
-        hasInvalidProfileParam: Bool = false,
-        hasMultipleProfileParams: Bool = false,
         workingDirectory: String?,
         initialCommand: String?,
         initialInput: String? = nil,
@@ -94,10 +73,6 @@ public struct ControlPaneCreateInputs: Sendable, Equatable {
     ) {
         self.directionRaw = directionRaw
         self.typeRaw = typeRaw
-        self.urlRaw = urlRaw
-        self.profileRaw = profileRaw
-        self.hasInvalidProfileParam = hasInvalidProfileParam
-        self.hasMultipleProfileParams = hasMultipleProfileParams
         self.workingDirectory = workingDirectory
         self.initialCommand = initialCommand
         self.initialInput = initialInput

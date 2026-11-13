@@ -28,6 +28,8 @@ extension SurfaceResumeBindingSnapshot {
             }
             return " \(executable) fork --surface\n"
         }
+        // A legacy remote binding is never typed into a local shell.
+        guard launchFlavor == .local else { return nil }
         guard let inline = inlineStartupInput(
             repairPortableAgentExecutable: repairPortableAgentExecutable
         ) else {

@@ -14,8 +14,8 @@ public enum ControlTabActionResolution: Sendable, Equatable {
         case pinned(Bool)
         /// `toggle_full_width_tab` — the resulting full-width tab mode flag.
         case fullWidthTabMode(Bool)
-        /// `duplicate` / `new_terminal_right` / `new_browser_right` — the
-        /// created surface's `created_*` identity keys.
+        /// `new_terminal_right` — the created surface's `created_*` identity
+        /// keys.
         case created(UUID)
         /// `new_terminal_right` on a remote tmux mirror — the create was
         /// routed to the remote as `new-window`; the tab arrives via
@@ -77,25 +77,14 @@ public enum ControlTabActionResolution: Sendable, Equatable {
     case unknownAction
     /// `rename` without a usable `title`.
     case invalidTitle
-    /// `new_browser_right` with an unparsable `url`.
-    case invalidURL(rawURL: String)
-    /// `reload` on a non-browser surface.
-    case reloadNotBrowser
-    /// `duplicate` on a non-browser surface.
-    case duplicateNotBrowser
-    /// The cmux browser is disabled; the app already attempted the external
-    /// open (shared `v2BrowserDisabledExternalOpenResult` outcome).
-    case browserDisabled(ControlSurfaceBrowserDisabledOutcome)
     /// The surface's pane could not be resolved.
     case tabPaneNotFound
     /// Bonsplit rejected the full-width tab mode toggle.
     case fullWidthTabToggleFailed
     /// The anchor tab was not found in its pane (`close_left` / `close_right`).
     case tabNotFoundInPane
-    /// Surface creation failed (`new_terminal_right` / `new_browser_right`).
+    /// Surface creation failed (`new_terminal_right`).
     case createFailed
-    /// Browser duplication failed.
-    case duplicateFailed
     /// A fully-shaped result bridged from the still-app-side
     /// move-to-new-workspace family (`move_to_new_workspace` /
     /// `detach_to_workspace` / `detach_to_new_workspace`).

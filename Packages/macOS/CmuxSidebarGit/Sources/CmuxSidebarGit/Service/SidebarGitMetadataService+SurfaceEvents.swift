@@ -26,7 +26,7 @@ extension SidebarGitMetadataService {
         }
     }
 
-    /// Records a trusted remote directory report and clears stale git/PR
+    /// Records a trusted remote directory report and clears stale git
     /// metadata before scheduling fresh probes for the remote path.
     public func updateRemoteSurfaceDirectory(workspaceId: UUID, panelId: UUID, directory: String, displayLabel: String?) {
         updateSurfaceDirectory(
@@ -69,7 +69,6 @@ extension SidebarGitMetadataService {
                     clearWorkspaceGitProbeTracking(for: probeKey)
                     if hadTrustedRemoteDirectory, previousDirectory != nextDirectory {
                         host.clearPanelGitBranch(workspaceId: workspaceId, panelId: panelId)
-                        host.clearPanelPullRequest(workspaceId: workspaceId, panelId: panelId)
                     }
                     return
                 }
@@ -81,11 +80,6 @@ extension SidebarGitMetadataService {
                 }
                 return
             }
-            pullRequestProbing.scheduleWorkspacePullRequestRefresh(
-                workspaceId: workspaceId,
-                panelId: panelId,
-                reason: "directoryChange"
-            )
             scheduleWorkspaceGitMetadataRefreshIfPossible(
                 workspaceId: workspaceId,
                 panelId: panelId,
@@ -123,7 +117,6 @@ extension SidebarGitMetadataService {
             host.shouldSkipLocalGitMetadata(workspaceId: workspaceId, panelId: panelId) {
             clearWorkspaceGitProbe(probeKey)
             workspaceGitTrackedDirectoryByKey.removeValue(forKey: probeKey)
-            pullRequestProbing.clearWorkspacePullRequestTracking(workspaceId: workspaceId, panelId: panelId)
             return
         }
         guard branchChanged else { return }
@@ -131,11 +124,6 @@ extension SidebarGitMetadataService {
             workspaceGitTrackedDirectoryByKey[probeKey] = directory
             updateWorkspaceGitMetadataWatcher(for: probeKey, directory: directory)
         }
-        pullRequestProbing.scheduleWorkspacePullRequestRefresh(
-            workspaceId: workspaceId,
-            panelId: panelId,
-            reason: "branchChange"
-        )
         scheduleWorkspaceGitMetadataRefreshIfPossible(
             workspaceId: workspaceId,
             panelId: panelId,
@@ -146,17 +134,11 @@ extension SidebarGitMetadataService {
     public func clearSurfaceGitBranch(workspaceId: UUID, panelId: UUID) {
         guard let host, host.workspaceExists(workspaceId) else { return }
         let hadBranch = host.panelGitBranch(workspaceId: workspaceId, panelId: panelId) != nil
-        let hadPullRequest = host.panelPullRequestBadge(workspaceId: workspaceId, panelId: panelId) != nil
-        guard hadBranch || hadPullRequest else { return }
-        pullRequestProbing.clearWorkspacePullRequestTracking(
-            workspaceId: workspaceId,
-            panelId: panelId
-        )
+        guard hadBranch else { return }
         let probeKey = WorkspaceGitProbeKey(workspaceId: workspaceId, panelId: panelId)
         workspaceGitTrackedDirectoryByKey.removeValue(forKey: probeKey)
         stopWorkspaceGitMetadataWatcher(for: probeKey)
         host.clearPanelGitBranch(workspaceId: workspaceId, panelId: panelId)
-        host.clearPanelPullRequest(workspaceId: workspaceId, panelId: panelId)
         scheduleWorkspaceGitMetadataRefreshIfPossible(
             workspaceId: workspaceId,
             panelId: panelId,

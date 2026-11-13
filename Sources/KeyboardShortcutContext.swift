@@ -1,10 +1,8 @@
 import AppKit
 import CmuxSettings
 import CmuxSimulatorUI
-import WebKit
 
 struct ShortcutEventFocusContext {
-    let browserPanel: BrowserPanel?
     let markdownPanel: MarkdownPanel?
     let filePreviewTextEditorFocused: Bool
     let simulatorFocused: Bool
@@ -15,7 +13,6 @@ struct ShortcutEventFocusContext {
     let shortcutContext: ShortcutContext
 
     init(
-        browserPanel: BrowserPanel?,
         markdownPanel: MarkdownPanel?,
         filePreviewTextEditorFocused: Bool,
         simulatorFocused: Bool,
@@ -24,7 +21,6 @@ struct ShortcutEventFocusContext {
         rightSidebarFocused: Bool,
         shortcutContext: ShortcutContext
     ) {
-        self.browserPanel = browserPanel
         self.markdownPanel = markdownPanel
         self.filePreviewTextEditorFocused = filePreviewTextEditorFocused
         self.simulatorFocused = simulatorFocused
@@ -42,7 +38,6 @@ struct ShortcutEventFocusContext {
     /// ``ShortcutWhenClause`` evaluates against.
     var focusState: ShortcutFocusState {
         ShortcutFocusState(
-            browser: browserPanel != nil,
             markdown: markdownPanel != nil,
             sidebar: rightSidebarFocused,
             filePreviewTextEditor: filePreviewTextEditorFocused,
@@ -66,30 +61,7 @@ struct ShortcutEventFocusContextCache {
     let context: ShortcutEventFocusContext
 }
 
-extension Notification.Name {
-    static let debugBrowserReloadShortcutInvoked = Notification.Name("cmux.debugBrowserReloadShortcutInvoked")
-    static let debugBrowserHardReloadShortcutInvoked = Notification.Name("cmux.debugBrowserHardReloadShortcutInvoked")
-}
-
 extension AppDelegate {
-    func reloadBrowserPanelForShortcut(_ panel: BrowserPanel) {
-#if DEBUG
-        NotificationCenter.default.post(name: .debugBrowserReloadShortcutInvoked, object: panel)
-#endif
-        panel.reload()
-    }
-
-    func hardReloadBrowserPanelForShortcut(_ panel: BrowserPanel) {
-#if DEBUG
-        NotificationCenter.default.post(name: .debugBrowserHardReloadShortcutInvoked, object: panel)
-#endif
-        panel.hardReload()
-    }
-
-    func shortcutEventBrowserPanel(_ event: NSEvent) -> BrowserPanel? {
-        shortcutEventFocusContext(event).browserPanel
-    }
-
     func shortcutEventMarkdownPanel(_ event: NSEvent) -> MarkdownPanel? {
         shortcutEventFocusContext(event).markdownPanel
     }
@@ -104,26 +76,19 @@ extension AppDelegate {
         let simulatorFocused = simulatorPanel != nil
         let simulatorTextEditorFocused = simulatorFocused
             && shortcutWindow?.firstResponder.map(shortcutResponderAcceptsTextEditing) == true
-        let browserPanel = simulatorFocused
-            ? nil
-            : shortcutEventFocusedBrowserPanel(event) ?? shortcutWebInspectorFocusedBrowserPanel(in: shortcutWindow)
-        // Only treat a markdown panel as focused when no browser panel owns the
-        // event, so a focused browser never routes markdown shortcuts.
-        let markdownPanel = browserPanel == nil ? shortcutFocusedMarkdownPanel(in: shortcutWindow) : nil
-        let filePreviewTextEditorFocused = browserPanel == nil && markdownPanel == nil
+        let markdownPanel = shortcutFocusedMarkdownPanel(in: shortcutWindow)
+        let filePreviewTextEditorFocused = markdownPanel == nil
             ? shortcutFocusedFilePreviewTextEditor(in: shortcutWindow)
             : false
         let rightSidebarFocused = !simulatorFocused
             && (shortcutWindow.map { shouldRouteRightSidebarModeShortcut(in: $0) } ?? false)
         let focusState = ShortcutFocusState(
-            browser: browserPanel != nil,
             markdown: markdownPanel != nil,
             sidebar: rightSidebarFocused,
             filePreviewTextEditor: filePreviewTextEditorFocused,
             simulator: simulatorFocused
         )
         let context = ShortcutEventFocusContext(
-            browserPanel: browserPanel,
             markdownPanel: markdownPanel,
             filePreviewTextEditorFocused: filePreviewTextEditorFocused,
             simulatorFocused: simulatorFocused,
@@ -279,150 +244,6 @@ extension AppDelegate {
         }
     }
 
-    func shortcutEventFocusedBrowserPanel(_ event: NSEvent) -> BrowserPanel? {
-        guard let shortcutWindow = shortcutResolvedEventWindow(event) ?? NSApp.keyWindow ?? NSApp.mainWindow else {
-            return nil
-        }
-
-        let responder = shortcutWindow.firstResponder
-        if let dockBrowser = shortcutActiveWindowDockBrowserPanel(
-            in: shortcutWindow
-        ) {
-            return dockBrowser
-        }
-        if responder.cmuxStrictOwningGhosttyView() != nil {
-            return nil
-        }
-
-        if let panelId = focusedBrowserAddressBarPanelIdForShortcutEvent(event),
-           let panel = shortcutBrowserPanel(panelId: panelId, in: shortcutWindow) {
-            return panel
-        }
-
-        if let responder,
-           let panelId = BrowserWindowPortalRegistry.searchOverlayPanelId(for: responder, in: shortcutWindow),
-           let panel = shortcutBrowserPanel(panelId: panelId, in: shortcutWindow) {
-            return panel
-        }
-
-        if let webView = shortcutOwningWebView(for: responder) {
-            return shortcutBrowserPanel(webView: webView)
-        }
-
-        if let panel = shortcutFocusedBrowserPanel(in: shortcutWindow) {
-            return panel
-        }
-
-        return nil
-    }
-
-    /// Resolves the browser that owns command/menu focus without requiring the
-    /// original key event. This is captured before overlays or menu tracking can
-    /// move AppKit's first responder.
-    func focusedBrowserPanelForAction(
-        in preferredWindow: NSWindow?
-    ) -> BrowserPanel? {
-        guard let window = preferredWindow ?? NSApp.keyWindow
-            ?? NSApp.mainWindow else {
-            return nil
-        }
-        let responder = window.firstResponder
-        if let dockBrowser = shortcutActiveWindowDockBrowserPanel(
-            in: window
-        ) {
-            return dockBrowser
-        }
-        if responder.cmuxStrictOwningGhosttyView() != nil {
-            return nil
-        }
-        if let addressBarPanelId = focusedBrowserAddressBarPanelId(),
-           browserOmnibarPanelId(for: responder) == addressBarPanelId,
-           let panel = shortcutBrowserPanel(
-               panelId: addressBarPanelId,
-               in: window
-           ) {
-            return panel
-        }
-        if let responder,
-           let panelId = BrowserWindowPortalRegistry.searchOverlayPanelId(
-               for: responder,
-               in: window
-           ),
-           let panel = shortcutBrowserPanel(panelId: panelId, in: window) {
-            return panel
-        }
-        if let webView = shortcutOwningWebView(for: responder),
-           let panel = shortcutBrowserPanel(webView: webView) {
-            return panel
-        }
-        if cmuxIsLikelyWebInspectorResponder(responder) {
-            return shortcutWebInspectorFocusedBrowserPanel(in: window)
-        }
-        return shortcutFocusedBrowserPanel(in: window)
-    }
-
-    /// Whether the keystroke's first responder is owned by a browser panel's web
-    /// view (the page itself or an editable element / field editor inside it), as
-    /// opposed to a browser panel merely being the selected pane while chrome — the
-    /// right sidebar, address bar, or find bar — holds keyboard focus. Scoped to
-    /// browser-panel web views (not the diff viewer / markdown renderer) so the
-    /// browser document-editing bypass only fires on genuine browser web-content
-    /// focus and the default Cmd+I (Show Notifications) keeps working otherwise
-    /// (issue #6776).
-    func shortcutEventFirstResponderOwnsBrowserWebView(_ event: NSEvent) -> Bool {
-        let shortcutWindow = shortcutResolvedEventWindow(event) ?? NSApp.keyWindow ?? NSApp.mainWindow
-        guard let responder = shortcutWindow?.firstResponder,
-              let webView = shortcutOwningWebView(for: responder) else {
-            return false
-        }
-        return shortcutBrowserPanel(webView: webView) != nil
-    }
-
-    private func shortcutFocusedBrowserPanel(in window: NSWindow?) -> BrowserPanel? {
-        if let window {
-            guard let context = shortcutMainWindowContext(in: window) else {
-                return nil
-            }
-            if let windowDock = existingWindowDock(forWindowId: context.windowId) {
-                if let panel = windowDock.browserPanel(owning: window.firstResponder, in: window) {
-                    return panel
-                }
-            }
-            if let panel = context.tabManager.selectedWorkspace?
-                .dockBrowserPanel(owning: window.firstResponder, in: window) {
-                return panel
-            }
-            if context.keyboardFocusCoordinator.activeRightSidebarMode == .dock {
-                guard let windowDock = existingWindowDock(
-                    forWindowId: context.windowId
-                ),
-                let focusedPanelId = windowDock.focusedPanelId else {
-                    return nil
-                }
-                return windowDock.browserPanel(for: focusedPanelId)
-            }
-            return context.tabManager.focusedWorkspaceBrowserPanel
-        }
-
-        return tabManager?.focusedWorkspaceBrowserPanel
-    }
-
-    /// The focus coordinator is authoritative while the Dock owns keyboard
-    /// focus. AppKit can briefly leave the previous main terminal as first
-    /// responder during portal reparenting, which must not hide the selected
-    /// Dock browser from browser commands.
-    private func shortcutActiveWindowDockBrowserPanel(
-        in window: NSWindow
-    ) -> BrowserPanel? {
-        guard let context = shortcutMainWindowContext(in: window),
-              context.keyboardFocusCoordinator.activeRightSidebarMode == .dock,
-              let dock = existingWindowDock(forWindowId: context.windowId),
-              let panelId = dock.focusedPanelId else {
-            return nil
-        }
-        return dock.browserPanel(for: panelId)
-    }
-
     private func shortcutFocusedSimulatorPanel(in window: NSWindow?) -> SimulatorPanel? {
         guard let window, let responder = window.firstResponder else { return nil }
         if let context = shortcutMainWindowContext(in: window),
@@ -444,131 +265,11 @@ extension AppDelegate {
         return nil
     }
 
-    private func shortcutWebInspectorFocusedBrowserPanel(in window: NSWindow?) -> BrowserPanel? {
-        let responder = window?.firstResponder ?? NSApp.keyWindow?.firstResponder ?? NSApp.mainWindow?.firstResponder
-        guard cmuxIsLikelyWebInspectorResponder(responder) else { return nil }
-
-        if let window,
-           let context = mainWindowContexts[ObjectIdentifier(window)] ??
-               mainWindowContexts.values.first(where: { $0.window === window }) {
-            return shortcutFocusedBrowserPanel(in: context.window ?? window)
-        }
-
-        return shortcutFocusedBrowserPanel(in: window)
-    }
-
     private func shortcutResolvedEventWindow(_ event: NSEvent) -> NSWindow? {
         if event.windowNumber > 0,
            let window = NSApp.window(withWindowNumber: event.windowNumber) {
             return window
         }
         return event.window
-    }
-
-    private func shortcutBrowserPanel(panelId: UUID, in window: NSWindow?) -> BrowserPanel? {
-        if let context = shortcutMainWindowContext(in: window),
-           let panel = existingWindowDock(forWindowId: context.windowId)?.browserPanel(for: panelId) {
-            return panel
-        }
-        if let panel = windowDockContainingPanel(panelId)?.browserPanel(for: panelId) {
-            return panel
-        }
-        guard let workspace = shortcutContextTabManager(in: window)?.selectedWorkspace else {
-            return nil
-        }
-        return workspace.browserPanelIncludingDock(for: panelId)
-    }
-
-    private func shortcutBrowserPanel(webView: WKWebView) -> BrowserPanel? {
-        browserPanel(owning: webView)
-    }
-
-    private func shortcutOwningWebView(for responder: NSResponder?) -> WKWebView? {
-        guard let responder else { return nil }
-        if let webView = responder as? WKWebView {
-            return webView
-        }
-
-        if let textView = responder as? NSTextView,
-           textView.isFieldEditor,
-           let ownerView = cmuxFieldEditorOwnerView(textView),
-           let webView = shortcutOwningWebView(for: ownerView) {
-            return webView
-        }
-
-        if let view = responder as? NSView,
-           let webView = shortcutOwningWebView(for: view) {
-            return webView
-        }
-
-        var current = responder.nextResponder
-        while let next = current {
-            if let webView = next as? WKWebView {
-                return webView
-            }
-            if let view = next as? NSView,
-               let webView = shortcutOwningWebView(for: view) {
-                return webView
-            }
-            current = next.nextResponder
-        }
-
-        return nil
-    }
-
-    private func shortcutOwningWebView(for view: NSView) -> WKWebView? {
-        if let webView = view as? WKWebView {
-            return webView
-        }
-
-        var current: NSView? = view.superview
-        while let candidate = current {
-            if let webView = candidate as? WKWebView {
-                return webView
-            }
-            if String(describing: type(of: candidate)).contains("WindowBrowserSlotView"),
-               let portalWebView = shortcutUniqueBrowserWebView(in: candidate) {
-                if view === portalWebView || view.isDescendant(of: portalWebView) {
-                    return portalWebView
-                }
-                if shortcutAllowsPortalSlotTextEntryFocus(view) {
-                    return nil
-                }
-                return portalWebView
-            }
-            current = candidate.superview
-        }
-
-        return nil
-    }
-
-    private func shortcutAllowsPortalSlotTextEntryFocus(_ view: NSView) -> Bool {
-        var current: NSView? = view
-        while let candidate = current {
-            if let textField = candidate as? NSTextField {
-                return textField.isEditable || textField.acceptsFirstResponder
-            }
-            if let textView = candidate as? NSTextView {
-                return textView.isEditable || textView.isSelectable || textView.isFieldEditor
-            }
-            current = candidate.superview
-        }
-        return false
-    }
-
-    private func shortcutUniqueBrowserWebView(in root: NSView) -> WKWebView? {
-        var stack: [NSView] = [root]
-        var found: WKWebView?
-        while let current = stack.popLast() {
-            if let webView = current as? WKWebView {
-                if found == nil {
-                    found = webView
-                } else if found !== webView {
-                    return nil
-                }
-            }
-            stack.append(contentsOf: current.subviews)
-        }
-        return found
     }
 }

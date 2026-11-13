@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SettingsSearchIndex {
-    static let defaultSelectionID = sectionID(for: .account)
+    static let defaultSelectionID = sectionID(for: .app)
 
     private static let sectionEntries: [SettingsSearchEntry] = SettingsNavigationTarget.allCases.map { target in
         SettingsSearchEntry(
@@ -16,8 +16,6 @@ enum SettingsSearchIndex {
     }
 
     private static let settingEntries: [SettingsSearchEntry] = [
-        setting(.account, "account", String(localized: "settings.section.account", defaultValue: "Account"), "sign in login team sync user profile"),
-        setting(.account, "pro", String(localized: "settings.account.pro.title", defaultValue: "cmux Pro"), "pro upgrade subscription billing plan pricing cloud"),
         setting(.app, "language", String(localized: "settings.app.language", defaultValue: "Language"), "locale translation japanese english restart"),
         setting(.app, "appearance", String(localized: "settings.app.appearance", defaultValue: "Appearance"), "theme light dark system"),
         setting(.app, "app-icon", String(localized: "settings.app.appIcon", defaultValue: "App Icon"), "dock icon alternate"),
@@ -61,7 +59,6 @@ enum SettingsSearchIndex {
             )
         ),
         setting(.app, "notification-command", String(localized: "settings.notifications.command", defaultValue: "Notification Command"), "shell command environment variables"),
-        setting(.app, "telemetry", String(localized: "settings.app.telemetry", defaultValue: "Send anonymous telemetry"), "analytics crash usage"),
         setting(.app, "default-terminal", String(localized: "settings.app.defaultTerminal", defaultValue: "Default Terminal"), "ssh links command tool unix executable launch services handler registration system default"),
         setting(.app, "warn-before-quit", String(localized: "settings.app.warnBeforeQuit", defaultValue: "Warn Before Quit"), "cmd q confirmation confirmQuit"),
         setting(.app, "warn-before-closing-tab", String(localized: "settings.app.warnBeforeClosingTab", defaultValue: "Warn Before Closing Tab"), "cmd w close tab confirmation"),
@@ -113,12 +110,7 @@ enum SettingsSearchIndex {
         setting(.sidebarAppearance, "path-last-segment-only", String(localized: "settings.app.pathLastSegmentOnly", defaultValue: "Truncate Path From Start"), "cwd path directory truncate last segment basename viewport"),
         setting(.sidebarAppearance, "show-notification-message", String(localized: "settings.app.showNotificationMessage", defaultValue: "Show Notification Message in Sidebar"), "workspace latest notification"), setting(.sidebarAppearance, "notification-message-line-limit", String(localized: "settings.app.notificationMessageLineLimit", defaultValue: "Notification Preview Lines"), "sidebar.notificationMessageLineLimit workspace latest notification lines limit"),
         setting(.sidebarAppearance, "show-branch-directory", String(localized: "settings.app.showBranchDirectory", defaultValue: "Show Branch + Directory in Sidebar"), "git cwd path"),
-        setting(.sidebarAppearance, "show-pull-requests", String(localized: "settings.app.showPullRequests", defaultValue: "Show Pull Requests in Sidebar"), "review pr mr link"),
         setting(.sidebarAppearance, "watch-git-status", String(localized: "settings.app.watchGitStatus", defaultValue: "Watch Git Status in Sidebar"), "git status branch watcher index lock"),
-        setting(.sidebarAppearance, "make-pr-clickable", String(localized: "settings.app.makeSidebarPullRequestClickable", defaultValue: "Make Sidebar PR Clickable"), "pull requests pull request pr mr review clickable links select workspace row"),
-        setting(.sidebarAppearance, "open-pr-links", String(localized: "settings.app.openSidebarPRLinks", defaultValue: "Open Sidebar PR Links in cmux Browser"), "pull request link browser"),
-        setting(.sidebarAppearance, "open-port-links", String(localized: "settings.app.openSidebarPortLinks", defaultValue: "Open Sidebar Port Links in cmux Browser"), "port link browser"),
-        setting(.sidebarAppearance, "show-ssh", String(localized: "settings.app.showSSH", defaultValue: "Show SSH in Sidebar"), "remote target"),
         setting(.sidebarAppearance, "show-ports", String(localized: "settings.app.showPorts", defaultValue: "Show Listening Ports in Sidebar"), "localhost port"),
         setting(.sidebarAppearance, "show-log", String(localized: "settings.app.showLog", defaultValue: "Show Latest Log in Sidebar"), "status message"),
         setting(.sidebarAppearance, "show-progress", String(localized: "settings.app.showProgress", defaultValue: "Show Progress in Sidebar"), "progress bar"),
@@ -132,7 +124,6 @@ enum SettingsSearchIndex {
         setting(.customSidebars, "renderer", String(localized: "settings.customSidebars.renderer", defaultValue: "Renderer"), "renderer in-process in app remote worker isolated process hover focus typing input"),
         setting(.betaFeatures, "feed", String(localized: "settings.betaFeatures.feed", defaultValue: "Feed"), "feed right sidebar agent decisions permissions questions"),
         setting(.betaFeatures, "dock", String(localized: "settings.betaFeatures.dock", defaultValue: "Dock"), "dock right sidebar terminal controls tui"),
-        setting(.betaFeatures, "cloudMachines", String(localized: "settings.betaFeatures.cloudMachines", defaultValue: "Cloud Machines"), "cloud machines vm right sidebar beta virtual machine persistent computer"),
         setting(.betaFeatures, "workspace-todo-controls", String(localized: "settings.betaFeatures.workspaceTodoControls", defaultValue: "Workspace Todo Controls"), "workspace todo todos task status checklist add item controls beta"),
         setting(.betaFeatures, "workspace-todos-checklist-style", String(localized: "settings.betaFeatures.workspaceTodosChecklistStyle", defaultValue: "Checklist Style"), "workspace todo todos task status checklist popover inline presentation style beta"),
         setting(.automation, "socket-mode", String(localized: "settings.automation.socketMode", defaultValue: "Socket Control Mode"), "unix socket api access password auth"),
@@ -160,24 +151,6 @@ enum SettingsSearchIndex {
         setting(.automation, "kiro-notification-level", String(localized: "settings.automation.kiro.notificationLevel", defaultValue: "Kiro Notification Level"), "agent hooks notifications verbosity tool events"),
         setting(.automation, "port-base", String(localized: "settings.automation.portBase", defaultValue: "Port Base"), "CMUX_PORT start"),
         setting(.automation, "port-range", String(localized: "settings.automation.portRange", defaultValue: "Port Range Size"), "CMUX_PORT_END workspace ports"),
-        setting(.browser, "search-engine", String(localized: "settings.browser.searchEngine", defaultValue: "Default Search Engine"), "address bar query google duckduckgo bing kagi brave startpage perplexity exa yahoo ecosia qwant mojeek wikipedia github baidu yandex custom search provider"),
-        setting(.browser, "enable-browser", String(localized: "settings.browser.enabled", defaultValue: "Enable cmux Browser"), "webview tabs links"),
-        setting(.browser, "search-suggestions", String(localized: "settings.browser.searchSuggestions", defaultValue: "Show Search Suggestions"), "browser address bar suggestions"),
-        setting(.browser, "theme", String(localized: "settings.browser.theme", defaultValue: "Browser Theme"), "web appearance light dark system"),
-        setting(.browser, "default-zoom-level", String(localized: "settings.browser.defaultZoomLevel", defaultValue: "Default Page Zoom"), "default browser zoom level page magnification percent scale actual size"),
-        setting(.browser, "hidden-webview-discard", String(localized: "settings.browser.hiddenWebViewDiscard", defaultValue: "Discard Hidden Browser WebViews"), "memory hidden tabs webview discard unload"),
-        setting(.browser, "hidden-webview-discard-delay", String(localized: "settings.browser.hiddenWebViewDiscardDelay", defaultValue: "Hidden WebView Discard Delay"), "memory hidden tabs delay seconds discard"),
-        setting(.browser, "ask-where-to-save-downloads", String(localized: "settings.browser.askWhereToSaveDownloads", defaultValue: "Ask Where to Save Downloads"), "downloads save panel download folder attachments files pdf gmail"),
-        setting(.browser, "terminal-links", String(localized: "settings.browser.openTerminalLinks", defaultValue: "Open Terminal Links in cmux Browser"), "click links browser"),
-        setting(.browser, "intercept-open", String(localized: "settings.browser.interceptOpen", defaultValue: "Intercept open http(s) in Terminal"), "open command urls"),
-        setting(.browser, "host-whitelist", String(localized: "settings.browser.hostWhitelist", defaultValue: "Hosts to Open in Embedded Browser"), "hosts wildcard terminal links"),
-        setting(.browser, "external-patterns", String(localized: "settings.browser.externalPatterns", defaultValue: "URLs to Always Open Externally"), "regex url rules default browser"),
-        setting(.browser, "http-allowlist", String(localized: "settings.browser.httpAllowlist", defaultValue: "HTTP Hosts Allowed in Embedded Browser"), "localhost non https warning"),
-        setting(.browser, "url-allowlist", String(localized: "settings.browser.urlAllowlist", defaultValue: "Embedded Browser URL Allowlist"), "browser url allowlist localhost wildcard scheme port organization policy"),
-        setting(.browserImport, "import-data", String(localized: "settings.browser.import", defaultValue: "Import Browser Data"), "bookmarks history cookies profiles"),
-        setting(.browserImport, "import-hint", String(localized: "settings.browser.import.hint.show", defaultValue: "Show import hint on blank browser tabs"), "blank tab browser import"),
-        setting(.browser, "react-grab", String(localized: "settings.browser.reactGrabVersion", defaultValue: "React Grab Version"), "npm react grab toolbar"),
-        setting(.browser, "history", String(localized: "settings.browser.history", defaultValue: "Browsing History"), "clear visited suggestions"),
         setting(.globalHotkey, "enable-hotkey", String(localized: "settings.globalHotkey.enable", defaultValue: "Enable System-Wide Hotkey"), "global shortcut show hide windows"),
         setting(.globalHotkey, "shortcut", String(localized: "settings.section.globalHotkey", defaultValue: "Global Hotkey"), "keyboard recorder command option control"),
         setting(.keyboardShortcuts, "shortcut-chords", String(localized: "settings.shortcuts.chords", defaultValue: "Shortcut Chords"), "tmux multi step keybindings"),
@@ -237,7 +210,6 @@ enum SettingsSearchIndex {
         "notifications.customSoundFilePath": settingID(for: .app, idSuffix: "notification-sound"),
         "notifications.soundOverrides": settingID(for: .app, idSuffix: "notification-sound-overrides"),
         "notifications.command": settingID(for: .app, idSuffix: "notification-command"),
-        "app.sendAnonymousTelemetry": settingID(for: .app, idSuffix: "telemetry"),
         "app.defaultTerminal": settingID(for: .app, idSuffix: "default-terminal"),
         "app.confirmQuit": settingID(for: .app, idSuffix: "warn-before-quit"),
         "app.warnBeforeQuit": settingID(for: .app, idSuffix: "warn-before-quit"),
@@ -259,12 +231,7 @@ enum SettingsSearchIndex {
         "sidebar.showNotificationMessage": settingID(for: .sidebarAppearance, idSuffix: "show-notification-message"),
         "sidebar.notificationMessageLineLimit": settingID(for: .sidebarAppearance, idSuffix: "notification-message-line-limit"),
         "sidebar.showBranchDirectory": settingID(for: .sidebarAppearance, idSuffix: "show-branch-directory"),
-        "sidebar.showPullRequests": settingID(for: .sidebarAppearance, idSuffix: "show-pull-requests"),
         "sidebar.watchGitStatus": settingID(for: .sidebarAppearance, idSuffix: "watch-git-status"),
-        "sidebar.makePullRequestsClickable": settingID(for: .sidebarAppearance, idSuffix: "make-pr-clickable"),
-        "sidebar.openPullRequestLinksInCmuxBrowser": settingID(for: .sidebarAppearance, idSuffix: "open-pr-links"),
-        "sidebar.openPortLinksInCmuxBrowser": settingID(for: .sidebarAppearance, idSuffix: "open-port-links"),
-        "sidebar.showSSH": settingID(for: .sidebarAppearance, idSuffix: "show-ssh"),
         "sidebar.showPorts": settingID(for: .sidebarAppearance, idSuffix: "show-ports"),
         "sidebar.showLog": settingID(for: .sidebarAppearance, idSuffix: "show-log"),
         "sidebar.showProgress": settingID(for: .sidebarAppearance, idSuffix: "show-progress"),
@@ -309,24 +276,6 @@ enum SettingsSearchIndex {
         "automation.kiroNotificationLevel": settingID(for: .automation, idSuffix: "kiro-notification-level"),
         "automation.portBase": settingID(for: .automation, idSuffix: "port-base"),
         "automation.portRange": settingID(for: .automation, idSuffix: "port-range"),
-        "browser.enabled": settingID(for: .browser, idSuffix: "enable-browser"),
-        "browser.defaultSearchEngine": settingID(for: .browser, idSuffix: "search-engine"),
-        "browser.customSearchEngineName": settingID(for: .browser, idSuffix: "search-engine"),
-        "browser.customSearchEngineURLTemplate": settingID(for: .browser, idSuffix: "search-engine"),
-        "browser.showSearchSuggestions": settingID(for: .browser, idSuffix: "search-suggestions"),
-        "browser.theme": settingID(for: .browser, idSuffix: "theme"),
-        "browser.defaultZoomLevel": settingID(for: .browser, idSuffix: "default-zoom-level"),
-        "browser.discardHiddenWebViews": settingID(for: .browser, idSuffix: "hidden-webview-discard"),
-        "browser.hiddenWebViewDiscardDelaySeconds": settingID(for: .browser, idSuffix: "hidden-webview-discard-delay"),
-        "browser.askWhereToSaveDownloads": settingID(for: .browser, idSuffix: "ask-where-to-save-downloads"),
-        "browser.openTerminalLinksInCmuxBrowser": settingID(for: .browser, idSuffix: "terminal-links"),
-        "browser.interceptTerminalOpenCommandInCmuxBrowser": settingID(for: .browser, idSuffix: "intercept-open"),
-        "browser.hostsToOpenInEmbeddedBrowser": settingID(for: .browser, idSuffix: "host-whitelist"),
-        "browser.urlsToAlwaysOpenExternally": settingID(for: .browser, idSuffix: "external-patterns"),
-        "browser.insecureHttpHostsAllowedInEmbeddedBrowser": settingID(for: .browser, idSuffix: "http-allowlist"),
-        "browser.urlAllowlist": settingID(for: .browser, idSuffix: "url-allowlist"),
-        "browser.showImportHintOnBlankTabs": settingID(for: .browserImport, idSuffix: "import-hint"),
-        "browser.reactGrabVersion": settingID(for: .browser, idSuffix: "react-grab"),
         "shortcuts.bindings": settingID(for: .keyboardShortcuts, idSuffix: "shortcuts")
     ].merging(terminalScrollSpeedSettingsPathAnchorIDs) { current, _ in current }
 

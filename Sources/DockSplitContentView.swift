@@ -5,7 +5,7 @@ import Foundation
 import SwiftUI
 
 /// Renders the Dock's Bonsplit tree, reusing `PanelContentView` so Dock
-/// terminals and browsers render identically to main-area panes.
+/// terminals render identically to main-area panes.
 struct DockSplitContentView: View {
     let store: DockSplitStore
     let appearance: PanelAppearance
@@ -58,13 +58,6 @@ struct DockSplitContentView: View {
             onNewTerminal: {
                 _ = store.newSurfaceFromDockAffordance(
                     kind: .terminal,
-                    inPane: paneId,
-                    window: NSApp.keyWindow ?? NSApp.mainWindow
-                )
-            },
-            onNewBrowser: {
-                _ = store.newSurfaceFromDockAffordance(
-                    kind: .browser,
                     inPane: paneId,
                     window: NSApp.keyWindow ?? NSApp.mainWindow
                 )

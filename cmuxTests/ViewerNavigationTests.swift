@@ -1,5 +1,4 @@
 import AppKit
-import CmuxBrowser
 import CmuxSettings
 import Testing
 import WebKit
@@ -27,145 +26,6 @@ struct ViewerNavigationTests {
         #expect(router.handle(Self.keyEvent("g", timestamp: 10), isAllowed: { _, _ in true }, perform: { performed.append($0) }))
         #expect(router.handle(Self.keyEvent("g", timestamp: 10.1), isAllowed: { _, _ in true }, perform: { performed.append($0) }))
         #expect(performed == [.diffViewerScrollToTop])
-    }
-
-    @Test
-    func diffViewerNavigationStateRestoresOnlyAfterCancelledNavigation() {
-        let state = DiffViewerNavigationDocumentState()
-        let firstNavigationObject = NSObject()
-        let secondNavigationObject = NSObject()
-        let firstNavigation = ObjectIdentifier(firstNavigationObject)
-        let secondNavigation = ObjectIdentifier(secondNavigationObject)
-        state.update(viewer: true, editable: false, rendererReady: true)
-        #expect(state.canHandleNavigation)
-
-        state.navigationDidStart(id: firstNavigation)
-        #expect(!state.canHandleNavigation)
-        state.navigationDidCancel(id: firstNavigation)
-        #expect(state.canHandleNavigation)
-
-        state.navigationDidStart(id: firstNavigation)
-        state.navigationDidStart(id: secondNavigation)
-        state.navigationDidCancel(id: firstNavigation)
-        #expect(!state.canHandleNavigation)
-        state.navigationDidCancel(id: secondNavigation)
-        #expect(state.canHandleNavigation)
-
-        state.navigationDidStart(id: firstNavigation)
-        state.navigationDidCommit(id: firstNavigation)
-        state.navigationDidCancel(id: firstNavigation)
-        #expect(!state.canHandleNavigation)
-    }
-
-    @Test
-    func tokenShapedURLWithoutActiveSessionIsNotTrusted() throws {
-        let inactiveToken = UUID().uuidString.lowercased()
-        let url = try #require(URL(
-            string: "http://127.0.0.1:5050/\(inactiveToken)/diff.html#cmux-diff-viewer"
-        ))
-
-        #expect(DiffCommentsBridge.diffViewerToken(from: url) != nil)
-        #expect(!DiffCommentsBridge.isTrustedDiffViewerURL(url))
-    }
-
-    @Test
-    func registeredLiveHTTPViewerIsTrustedOnlyOnItsOrigin() throws {
-        let liveToken = UUID().uuidString.lowercased()
-        let original = try #require(URL(
-            string: "http://127.0.0.1:5050/\(liveToken)/diff.html#cmux-diff-viewer"
-        ))
-        let rewritten = try #require(URL(
-            string: "http://127.0.0.1:5050/\(liveToken)/diff.html#/cmux-diff-viewer"
-        ))
-        let wrongPort = try #require(URL(
-            string: "http://127.0.0.1:5051/\(liveToken)/diff.html#/cmux-diff-viewer"
-        ))
-
-        #expect(DiffViewerSessionTrustRegistry.shared.registerLiveHTTPURL(original, token: liveToken))
-        #expect(DiffCommentsBridge.isTrustedDiffViewerURL(rewritten))
-        #expect(!DiffCommentsBridge.isTrustedDiffViewerURL(wrongPort))
-    }
-
-    @Test
-    func sidecarBridgeRequiresRegisteredCustomSchemeViewerURL() async throws {
-        let token = UUID().uuidString.lowercased()
-        let root = CmuxDiffViewerSessionPreparer.defaultTrustedRootURL
-            .appendingPathComponent("cmux-sidecar-bridge-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let html = root.appendingPathComponent("index.html", isDirectory: false)
-        try "<html></html>".write(to: html, atomically: true, encoding: .utf8)
-        try await CmuxDiffViewerURLSchemeHandler.shared.register(
-            token: token,
-            files: [.init(requestPath: "/index.html", fileURL: html, mimeType: "text/html")]
-        )
-
-        let customSchemeURL = try #require(URL(string: "cmux-diff-viewer://\(token)/index.html"))
-        let loopbackLookalikeURL = try #require(URL(string: "http://127.0.0.1:5050/\(token)/index.html"))
-        #expect(DiffSidecarBridge.isTrustedSidecarURL(customSchemeURL))
-        #expect(!DiffSidecarBridge.isTrustedSidecarURL(loopbackLookalikeURL))
-    }
-
-    @Test
-    func sidecarProcessPoolCancelsQueuedWorkWithoutLeakingPermit() async throws {
-        let pool = DiffSidecarProcessPool(limit: 1)
-        let counter = SidecarPoolTestCounter()
-        let firstStarted = AsyncStream<Void>.makeStream()
-        let releaseFirst = AsyncStream<Void>.makeStream()
-        var firstStartedIterator = firstStarted.stream.makeAsyncIterator()
-
-        let first = Task {
-            try await pool.withPermit {
-                await counter.increment()
-                firstStarted.continuation.yield()
-                for await _ in releaseFirst.stream {
-                    return
-                }
-            }
-        }
-        _ = await firstStartedIterator.next()
-
-        let cancelled = Task {
-            try await pool.withPermit {
-                await counter.increment()
-            }
-        }
-        cancelled.cancel()
-        releaseFirst.continuation.yield()
-        releaseFirst.continuation.finish()
-        try await first.value
-        await #expect(throws: CancellationError.self) {
-            try await cancelled.value
-        }
-        #expect(await counter.value == 1)
-
-        try await pool.withPermit {
-            await counter.increment()
-        }
-        #expect(await counter.value == 2)
-    }
-
-    @Test
-    func registeredLiveHTTPViewerTrustRenewsWhileSessionRemainsActive() throws {
-        let liveToken = UUID().uuidString.lowercased()
-        let url = try #require(URL(
-            string: "http://127.0.0.1:5050/\(liveToken)/diff.html#cmux-diff-viewer"
-        ))
-        let registeredAt = Date(timeIntervalSince1970: 1_000)
-
-        #expect(DiffViewerSessionTrustRegistry.shared.registerLiveHTTPURL(
-            url,
-            token: liveToken,
-            now: registeredAt
-        ))
-        #expect(DiffViewerSessionTrustRegistry.shared.isTrustedDiffViewerURL(
-            url,
-            now: registeredAt.addingTimeInterval(23 * 60 * 60)
-        ))
-        #expect(DiffViewerSessionTrustRegistry.shared.isTrustedDiffViewerURL(
-            url,
-            now: registeredAt.addingTimeInterval(46 * 60 * 60)
-        ))
     }
 
     @Test
@@ -222,7 +82,6 @@ struct ViewerNavigationTests {
         appDelegate.shortcutEventFocusContextCache = ShortcutEventFocusContextCache(
             event: event,
             context: ShortcutEventFocusContext(
-                browserPanel: nil,
                 markdownPanel: nil,
                 filePreviewTextEditorFocused: false,
                 simulatorFocused: false,
@@ -374,7 +233,6 @@ struct ViewerNavigationTests {
         appDelegate.shortcutEventFocusContextCache = ShortcutEventFocusContextCache(
             event: event,
             context: ShortcutEventFocusContext(
-                browserPanel: nil,
                 markdownPanel: nil,
                 filePreviewTextEditorFocused: false,
                 simulatorFocused: false,

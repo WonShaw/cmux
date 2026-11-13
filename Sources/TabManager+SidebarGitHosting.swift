@@ -7,7 +7,7 @@ import CmuxSidebar
 //
 // TabManager is the window-side host of the extracted CmuxSidebarGit
 // services: snapshot reads of workspace/panel state, synchronous projection
-// writes of branch and PR badge state onto Workspace, and the environment
+// writes of branch state onto Workspace, and the environment
 // toggles (settings + mobile-host activity) the schedulers honor. Every
 // method forwards to the same Workspace/defaults accessors the legacy
 // in-class subsystem used, so state transitions stay byte-identical.
@@ -42,9 +42,8 @@ extension TabManager: SidebarGitHosting {
     }
 
     func isRemoteTerminalPanel(workspaceId: UUID, panelId: UUID) -> Bool {
-        guard let workspace = tabs.first(where: { $0.id == workspaceId }) else { return false }
-        return workspace.isRemoteTerminalSurface(panelId) ||
-            workspace.cloudDirectoryProvenanceRequired(panelId: panelId)
+        // This build has no remote (ssh or cloud) terminal surfaces.
+        false
     }
 
     func gitProbeDirectory(workspaceId: UUID, panelId: UUID) -> String? {
@@ -54,7 +53,8 @@ extension TabManager: SidebarGitHosting {
 
     func hasTrustedRemotePanelDirectory(workspaceId: UUID, panelId: UUID) -> Bool {
         guard let workspace = tabs.first(where: { $0.id == workspaceId }) else { return false }
-        return workspace.remoteDirectoryReportPanelIds.contains(panelId)
+        return !workspace.allowsLocalDirectoryFallback(panelId: panelId) &&
+            workspace.reportedPanelDirectory(panelId: panelId) != nil
     }
 
     func panelGitBranch(workspaceId: UUID, panelId: UUID) -> SidebarPanelGitBranch? {
@@ -69,29 +69,13 @@ extension TabManager: SidebarGitHosting {
         return Set(workspace.panelGitBranches.keys)
     }
 
-    func panelPullRequestBadge(workspaceId: UUID, panelId: UUID) -> SidebarPullRequestBadge? {
-        guard let state = tabs.first(where: { $0.id == workspaceId })?.panelPullRequests[panelId] else {
-            return nil
-        }
-        return state.sidebarPullRequestBadge
-    }
-
-    func panelPullRequestPanelIds(in workspaceId: UUID) -> Set<UUID> {
-        guard let workspace = tabs.first(where: { $0.id == workspaceId }) else { return [] }
-        return Set(workspace.panelPullRequests.keys)
-    }
-
     func focusedPanelId(in workspaceId: UUID) -> UUID? {
         tabs.first(where: { $0.id == workspaceId })?.focusedPanelId
     }
 
     func hasWorkspaceLevelGitSignal(_ workspaceId: UUID) -> Bool {
         guard let workspace = tabs.first(where: { $0.id == workspaceId }) else { return false }
-        return workspace.gitBranch != nil || workspace.pullRequest != nil
-    }
-
-    func isSelectedFocusedPanel(workspaceId: UUID, panelId: UUID) -> Bool {
-        selectedWorkspace?.id == workspaceId && selectedWorkspace?.focusedPanelId == panelId
+        return workspace.gitBranch != nil
     }
 
     // MARK: Projection writes
@@ -135,40 +119,9 @@ extension TabManager: SidebarGitHosting {
         tabs.first(where: { $0.id == workspaceId })?.clearPanelGitBranch(panelId: panelId)
     }
 
-    func updatePanelPullRequest(workspaceId: UUID, panelId: UUID, badge: SidebarPullRequestBadge) {
-        tabs.first(where: { $0.id == workspaceId })?.updatePanelPullRequest(
-            panelId: panelId,
-            number: badge.number,
-            label: badge.label,
-            url: badge.url,
-            // Raw values are shared between the app and package status enums.
-            status: SidebarPullRequestStatus(rawValue: badge.status.rawValue) ?? .open,
-            branch: badge.branch,
-            isStale: badge.isStale
-        )
-    }
-
-    func clearPanelPullRequest(workspaceId: UUID, panelId: UUID) {
-        tabs.first(where: { $0.id == workspaceId })?.clearPanelPullRequest(panelId: panelId)
-    }
-
-    func schedulePanelGitMetadataProbe(workspaceId: UUID, panelId: UUID, reason: String) {
-        sidebarGitMetadataService.scheduleInitialWorkspaceGitMetadataRefreshIfPossible(
-            workspaceId: workspaceId,
-            panelId: panelId,
-            reason: reason
-        )
-    }
-
     func clearAllSidebarGitMetadata() {
         for workspace in tabs {
             workspace.clearSidebarGitMetadata()
-        }
-    }
-
-    func clearAllSidebarPullRequestMetadata() {
-        for workspace in tabs {
-            workspace.clearSidebarPullRequestMetadata()
         }
     }
 
@@ -178,30 +131,11 @@ extension TabManager: SidebarGitHosting {
         SidebarWorkspaceDetailDefaults.gitMetadataActivity(defaults: .standard)
     }
 
-    var pullRequestActivity: SidebarGitMetadataActivity {
-        SidebarWorkspaceDetailDefaults.pullRequestActivity(defaults: .standard)
-    }
-
     func mobileHostHasRecentActivity(within interval: TimeInterval) -> Bool {
-        MobileHostRequestActivity.hasRecentActivity(within: interval)
+        false
     }
 
     func mobileHostQuietDelay(for interval: TimeInterval) -> TimeInterval {
-        MobileHostRequestActivity.quietDelay(for: interval)
-    }
-}
-
-extension SidebarPullRequestState {
-    /// The package wire value for this badge (status bridges by shared raw
-    /// value: open/merged/closed).
-    var sidebarPullRequestBadge: SidebarPullRequestBadge {
-        SidebarPullRequestBadge(
-            number: number,
-            label: label,
-            url: url,
-            status: PullRequestStatus(rawValue: status.rawValue) ?? .open,
-            branch: branch,
-            isStale: isStale
-        )
+        0
     }
 }

@@ -8,56 +8,6 @@ import SQLite3
 #endif
 
 final class SearchIndexTests: XCTestCase {
-    func testSearchFindsBrowserAndMarkdownDocuments() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.directoryURL) }
-
-        let index = try SearchIndex(databaseURL: fixture.databaseURL)
-        let windowID = UUID()
-        let workspaceID = UUID()
-        let browserPanelID = UUID()
-        let markdownPanelID = UUID()
-
-        try await index.upsert(
-            SearchIndexDocument(
-                id: "browser-doc",
-                windowID: windowID,
-                workspaceID: workspaceID,
-                panelID: browserPanelID,
-                kind: .browser,
-                title: "Release Notes",
-                location: "https://example.test/releases",
-                anchor: "https://example.test/releases",
-                text: "The browser panel contains apricot release details.",
-                timestamp: Date(timeIntervalSince1970: 200)
-            )
-        )
-        try await index.upsert(
-            SearchIndexDocument(
-                id: "markdown-doc",
-                windowID: windowID,
-                workspaceID: workspaceID,
-                panelID: markdownPanelID,
-                kind: .markdown,
-                title: "Plan.md",
-                location: "/tmp/Plan.md",
-                anchor: "/tmp/Plan.md",
-                text: "Markdown notes mention blueberry architecture.",
-                timestamp: Date(timeIntervalSince1970: 100)
-            )
-        )
-
-        let browserHits = try await index.search("apricot", limit: 10)
-        XCTAssertEqual(browserHits.map(\.id), ["browser-doc"])
-        XCTAssertEqual(browserHits.first?.kind, .browser)
-        XCTAssertEqual(browserHits.first?.panelID, browserPanelID)
-
-        let markdownHits = try await index.search("blueberry", limit: 10)
-        XCTAssertEqual(markdownHits.map(\.id), ["markdown-doc"])
-        XCTAssertEqual(markdownHits.first?.kind, .markdown)
-        XCTAssertEqual(markdownHits.first?.panelID, markdownPanelID)
-    }
-
     func testUpsertReplacesExistingDocumentText() async throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.directoryURL) }
@@ -98,54 +48,6 @@ final class SearchIndexTests: XCTestCase {
 
         let newTokenHits = try await index.search("newtoken", limit: 10)
         XCTAssertEqual(newTokenHits.map(\.id), ["doc"])
-    }
-
-    func testPanelStableIDReplacesDocumentAfterNavigationOrMove() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.directoryURL) }
-
-        let index = try SearchIndex(databaseURL: fixture.databaseURL)
-        let panelID = UUID()
-        let documentID = SearchIndexDocument.panelStableID(panelID: panelID, kind: .browser)
-
-        try await index.upsert(
-            SearchIndexDocument(
-                id: documentID,
-                windowID: UUID(),
-                workspaceID: UUID(),
-                panelID: panelID,
-                kind: .browser,
-                title: "Old Page",
-                location: "https://example.test/old",
-                anchor: "https://example.test/old",
-                text: "oldnavigationtoken"
-            )
-        )
-
-        let movedWindowID = UUID()
-        let movedWorkspaceID = UUID()
-        try await index.upsert(
-            SearchIndexDocument(
-                id: documentID,
-                windowID: movedWindowID,
-                workspaceID: movedWorkspaceID,
-                panelID: panelID,
-                kind: .browser,
-                title: "New Page",
-                location: "https://example.test/new",
-                anchor: "https://example.test/new",
-                text: "newnavigationtoken"
-            )
-        )
-
-        let oldNavigationHits = try await index.search("oldnavigationtoken", limit: 10)
-        XCTAssertEqual(oldNavigationHits, [])
-
-        let hits = try await index.search("newnavigationtoken", limit: 10)
-        XCTAssertEqual(hits.map(\.id), [documentID])
-        XCTAssertEqual(hits.first?.windowID, movedWindowID)
-        XCTAssertEqual(hits.first?.workspaceID, movedWorkspaceID)
-        XCTAssertEqual(hits.first?.location, "https://example.test/new")
     }
 
     func testSearchLowercasesUppercaseFTSOperatorTokens() async throws {
@@ -201,59 +103,6 @@ final class SearchIndexTests: XCTestCase {
             SearchIndex.queryTokens(for: "  Alpha-beta AND gamma_delta  "),
             ["alpha", "beta", "and", "gamma", "delta"]
         )
-    }
-
-    func testBrowserInlineNeedleUsesMatchingSearchToken() {
-        let hit = SearchIndexHit(
-            id: "browser-doc",
-            windowID: UUID(),
-            workspaceID: UUID(),
-            panelID: UUID(),
-            kind: .browser,
-            title: "Result",
-            location: "https://example.test",
-            anchor: "https://example.test",
-            snippet: "The rendered page contains bar but not the complete raw query.",
-            rank: 0,
-            timestamp: Date(timeIntervalSince1970: 0)
-        )
-
-        XCTAssertEqual(
-            GlobalSearchInlineSearch.browserNeedle(for: "foo bar", hit: hit),
-            "bar"
-        )
-    }
-
-    func testDeletePanelRemovesIndexedDocuments() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.directoryURL) }
-
-        let index = try SearchIndex(databaseURL: fixture.databaseURL)
-        let windowID = UUID()
-        let workspaceID = UUID()
-        let panelID = UUID()
-
-        try await index.upsert(
-            SearchIndexDocument(
-                id: "doc",
-                windowID: windowID,
-                workspaceID: workspaceID,
-                panelID: panelID,
-                kind: .browser,
-                title: "Searchable",
-                location: "https://example.test",
-                anchor: "https://example.test",
-                text: "kiwifruit"
-            )
-        )
-
-        let indexedHits = try await index.search("kiwifruit", limit: 10)
-        XCTAssertEqual(indexedHits.count, 1)
-
-        try await index.deletePanel(panelID)
-
-        let deletedHits = try await index.search("kiwifruit", limit: 10)
-        XCTAssertEqual(deletedHits, [])
     }
 
     func testDeleteDocumentRemovesOnlyMatchingDocument() async throws {

@@ -27,7 +27,7 @@ final class WorkspaceTerminalFontSizeCoordinator {
     private static let mutationRetryBackoffInterval: TimeInterval = 0.05
 
     private static let logger = Logger(
-        subsystem: "com.cmuxterm.app",
+        subsystem: "com.comux.app",
         category: "WorkspaceTerminalFontSize"
     )
 

@@ -5,13 +5,13 @@ extension ShortcutAction {
         case .openSettings, .reloadConfiguration, .showHideAllWindows, .globalSearch,
              .newWindow, .closeWindow, .toggleFullScreen, .quit:
             return .app
-        case .toggleSidebar, .newTab, .newBrowserWorkspace, .newCloudWorkspace, .newCloudMachine, .saveLayoutTemplate, .openFolder, .reopenPreviousSession, .goToWorkspace,
-             .commandPalette, .commandPaletteNext, .commandPalettePrevious, .sendFeedback,
+        case .toggleSidebar, .newTab, .saveLayoutTemplate, .openFolder, .reopenPreviousSession, .goToWorkspace,
+             .commandPalette, .commandPaletteNext, .commandPalettePrevious,
              .showNotifications, .jumpToUnread, .toggleUnread, .markOldestUnreadAndJumpNext,
              .markAllNotificationsRead, .clearAllNotifications,
              .focusRightSidebar, .switchRightSidebarToFiles, .switchRightSidebarToFind,
              .switchRightSidebarToSessions, .switchRightSidebarToFeed,
-             .switchRightSidebarToDock, .switchRightSidebarToMachines, .triggerFlash, .reopenClosedWorkspace:
+             .switchRightSidebarToDock, .triggerFlash, .reopenClosedWorkspace:
             return .workspace
         case .nextSurface, .prevSurface, .moveSurfaceLeft, .moveSurfaceRight,
              .moveSurfaceToPreviousPane, .moveSurfaceToNextPane,
@@ -36,7 +36,7 @@ extension ShortcutAction {
              .toggleSplitZoom, .increaseWorkspaceTerminalFontSize,
              .decreaseWorkspaceTerminalFontSize, .resetWorkspaceTerminalFontSize,
              .equalizeSplits, .resizePaneLeft, .resizePaneRight,
-             .resizePaneUp, .resizePaneDown, .splitBrowserRight, .splitBrowserDown,
+             .resizePaneUp, .resizePaneDown,
              .toggleRightSidebar, .fileExplorerOpenSelection, .fileExplorerOpenSelectionFinderAlias,
              .toggleCanvasLayout, .canvasRevealFocusedPane, .canvasOverview,
              .canvasZoomIn, .canvasZoomOut, .canvasZoomReset, .canvasTidy,
@@ -46,19 +46,15 @@ extension ShortcutAction {
              .simulatorHome, .simulatorRotateLeft, .simulatorRotateRight,
              .simulatorToggleAppearance, .simulatorToggleSoftwareKeyboard:
             return .panes
-        case .openDiffViewer, .saveFilePreview, .openBrowser, .focusBrowserAddressBar,
-             .browserBack, .browserForward, .browserReload, .browserHardReload,
+        case .saveFilePreview,
              .browserZoomIn, .browserZoomOut, .browserZoomReset,
              .markdownZoomIn, .markdownZoomOut, .markdownZoomReset,
              .find, .findInDirectory, .findNext, .findPrevious,
-             .hideFind, .useSelectionForFind, .toggleBrowserDeveloperTools,
-             .showBrowserJavaScriptConsole, .toggleBrowserFocusMode,
-             .toggleBrowserDesignMode, .toggleReactGrab,
+             .hideFind, .useSelectionForFind,
              .diffViewerScrollDown, .diffViewerScrollUp,
              .diffViewerScrollHalfPageDown, .diffViewerScrollHalfPageUp,
              .diffViewerScrollDownEmacs, .diffViewerScrollUpEmacs,
-             .diffViewerScrollToBottom, .diffViewerScrollToTop,
-             .diffViewerOpenFileSearch, .diffViewerNextFile, .diffViewerPreviousFile:
+             .diffViewerScrollToBottom, .diffViewerScrollToTop:
             return .browser
         }
     }
@@ -73,7 +69,7 @@ extension ShortcutAction {
         case navigation
         /// Pane layout and focus actions.
         case panes
-        /// Browser, viewer, and find actions.
+        /// Viewer and find actions (the raw name is kept for persisted data).
         case browser
 
         /// The English section title used by shortcut catalog consumers.
@@ -83,7 +79,7 @@ extension ShortcutAction {
             case .workspace: return "Workspace"
             case .navigation: return "Navigation"
             case .panes: return "Panes"
-            case .browser: return "Browser & Find"
+            case .browser: return "Viewers & Find"
             }
         }
     }

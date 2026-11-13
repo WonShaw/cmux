@@ -117,7 +117,7 @@ private final class ShortcutNoopFileSearchController: FileSearchControlling {
             let event = try #require(
                 makeKeyDownEvent(shortcut: KeyboardShortcutSettings.Action.fileExplorerOpenSelection.defaultShortcut)
             )
-            let context = ShortcutFocusState(browser: false, markdown: false, sidebar: true).context
+            let context = ShortcutFocusState(markdown: false, sidebar: true).context
 
             #expect(!event.isFileExplorerOpenSelectionShortcut(in: context))
         }
@@ -221,52 +221,6 @@ private final class ShortcutNoopFileSearchController: FileSearchControlling {
 
             tableView.keyDown(with: event)
 
-            #expect(commitCount == 1)
-        }
-    }
-
-    @Test func openSelectionPaneFocusPreventsNonBrowserShortcutShadowing() throws {
-        try withIsolatedShortcutSettings {
-            let appDelegate = try #require(AppDelegate.shared)
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
-                styleMask: [.titled, .closable],
-                backing: .buffered,
-                defer: false
-            )
-            window.identifier = NSUserInterfaceItemIdentifier("cmux.about")
-            let contentView = NSView(frame: window.contentRect(forFrameRect: window.frame))
-            let tableView = FileExplorerSearchResultsTableView(frame: NSRect(x: 0, y: 0, width: 240, height: 180))
-            tableView.fileExplorerPanelPlacement = .pane
-            var commitCount = 0
-            tableView.onCommit = {
-                commitCount += 1
-            }
-            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
-            column.isEditable = false
-            tableView.addTableColumn(column)
-            let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 240, height: 180))
-            scrollView.documentView = tableView
-            contentView.addSubview(scrollView)
-            window.contentView = contentView
-            window.makeKeyAndOrderFront(nil)
-            window.displayIfNeeded()
-            defer { window.orderOut(nil) }
-
-            #expect(window.makeFirstResponder(tableView))
-            #expect(window.firstResponder === tableView)
-
-            let commandR = StoredShortcut(key: "r", command: true, shift: false, option: false, control: false)
-            KeyboardShortcutSettings.setShortcut(.unbound, for: .browserReload)
-            KeyboardShortcutSettings.setShortcut(commandR, for: .fileExplorerOpenSelection)
-            let event = try #require(makeKeyDownEvent(shortcut: commandR, windowNumber: window.windowNumber))
-            try #require(KeyboardShortcutSettings.shortcut(for: .fileExplorerOpenSelection).matches(event: event))
-            defer { appDelegate.clearShortcutEventFocusContextCache(for: event) }
-
-            #expect(!appDelegate.shortcutWhenClauseAllows(action: .fileExplorerOpenSelection, event: event))
-            #expect(appDelegate.shortcutWhenClauseAllows(action: .renameTab, event: event))
-            #expect(event.isFileExplorerOpenSelectionShortcut(in: FileExplorerPanelPlacement.pane))
-            #expect(appDelegate.handleConfiguredShortcutKeyEquivalent(event))
             #expect(commitCount == 1)
         }
     }

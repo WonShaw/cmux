@@ -438,55 +438,6 @@ struct AutomationRuleTests {
         #expect(!FileManager.default.fileExists(atPath: fileURL.path))
     }
 
-    @Test("webhook credentials require HTTPS and are stripped across origins")
-    func webhookCredentialTransportPolicy() throws {
-        let policy = AutomationWebhookPolicy()
-        let httpURL = try #require(URL(string: "http://example.test/hook"))
-        let httpsURL = try #require(URL(string: "https://example.test/hook"))
-        let userInfoURL = try #require(URL(string: "https://user:password@example.test/hook"))
-        #expect(!policy.isValid(url: httpURL, headers: ["Authorization": "Bearer secret"]))
-        #expect(policy.isValid(url: httpURL, headers: ["X-Trace": "trace"]))
-        #expect(policy.isValid(url: httpsURL, headers: ["Authorization": "Bearer secret"]))
-        #expect(!policy.isValid(url: userInfoURL, headers: [:]))
-
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cmux-automation-webhook-policy-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let store = AutomationConfigStore(fileURL: directory.appendingPathComponent("automations.json"))
-        let invalidConfiguration = AutomationConfiguration(rules: [
-            AutomationRule(
-                id: "insecure-webhook",
-                when: AutomationWhen(event: "webhook"),
-                actions: [AutomationAction(
-                    action: "webhook",
-                    parameters: [
-                        "url": .string(httpURL.absoluteString),
-                        "headers": .object(["Authorization": .string("Bearer secret")])
-                    ]
-                )]
-            )
-        ])
-        #expect(throws: AutomationConfigStoreError.self) { try store.save(invalidConfiguration) }
-
-        let delegate = AutomationWebhookRedirectDelegate(
-            originalURL: httpsURL,
-            sensitiveHeaderNames: policy.credentialHeaderNames(in: ["Authorization": "Bearer secret"])
-        )
-        var redirected = URLRequest(url: try #require(URL(string: "https://other.test/hook")))
-        redirected.setValue("Bearer secret", forHTTPHeaderField: "Authorization")
-        redirected.setValue("trace", forHTTPHeaderField: "X-Trace")
-        let sanitized = try #require(delegate.requestForRedirect(redirected))
-        #expect(sanitized.value(forHTTPHeaderField: "Authorization") == nil)
-        #expect(sanitized.value(forHTTPHeaderField: "X-Trace") == "trace")
-        let insecure = URLRequest(url: httpURL)
-        #expect(delegate.requestForRedirect(insecure) == nil)
-        let credentialFreeDelegate = AutomationWebhookRedirectDelegate(
-            originalURL: httpsURL,
-            sensitiveHeaderNames: []
-        )
-        #expect(credentialFreeDelegate.requestForRedirect(insecure) == nil)
-    }
-
     @Test("engine fires a real run action and records completion")
     @MainActor
     func engineFiresRealRunActionAndRecordsCompletion() async throws {

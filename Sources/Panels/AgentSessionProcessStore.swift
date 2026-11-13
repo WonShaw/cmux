@@ -461,6 +461,11 @@ final class AgentSessionProcessStore {
         shouldFailOnEOF: () async -> Bool,
         failStream: () async -> Void
     ) async {
+        // Offline build: the event stream may only ever target this machine.
+        guard agentSessionIsLoopbackURL(url) else {
+            await failStream()
+            return
+        }
         var request = URLRequest(url: url)
         request.timeoutInterval = 3600
         if let authorizationHeader {
@@ -569,6 +574,10 @@ final class AgentSessionProcessStore {
         body: [String: Any],
         authorizationHeader: String? = nil
     ) async throws -> [String: Any] {
+        // Offline build: requests may only ever target this machine.
+        guard agentSessionIsLoopbackURL(url) else {
+            throw URLError(.unsupportedURL)
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 30

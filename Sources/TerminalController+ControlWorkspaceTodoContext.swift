@@ -63,9 +63,6 @@ extension TerminalController: ControlWorkspaceTodoContext {
             signals: ControlWorkspaceTodoStatusSnapshot.Signals(
                 anyAgentNeedsInput: signals.anyAgentNeedsInput,
                 anyAgentRunning: signals.anyAgentRunning,
-                anyOpenPullRequest: signals.anyOpenPullRequest,
-                hasPullRequests: signals.hasPullRequests,
-                allPullRequestsMergedOrClosed: signals.allPullRequestsMergedOrClosed,
                 isGitDirty: signals.isGitDirty
             )
         )

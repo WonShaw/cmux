@@ -22,19 +22,11 @@ struct InternalFlagRowSnapshot: Identifiable, Equatable {
                 defaultValue: "Controlled remotely; local override inactive."
             )
         }
-        if definition.key == CmuxFeatureFlags.cloudMachinesFlag.key {
-            return String(
-                localized: "featureFlags.override.cloudDogfoodNote",
-                defaultValue: "Cloud overrides take priority in this Nightly or debug build."
-            )
-        }
         return nil
     }
 
     var sourceTitle: String {
         switch resolution.source {
-        case .remote:
-            return String(localized: "featureFlags.source.remote", defaultValue: "Remote")
         case .override:
             return String(localized: "featureFlags.source.override", defaultValue: "Override")
         case .default:

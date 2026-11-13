@@ -14,8 +14,6 @@ extension RightSidebarMode {
             return .feed
         case "dock":
             return .dock
-        case "cloud", "machines", "vms":
-            return .machines
         case "custom", "custom-sidebar":
             return .customSidebar
         default:
@@ -26,17 +24,15 @@ extension RightSidebarMode {
     static func availableModes(defaults: UserDefaults = .standard) -> [RightSidebarMode] {
         availableModes(
             feedEnabled: RightSidebarBetaFeatureSettings.isFeedEnabled(defaults: defaults),
-            dockEnabled: RightSidebarBetaFeatureSettings.isDockEnabled(defaults: defaults),
-            machinesEnabled: CloudMachinesFeature.offMainIsEnabled(defaults: defaults)
+            dockEnabled: RightSidebarBetaFeatureSettings.isDockEnabled(defaults: defaults)
         )
     }
 
-    static func availableModes(feedEnabled: Bool, dockEnabled: Bool, machinesEnabled: Bool) -> [RightSidebarMode] {
+    static func availableModes(feedEnabled: Bool, dockEnabled: Bool) -> [RightSidebarMode] {
         allCases.filter {
             $0.isAvailable(
                 feedEnabled: feedEnabled,
-                dockEnabled: dockEnabled,
-                machinesEnabled: machinesEnabled
+                dockEnabled: dockEnabled
             )
         }
     }
@@ -44,8 +40,7 @@ extension RightSidebarMode {
     func isAvailable(defaults: UserDefaults = .standard) -> Bool {
         isAvailable(
             feedEnabled: RightSidebarBetaFeatureSettings.isFeedEnabled(defaults: defaults),
-            dockEnabled: RightSidebarBetaFeatureSettings.isDockEnabled(defaults: defaults),
-            machinesEnabled: CloudMachinesFeature.offMainIsEnabled(defaults: defaults)
+            dockEnabled: RightSidebarBetaFeatureSettings.isDockEnabled(defaults: defaults)
         )
     }
 
@@ -75,7 +70,7 @@ extension RightSidebarMode {
         return index + 1
     }
 
-    func isAvailable(feedEnabled: Bool, dockEnabled: Bool, machinesEnabled: Bool) -> Bool {
+    func isAvailable(feedEnabled: Bool, dockEnabled: Bool) -> Bool {
         switch self {
         case .files, .find, .sessions:
             return true
@@ -83,8 +78,6 @@ extension RightSidebarMode {
             return feedEnabled
         case .dock:
             return dockEnabled
-        case .machines:
-            return machinesEnabled
         case .customSidebar:
             // Available once the custom-sidebars beta is on AND a right-side
             // sidebar has been picked (right_sidebar set custom <name>); the

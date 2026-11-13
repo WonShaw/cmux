@@ -10,18 +10,13 @@ final class RecordingSidebarGitHost: SidebarGitHosting {
         case panelDirectory(UUID, UUID, String)
         case gitBranch(UUID, UUID, String, Bool)
         case clearGitBranch(UUID, UUID)
-        case pullRequestBadge(UUID, UUID, SidebarPullRequestBadge)
-        case clearPullRequestBadge(UUID, UUID)
-        case scheduleGitMetadataProbe(UUID, UUID, String)
         case clearAllGitMetadata
-        case clearAllPullRequestMetadata
     }
 
     struct PanelState {
         var directory: String?
         var hasTrustedRemoteDirectory = false
         var branch: SidebarPanelGitBranch?
-        var badge: SidebarPullRequestBadge?
         var isTerminal = true
         var isRemoteTerminal = false
     }
@@ -34,11 +29,6 @@ final class RecordingSidebarGitHost: SidebarGitHosting {
 
     var workspaces: [(id: UUID, state: WorkspaceState)] = []
     var gitMetadataActivity: SidebarGitMetadataActivity = .activePolling
-    var pullRequestActivity: SidebarGitMetadataActivity = .disabled
-    var pollingEnabled: Bool {
-        get { pullRequestActivity.performsActivePolling }
-        set { pullRequestActivity = newValue ? .activePolling : .disabled }
-    }
     var mobileHostActive = false
     var selectedWorkspaceId: UUID?
     private(set) var events: [ProjectionEvent] = []
@@ -108,24 +98,13 @@ final class RecordingSidebarGitHost: SidebarGitHosting {
         guard let state = state(workspaceId) else { return [] }
         return Set(state.panels.filter { $0.value.branch != nil }.keys)
     }
-    func panelPullRequestBadge(workspaceId: UUID, panelId: UUID) -> SidebarPullRequestBadge? {
-        state(workspaceId)?.panels[panelId]?.badge
-    }
-    func panelPullRequestPanelIds(in workspaceId: UUID) -> Set<UUID> {
-        guard let state = state(workspaceId) else { return [] }
-        return Set(state.panels.filter { $0.value.badge != nil }.keys)
-    }
     func focusedPanelId(in workspaceId: UUID) -> UUID? {
         state(workspaceId)?.focusedPanelId
     }
     func hasWorkspaceLevelGitSignal(_ workspaceId: UUID) -> Bool {
         guard let state = state(workspaceId) else { return false }
-        return state.panels.values.contains { $0.branch != nil || $0.badge != nil }
+        return state.panels.values.contains { $0.branch != nil }
     }
-    func isSelectedFocusedPanel(workspaceId: UUID, panelId: UUID) -> Bool {
-        selectedWorkspaceId == workspaceId && state(workspaceId)?.focusedPanelId == panelId
-    }
-
     // MARK: Writes
 
     @discardableResult
@@ -160,42 +139,17 @@ final class RecordingSidebarGitHost: SidebarGitHosting {
     func clearPanelGitBranch(workspaceId: UUID, panelId: UUID) {
         mutate(workspaceId) {
             $0.panels[panelId]?.branch = nil
-            $0.panels[panelId]?.badge = nil
         }
         record(.clearGitBranch(workspaceId, panelId))
-    }
-
-    func updatePanelPullRequest(workspaceId: UUID, panelId: UUID, badge: SidebarPullRequestBadge) {
-        mutate(workspaceId) { $0.panels[panelId]?.badge = badge }
-        record(.pullRequestBadge(workspaceId, panelId, badge))
-    }
-
-    func clearPanelPullRequest(workspaceId: UUID, panelId: UUID) {
-        mutate(workspaceId) { $0.panels[panelId]?.badge = nil }
-        record(.clearPullRequestBadge(workspaceId, panelId))
-    }
-
-    func schedulePanelGitMetadataProbe(workspaceId: UUID, panelId: UUID, reason: String) {
-        record(.scheduleGitMetadataProbe(workspaceId, panelId, reason))
     }
 
     func clearAllSidebarGitMetadata() {
         for index in workspaces.indices {
             for panelId in workspaces[index].state.panels.keys {
                 workspaces[index].state.panels[panelId]?.branch = nil
-                workspaces[index].state.panels[panelId]?.badge = nil
             }
         }
         record(.clearAllGitMetadata)
-    }
-
-    func clearAllSidebarPullRequestMetadata() {
-        for index in workspaces.indices {
-            for panelId in workspaces[index].state.panels.keys {
-                workspaces[index].state.panels[panelId]?.badge = nil
-            }
-        }
-        record(.clearAllPullRequestMetadata)
     }
 
     // MARK: Environment

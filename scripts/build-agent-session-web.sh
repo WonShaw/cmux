@@ -65,6 +65,10 @@ write_index() {
     printf '<html lang="en" data-codex-window-type="electron" data-window-type="electron" data-codex-os="darwin">\n'
     printf '  <head>\n'
     printf '    <meta charset="UTF-8" />\n'
+    # Offline fork: the session view may only use inlined scripts/styles and
+    # local/inline images; it can never load a network subresource.
+    printf '    <meta http-equiv="Content-Security-Policy" content="%s" />\n' \
+      "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src file: data: blob:; font-src file: data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'"
     printf '    <meta\n'
     printf '      name="viewport"\n'
     printf '      content="width=device-width, initial-scale=1.0"\n'

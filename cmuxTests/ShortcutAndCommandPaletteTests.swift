@@ -10,8 +10,6 @@ import WebKit
 import ObjectiveC.runtime
 import Bonsplit
 import UserNotifications
-import Sparkle
-import CmuxUpdater
 // Selective imports: the app target also defines AppIconMode/StoredShortcut/etc.,
 // so a blanket `import CmuxSettings` here makes those names ambiguous. Import only
 // the settings symbols this file needs.
@@ -136,155 +134,6 @@ final class CommandEquivalentTransientFocusRepairTests: XCTestCase {
     }
 }
 
-final class ReactGrabShortcutRouteTests: XCTestCase {
-    func testFocusedBrowserRoutesDirectlyWithoutPasteback() {
-        let browserId = UUID()
-        let terminalId = UUID()
-
-        let route = resolveReactGrabShortcutRoute(
-            panels: [
-                ReactGrabShortcutPanelSnapshot(id: terminalId, panelType: .terminal, isFocused: false),
-                ReactGrabShortcutPanelSnapshot(id: browserId, panelType: .browser, isFocused: true),
-            ]
-        )
-
-        XCTAssertEqual(
-            route,
-            ReactGrabShortcutRoute(browserPanelId: browserId, returnTerminalPanelId: nil)
-        )
-    }
-
-    func testFocusedTerminalRoutesToOnlyBrowserAndRemembersPastebackTarget() {
-        let browserId = UUID()
-        let terminalId = UUID()
-
-        let route = resolveReactGrabShortcutRoute(
-            panels: [
-                ReactGrabShortcutPanelSnapshot(id: terminalId, panelType: .terminal, isFocused: true),
-                ReactGrabShortcutPanelSnapshot(id: browserId, panelType: .browser, isFocused: false),
-            ]
-        )
-
-        XCTAssertEqual(
-            route,
-            ReactGrabShortcutRoute(browserPanelId: browserId, returnTerminalPanelId: terminalId)
-        )
-    }
-
-    func testFocusedTerminalDoesNotRouteWhenMultipleBrowsersExist() {
-        let route = resolveReactGrabShortcutRoute(
-            panels: [
-                ReactGrabShortcutPanelSnapshot(id: UUID(), panelType: .terminal, isFocused: true),
-                ReactGrabShortcutPanelSnapshot(id: UUID(), panelType: .browser, isFocused: false),
-                ReactGrabShortcutPanelSnapshot(id: UUID(), panelType: .browser, isFocused: false),
-            ]
-        )
-
-        XCTAssertNil(route)
-    }
-
-    func testFocusedTerminalDoesNotRouteWithoutBrowser() {
-        let route = resolveReactGrabShortcutRoute(
-            panels: [
-                ReactGrabShortcutPanelSnapshot(id: UUID(), panelType: .terminal, isFocused: true),
-            ]
-        )
-
-        XCTAssertNil(route)
-    }
-}
-
-
-@MainActor
-final class ReactGrabPastebackTargetTests: XCTestCase {
-    func testPrefersExplicitTerminalTargetWhenBrowserPanelIsFocused() {
-        let workspace = Workspace(title: "Tests")
-        guard let terminalId = workspace.focusedPanelId else {
-            XCTFail("Expected initial terminal panel")
-            return
-        }
-        guard let browserPanel = workspace.newBrowserSplit(
-            from: terminalId,
-            orientation: .horizontal
-        ) else {
-            XCTFail("Expected browser split panel")
-            return
-        }
-
-        workspace.focusPanel(browserPanel.id)
-
-        XCTAssertEqual(workspace.focusedPanelId, browserPanel.id)
-        XCTAssertEqual(
-            AppDelegate.resolveTerminalPanelForTextSend(
-                in: workspace,
-                preferredPanelId: terminalId
-            )?.id,
-            terminalId
-        )
-    }
-
-    func testDoesNotFallbackWhenPreferredTerminalTargetIsMissing() {
-        let workspace = Workspace(title: "Tests")
-        guard let terminalId = workspace.focusedPanelId,
-              let browserPanel = workspace.newBrowserSplit(
-                from: terminalId,
-                orientation: .horizontal
-              ) else {
-            XCTFail("Expected initial workspace split")
-            return
-        }
-
-        workspace.focusPanel(browserPanel.id)
-
-        XCTAssertNil(
-            AppDelegate.resolveTerminalPanelForTextSend(
-                in: workspace,
-                preferredPanelId: UUID()
-            )
-        )
-    }
-
-    func testShortcutStillRoutesTerminalPastebackWhenWebViewFocusIsDeferred() {
-        let manager = TabManager()
-        guard let workspace = manager.selectedWorkspace,
-              let terminalId = workspace.focusedPanelId,
-              let browserPanel = workspace.newBrowserSplit(
-                from: terminalId,
-                orientation: .horizontal
-              ) else {
-            XCTFail("Expected initial workspace with terminal and browser split")
-            return
-        }
-
-        workspace.focusPanel(terminalId)
-
-        XCTAssertTrue(manager.toggleReactGrabFromCurrentFocus())
-        XCTAssertEqual(workspace.focusedPanelId, browserPanel.id)
-        XCTAssertEqual(browserPanel.pendingReactGrabReturnTargetPanelId, terminalId)
-    }
-
-    func testShortcutClearsSplitZoomBeforeRoutingToBrowserPane() {
-        let manager = TabManager()
-        guard let workspace = manager.selectedWorkspace,
-              let terminalId = workspace.focusedPanelId,
-              let browserPanel = workspace.newBrowserSplit(
-                from: terminalId,
-                orientation: .horizontal
-              ) else {
-            XCTFail("Expected initial workspace with terminal and browser split")
-            return
-        }
-
-        workspace.focusPanel(terminalId)
-        XCTAssertTrue(workspace.toggleSplitZoom(panelId: terminalId))
-        XCTAssertTrue(workspace.bonsplitController.isSplitZoomed)
-
-        XCTAssertTrue(manager.toggleReactGrabFromCurrentFocus())
-        XCTAssertFalse(workspace.bonsplitController.isSplitZoomed)
-        XCTAssertEqual(workspace.focusedPanelId, browserPanel.id)
-        XCTAssertEqual(browserPanel.pendingReactGrabReturnTargetPanelId, terminalId)
-    }
-}
 
 
 final class FullScreenShortcutTests: XCTestCase {
@@ -760,38 +609,6 @@ final class CommandPaletteFocusStealerClassificationTests: XCTestCase {
 
 
 final class CommandPaletteRestoreFocusStateMachineTests: XCTestCase {
-    func testRestoresBrowserAddressBarWhenPaletteOpenedFromFocusedAddressBar() {
-        let panelId = UUID()
-        XCTAssertTrue(
-            ContentView.shouldRestoreBrowserAddressBarAfterCommandPaletteDismiss(
-                focusedPanelIsBrowser: true,
-                focusedBrowserAddressBarPanelId: panelId,
-                focusedPanelId: panelId
-            )
-        )
-    }
-
-    func testDoesNotRestoreBrowserAddressBarWhenFocusedPanelIsNotBrowser() {
-        let panelId = UUID()
-        XCTAssertFalse(
-            ContentView.shouldRestoreBrowserAddressBarAfterCommandPaletteDismiss(
-                focusedPanelIsBrowser: false,
-                focusedBrowserAddressBarPanelId: panelId,
-                focusedPanelId: panelId
-            )
-        )
-    }
-
-    func testDoesNotRestoreBrowserAddressBarWhenAnotherPanelHadAddressBarFocus() {
-        XCTAssertFalse(
-            ContentView.shouldRestoreBrowserAddressBarAfterCommandPaletteDismiss(
-                focusedPanelIsBrowser: true,
-                focusedBrowserAddressBarPanelId: UUID(),
-                focusedPanelId: UUID()
-            )
-        )
-    }
-
     func testTerminalFocusTextBoxCommandRestoresTextBoxAfterPaletteDismiss() {
         XCTAssertEqual(
             ContentView.commandPalettePostRunRestoreFocusIntent(forCommandId: "palette.terminalFocusTextBoxInput"),
@@ -1906,28 +1723,28 @@ final class QuitWarningSettingsTests: XCTestCase {
 final class BuildFlavorTests: XCTestCase {
     func testDetectsDevFromBundleName() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux DEV noqdlg", bundleIdentifier: "com.cmuxterm.app"),
+            BuildFlavor.detect(bundleName: "cmux DEV noqdlg", bundleIdentifier: "com.comux.app"),
             .dev
         )
     }
 
     func testDetectsDevBeforeTagTextCanLookNightly() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux DEV nightly", bundleIdentifier: "com.cmuxterm.app"),
+            BuildFlavor.detect(bundleName: "cmux DEV nightly", bundleIdentifier: "com.comux.app"),
             .dev
         )
     }
 
     func testDetectsNightlyFromBundleIdentifier() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "com.cmuxterm.app.nightly"),
+            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "com.comux.app.nightly"),
             .nightly
         )
     }
 
     func testDetectsStableByDefault() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "com.cmuxterm.app"),
+            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "com.comux.app"),
             .stable
         )
     }
@@ -2035,189 +1852,3 @@ final class QuitConfirmationPolicyTests: XCTestCase {
     }
 }
 
-
-final class UpdateChannelSettingsTests: XCTestCase {
-    func testResolvedFeedFallsBackWhenInfoFeedMissing() {
-        let resolver = UpdateFeedResolver()
-        let resolved = resolver.resolve(infoFeedURL: nil)
-        XCTAssertEqual(resolved.url, resolver.fallbackFeedURL)
-        XCTAssertFalse(resolved.isNightly)
-        XCTAssertTrue(resolved.usedFallback)
-    }
-
-    func testResolvedFeedFallsBackWhenInfoFeedEmpty() {
-        let resolver = UpdateFeedResolver()
-        let resolved = resolver.resolve(infoFeedURL: "")
-        XCTAssertEqual(resolved.url, resolver.fallbackFeedURL)
-        XCTAssertFalse(resolved.isNightly)
-        XCTAssertTrue(resolved.usedFallback)
-    }
-
-    func testResolvedFeedUsesInfoFeedForStableChannel() {
-        let infoFeed = "https://example.com/custom/appcast.xml"
-        let resolved = UpdateFeedResolver().resolve(infoFeedURL: infoFeed)
-        XCTAssertEqual(resolved.url, infoFeed)
-        XCTAssertFalse(resolved.isNightly)
-        XCTAssertFalse(resolved.usedFallback)
-    }
-
-    func testResolvedFeedDetectsNightlyFromInfoFeedURL() {
-        let resolved = UpdateFeedResolver().resolve(
-            infoFeedURL: "https://example.com/nightly/appcast.xml"
-        )
-        XCTAssertEqual(resolved.url, "https://example.com/nightly/appcast.xml")
-        XCTAssertTrue(resolved.isNightly)
-        XCTAssertFalse(resolved.usedFallback)
-    }
-}
-
-
-final class UpdateSettingsTests: XCTestCase {
-    func testApplyEnablesAutomaticChecksAndDailySchedule() {
-        let defaults = makeDefaults()
-        UpdateSettings().apply(to: defaults)
-
-        XCTAssertTrue(defaults.bool(forKey: UpdateSettings.automaticChecksKey))
-        XCTAssertEqual(defaults.double(forKey: UpdateSettings.scheduledCheckIntervalKey), UpdateSettings().scheduledCheckInterval)
-        XCTAssertFalse(defaults.bool(forKey: UpdateSettings.automaticallyUpdateKey))
-        XCTAssertFalse(defaults.bool(forKey: UpdateSettings.sendProfileInfoKey))
-        XCTAssertTrue(defaults.bool(forKey: UpdateSettings.migrationKey))
-    }
-
-    func testApplyRepairsLegacyDisabledAutomaticChecksOnce() {
-        let defaults = makeDefaults()
-        defaults.set(false, forKey: UpdateSettings.automaticChecksKey)
-        defaults.set(0, forKey: UpdateSettings.scheduledCheckIntervalKey)
-        defaults.set(true, forKey: UpdateSettings.automaticallyUpdateKey)
-
-        UpdateSettings().apply(to: defaults)
-
-        XCTAssertTrue(defaults.bool(forKey: UpdateSettings.automaticChecksKey))
-        XCTAssertEqual(defaults.double(forKey: UpdateSettings.scheduledCheckIntervalKey), UpdateSettings().scheduledCheckInterval)
-        XCTAssertTrue(defaults.bool(forKey: UpdateSettings.automaticallyUpdateKey))
-
-        defaults.set(false, forKey: UpdateSettings.automaticChecksKey)
-        UpdateSettings().apply(to: defaults)
-
-        XCTAssertFalse(defaults.bool(forKey: UpdateSettings.automaticChecksKey))
-    }
-
-    private func makeDefaults() -> UserDefaults {
-        let suiteName = "UpdateSettingsTests.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            fatalError("Failed to create isolated UserDefaults suite")
-        }
-        defaults.removePersistentDomain(forName: suiteName)
-        return defaults
-    }
-}
-
-@MainActor
-final class UpdateViewModelPresentationTests: XCTestCase {
-    func testDetectedBackgroundUpdateShowsPillWhileIdle() {
-        let viewModel = UpdateStateModel()
-
-        viewModel.debugSetDetectedVersion("9.9.9")
-
-        XCTAssertTrue(viewModel.showsPill)
-        XCTAssertTrue(viewModel.showsDetectedBackgroundUpdate)
-        XCTAssertEqual(viewModel.text, "Update Available: 9.9.9")
-        XCTAssertEqual(viewModel.iconName, "shippingbox.fill")
-    }
-
-    func testActiveUpdateStateTakesPrecedenceOverDetectedBackgroundVersion() {
-        let viewModel = UpdateStateModel()
-
-        viewModel.debugSetDetectedVersion("9.9.9")
-        viewModel.setState(.checking(.init(cancel: {})))
-
-        XCTAssertTrue(viewModel.showsPill)
-        XCTAssertFalse(viewModel.showsDetectedBackgroundUpdate)
-        XCTAssertEqual(viewModel.text, "Checking for Updates…")
-    }
-
-    func testDismissDetectedAvailableUpdateRepliesAndClearsState() throws {
-        let viewModel = UpdateStateModel()
-        let item = try XCTUnwrap(makeAppcastItem(displayVersion: "9.9.9"))
-        let recorder = UpdateChoiceRecorder()
-
-        viewModel.recordDetectedUpdate(item)
-        viewModel.setState(.updateAvailable(.init(
-            appcastItem: item,
-            reply: { recorder.record($0) }
-        )))
-
-        viewModel.dismissDetectedAvailableUpdate()
-
-        XCTAssertEqual(recorder.snapshot(), [.dismiss])
-        XCTAssertEqual(viewModel.state, .idle)
-        XCTAssertNil(viewModel.detectedUpdateVersion)
-        XCTAssertNil(viewModel.detectedUpdateItem)
-        XCTAssertFalse(viewModel.showsPill)
-    }
-
-    func testCancelActiveStateForNewCheckDismissesAndClearsTransientState() throws {
-        let viewModel = UpdateStateModel()
-        let item = try XCTUnwrap(makeAppcastItem(displayVersion: "9.9.9"))
-        let recorder = UpdateChoiceRecorder()
-
-        viewModel.setState(.updateAvailable(.init(
-            appcastItem: item,
-            reply: { recorder.record($0) }
-        )))
-        viewModel.setOverrideState(.checking(.init(cancel: {})))
-
-        viewModel.cancelActiveStateForNewCheck()
-
-        XCTAssertEqual(recorder.snapshot(), [.dismiss])
-        XCTAssertEqual(viewModel.state, .idle)
-        XCTAssertNil(viewModel.overrideState)
-    }
-
-    func testApplyDriverStateRecordsDetectedUpdateMetadata() throws {
-        let viewModel = UpdateStateModel()
-        let item = try XCTUnwrap(makeAppcastItem(displayVersion: "9.9.9"))
-
-        viewModel.applyDriverState(.updateAvailable(.init(
-            appcastItem: item,
-            reply: { _ in }
-        )))
-        viewModel.setState(.idle)
-
-        XCTAssertEqual(viewModel.detectedUpdateVersion, "9.9.9")
-        XCTAssertTrue(viewModel.hasCachedDetectedUpdateDetails)
-        XCTAssertTrue(viewModel.showsDetectedBackgroundUpdate)
-    }
-
-    private func makeAppcastItem(displayVersion: String) -> SUAppcastItem? {
-        let enclosure: [String: Any] = [
-            "url": "https://example.com/cmux.zip",
-            "length": "1024",
-            "sparkle:version": displayVersion,
-            "sparkle:shortVersionString": displayVersion,
-        ]
-        let dict: [String: Any] = [
-            "title": "cmux \(displayVersion)",
-            "pubDate": "Wed, 25 Mar 2026 12:00:00 +0000",
-            "enclosure": enclosure,
-        ]
-        return SUAppcastItem(dictionary: dict)
-    }
-}
-
-private final class UpdateChoiceRecorder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var choices: [SPUUserUpdateChoice] = []
-
-    func record(_ choice: SPUUserUpdateChoice) {
-        lock.lock()
-        choices.append(choice)
-        lock.unlock()
-    }
-
-    func snapshot() -> [SPUUserUpdateChoice] {
-        lock.lock()
-        defer { lock.unlock() }
-        return choices
-    }
-}

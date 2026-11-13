@@ -93,7 +93,6 @@ extension TerminalController {
         "pane.break",
         "pane.join",
         "markdown.open",
-        "browser.open_split",
         "sidebar.custom.open",
         // Opens the forked session's tab only when the caller passes
         // open=true; focus follows the same explicit opt-in.

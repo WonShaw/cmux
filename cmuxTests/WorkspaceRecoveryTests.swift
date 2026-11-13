@@ -254,47 +254,6 @@ struct WorkspaceRecoveryTests {
     }
 
     @Test
-    func failedClosedRestoreLeavesNoWorkspaceOrRecoveryRecord() throws {
-        let directory = "/tmp/failed-history-restore"
-        let fixture = try makeCustomizationStore()
-        defer { fixture.defaults.removePersistentDomain(forName: fixture.suiteName) }
-
-        let sourceManager = TabManager(initialWorkingDirectory: directory, autoWelcomeIfNeeded: false)
-        var snapshot = try #require(sourceManager.selectedWorkspace).sessionSnapshot(includeScrollback: false)
-        snapshot.customTitle = "Failed Restore Label"
-        snapshot.customTitleSource = .user
-        var panelSnapshot = try #require(snapshot.panels.first)
-        panelSnapshot.type = .markdown
-        panelSnapshot.terminal = nil
-        panelSnapshot.browser = nil
-        panelSnapshot.markdown = nil
-        panelSnapshot.filePreview = nil
-        panelSnapshot.rightSidebarTool = nil
-        snapshot.panels = [panelSnapshot]
-        snapshot.layout = .pane(SessionPaneLayoutSnapshot(
-            panelIds: [panelSnapshot.id],
-            selectedPanelId: panelSnapshot.id
-        ))
-        let entry = ClosedWorkspaceHistoryEntry(
-            workspaceId: UUID(),
-            windowId: nil,
-            workspaceIndex: 0,
-            snapshot: snapshot
-        )
-        let destinationManager = TabManager(
-            autoWelcomeIfNeeded: false,
-            workspaceCustomizationStore: fixture.store
-        )
-        let tabsBeforeRestore = destinationManager.tabs.map(\.id)
-
-        #expect(!destinationManager.restoreClosedWorkspace(entry))
-        #expect(destinationManager.tabs.map(\.id) == tabsBeforeRestore)
-        if let stableId = snapshot.stableId {
-            #expect(fixture.store.customization(for: stableId) == nil)
-        }
-    }
-
-    @Test
     func freshWorkspaceCreationDoesNotCloneRenamedSiblingIdentity() throws {
         let directoryURL = FileManager.default.temporaryDirectory
             .appending(path: "cmux-sticky-cmdn-\(UUID().uuidString)", directoryHint: .isDirectory)

@@ -5,19 +5,15 @@ import Foundation
 struct GitStatusProvider: Sendable {
     private static let nonLockingGitEnvironmentKey = "GIT_OPTIONAL_LOCKS"
     private static let nonLockingGitEnvironmentValue = "0"
-    private static let nonLockingRemoteGitCommand = "env \(nonLockingGitEnvironmentKey)=\(nonLockingGitEnvironmentValue) git"
 
     private let gitExecutableURL: URL
-    private let sshExecutableURL: URL
     private let environment: [String: String]
 
     init(
         gitExecutableURL: URL = URL(fileURLWithPath: "/usr/bin/git"),
-        sshExecutableURL: URL = URL(fileURLWithPath: "/usr/bin/ssh"),
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         self.gitExecutableURL = gitExecutableURL
-        self.sshExecutableURL = sshExecutableURL
         self.environment = environment
     }
 
@@ -33,30 +29,6 @@ struct GitStatusProvider: Sendable {
             explorerRoot: Self.canonicalPath(directory),
             keyRoot: directory
         )
-    }
-
-    func fetchStatusSSH(
-        directory: String, destination: String, port: Int?,
-        identityFile: String?, sshOptions: [String]
-    ) -> [String: GitFileStatus] {
-        let escapedDir = directory.replacingOccurrences(of: "'", with: "'\\''")
-        let cmd = [
-            "cd '\(escapedDir)' 2>/dev/null",
-            "\(Self.nonLockingRemoteGitCommand) rev-parse --show-toplevel 2>/dev/null",
-            "echo '---GIT_STATUS---'",
-            "\(Self.nonLockingRemoteGitCommand) status --porcelain=v1 -z 2>/dev/null",
-        ].joined(separator: " && ")
-        guard let output = runSSH(
-            command: cmd, destination: destination,
-            port: port, identityFile: identityFile, sshOptions: sshOptions
-        ) else { return [:] }
-
-        let parts = output.components(separatedBy: "---GIT_STATUS---\n")
-        guard parts.count == 2 else { return [:] }
-        let repoRoot = parts[0].trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-        // Remote paths must not be resolved against the local filesystem, so the comparison
-        // space and the key space are both the caller's spelling here.
-        return parseGitStatus(output: parts[1], repoRoot: repoRoot, explorerRoot: directory, keyRoot: directory)
     }
 
     private func parseGitStatus(
@@ -189,38 +161,8 @@ struct GitStatusProvider: Sendable {
     }
 
     private func nonLockingGitEnvironment() -> [String: String] {
-        var environment = environment
+        var environment = GitOfflineEnvironment.applying(to: environment)
         environment[Self.nonLockingGitEnvironmentKey] = Self.nonLockingGitEnvironmentValue
         return environment
-    }
-
-    private func runSSH(
-        command: String, destination: String,
-        port: Int?, identityFile: String?, sshOptions: [String]
-    ) -> String? {
-        let process = Process()
-        process.executableURL = sshExecutableURL
-        // The positional command conflicts with a host-configured
-        // RemoteCommand unless overridden (issue #7246).
-        var args: [String] = SSHHostConfiguredRemoteCommand().overrideArguments
-        if let port { args += ["-p", String(port)] }
-        if let identityFile { args += ["-i", identityFile] }
-        for option in sshOptions { args += ["-o", option] }
-        args += ["-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-T"]
-        args += [destination, command]
-        process.arguments = args
-        process.environment = environment
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFileOrEmpty()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return nil }
-            return String(data: data, encoding: .utf8)
-        } catch {
-            return nil
-        }
     }
 }

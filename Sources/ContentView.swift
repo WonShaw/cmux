@@ -2,7 +2,6 @@ import AppKit
 import CmuxAppKitSupportUI
 import CmuxCommandPalette
 import CmuxCore
-import CmuxFeedback
 import CmuxFoundation
 import CmuxNotifications
 import CmuxPanes
@@ -20,14 +19,11 @@ import CmuxSidebar
 import CmuxSidebarRemoteRender
 import CmuxSwiftRender
 import CmuxSwiftRenderUI
-import CmuxUpdater
-import CmuxUpdaterUI
 import ImageIO
 import Observation
 import SwiftUI
 import ObjectiveC
 import UniformTypeIdentifiers
-import WebKit
 
 var fileDropOverlayKey: UInt8 = 0
 private var commandPaletteWindowOverlayKey: UInt8 = 0
@@ -721,11 +717,6 @@ private final class SelectedWorkspaceDirectoryObserver: ObservableObject {
     private struct Snapshot: Equatable {
         let workspaceId: UUID?
         let currentDirectory: String?
-        let remoteConfiguration: WorkspaceRemoteConfiguration?
-        let remoteConnectionState: WorkspaceRemoteConnectionState?
-        let remoteConnectionDetail: String?
-        let remoteDaemonStatus: WorkspaceRemoteDaemonStatus?
-        let activeRemoteTerminalSessionCount: Int
     }
 
     @Published private(set) var directoryChangeGeneration: UInt64 = 0
@@ -746,50 +737,19 @@ private final class SelectedWorkspaceDirectoryObserver: ObservableObject {
                     return Just(
                         Snapshot(
                             workspaceId: nil,
-                            currentDirectory: nil,
-                            remoteConfiguration: nil,
-                            remoteConnectionState: nil,
-                            remoteConnectionDetail: nil,
-                            remoteDaemonStatus: nil,
-                            activeRemoteTerminalSessionCount: 0
+                            currentDirectory: nil
                         )
                     )
                     .map { ($0, UInt64(0)) }
                     .eraseToAnyPublisher()
                 }
                 let directoryChangeRevision = workspace.currentDirectoryChangeRevisionPublisher()
+                let workspaceId = workspace.id
                 return workspace.$currentDirectory
-                    .combineLatest(
-                        workspace.$remoteConfiguration,
-                        workspace.$remoteConnectionState,
-                        workspace.$remoteConnectionDetail
-                    )
-                    .combineLatest(
-                        workspace.$remoteDaemonStatus,
-                        workspace.$activeRemoteTerminalSessionCount
-                    )
-                    .map { values in
-                        let (
-                            previousValues,
-                            remoteDaemonStatus,
-                            activeRemoteTerminalSessionCount
-                        ) = values
-                        let (
-                            currentDirectory,
-                            remoteConfiguration,
-                            remoteConnectionState,
-                            remoteConnectionDetail
-                        ) = previousValues
-                        return Snapshot(
-                            workspaceId: workspace.id,
-                            currentDirectory: workspace.isRemoteWorkspace
-                                ? workspace.presentedCurrentDirectory
-                                : currentDirectory,
-                            remoteConfiguration: remoteConfiguration,
-                            remoteConnectionState: remoteConnectionState,
-                            remoteConnectionDetail: remoteConnectionDetail,
-                            remoteDaemonStatus: remoteDaemonStatus,
-                            activeRemoteTerminalSessionCount: activeRemoteTerminalSessionCount
+                    .map { currentDirectory -> Snapshot in
+                        Snapshot(
+                            workspaceId: workspaceId,
+                            currentDirectory: currentDirectory
                         )
                     }
                     .combineLatest(directoryChangeRevision)
@@ -845,7 +805,6 @@ struct ContentView: View {
         case forkableAgentAvailability(String)
     }
 
-    var updateViewModel: UpdateStateModel
     let windowId: UUID
     let featureFlags: CmuxFeatureFlags
     let sidebarUnread: SidebarUnreadModel
@@ -853,13 +812,11 @@ struct ContentView: View {
 
     @MainActor
     init(
-        updateViewModel: UpdateStateModel,
         windowId: UUID,
         featureFlags: CmuxFeatureFlags? = nil,
         sidebarUnread: SidebarUnreadModel? = nil,
         titlebarControlsLayoutModel: TitlebarControlsLayoutModel? = nil
     ) {
-        self.updateViewModel = updateViewModel
         self.windowId = windowId
         self.featureFlags = featureFlags ?? .shared
         self.sidebarUnread = sidebarUnread ?? TerminalNotificationStore.shared.sidebarUnread
@@ -951,7 +908,6 @@ struct ContentView: View {
     @State private var commandPaletteScrollTargetIndex: Int?
     @State private var commandPaletteScrollTargetAnchor: UnitPoint?
     @State private var commandPaletteRestoreFocusTarget: CommandPaletteRestoreFocusTarget?
-    @State private var commandPaletteBrowserActionTarget: BrowserActionTarget?
     @State private var commandPaletteSearchCorpus: [CommandPaletteSearchCorpusEntry<String>] = []
     @State private var commandPaletteSearchCorpusByID: [String: CommandPaletteSearchCorpusEntry<String>] = [:]
     @State private var commandPaletteSearchCommandsByID: [String: CommandPaletteCommand] = [:]
@@ -990,7 +946,6 @@ struct ContentView: View {
     @State private var commandPalettePendingActivation: CommandPalettePendingActivation?
     @State private var commandPaletteResultsRevision: UInt64 = 0
     @State private var commandPaletteUsageHistoryByCommandId: [String: CommandPaletteUsageEntry] = [:]
-    @State private var isFeedbackComposerPresented = false
     @AppStorage(AppCatalogSection().renameSelectsExistingName.userDefaultsKey)
     private var commandPaletteRenameSelectAllOnFocus = AppCatalogSection().renameSelectsExistingName.defaultValue
     @AppStorage(AppCatalogSection().commandPaletteSearchesAllSurfaces.userDefaultsKey)
@@ -1009,8 +964,6 @@ struct ContentView: View {
         switch panel {
         case let terminal as TerminalPanel:
             targetView = terminal.hostedView
-        case let browser as BrowserPanel:
-            targetView = browser.webView
         default:
             targetView = nil
         }
@@ -1737,14 +1690,12 @@ struct ContentView: View {
 
     private var sidebarView: some View {
         let sidebar = VerticalTabsSidebar(
-            updateViewModel: updateViewModel,
             fileExplorerState: fileExplorerState,
             featureFlags: featureFlags,
             isPresented: sidebarState.isVisible,
             sidebarUnread: sidebarUnread,
             titlebarControlsLayoutModel: titlebarControlsLayoutModel,
             windowId: windowId,
-            onSendFeedback: presentFeedbackComposer,
             onToggleSidebar: { sidebarState.toggle() },
             onNewTab: {
                 AppDelegate.shared?.performNewWorkspaceAction(
@@ -2301,10 +2252,8 @@ struct ContentView: View {
     private func schedulePortalGeometrySynchronize() {
         if let observedWindow {
             TerminalWindowPortalRegistry.scheduleExternalGeometrySynchronize(for: observedWindow)
-            BrowserWindowPortalRegistry.scheduleExternalGeometrySynchronize(for: observedWindow)
         } else {
             TerminalWindowPortalRegistry.scheduleExternalGeometrySynchronizeForAllWindows()
-            BrowserWindowPortalRegistry.scheduleExternalGeometrySynchronizeForAllWindows()
         }
     }
 
@@ -2434,24 +2383,6 @@ struct ContentView: View {
         }
 
         sidebarSelectionState.selection = .tabs
-        if workspace.isRemoteWorkspace {
-            Task { [weak workspace, fileExplorerStore] in
-                guard let workspace else { return }
-                do {
-                    let localURL = try await fileExplorerStore.materializeRemoteFileForPreview(path: filePath)
-                    _ = workspace.openFileSurfaces(
-                        inPane: paneId,
-                        filePaths: [localURL.path],
-                        focus: true,
-                        reuseExisting: true,
-                        duplicateWhenFocused: true
-                    )
-                } catch {
-                    NSSound.beep()
-                }
-            }
-            return
-        }
         _ = workspace.openFileSurfaces(
             inPane: paneId,
             filePaths: [filePath],
@@ -2475,42 +2406,7 @@ struct ContentView: View {
 
         if tab.usesRemoteDirectoryProvenance {
             sessionIndexStore.setCurrentDirectoryIfChanged(nil)
-            guard shouldSyncFileExplorerStore else {
-                fileExplorerStore.applyWorkspaceRoot(.none)
-                return
-            }
-            guard let config = tab.remoteConfiguration, config.transport == .ssh else {
-                fileExplorerStore.applyWorkspaceRoot(.none)
-                return
-            }
-            let unavailableDetail = tab.remoteConnectionDetail ?? tab.remoteDaemonStatus.detail
-
-            #if DEBUG
-            let hasUnavailableDetail = unavailableDetail?.isEmpty == false
-            cmuxDebugLog(
-                "fileExplorer.sync remote state=\(tab.remoteConnectionState.rawValue) " +
-                "hasDestination=\(config.destination.isEmpty ? 0 : 1) " +
-                "hasDisplayTarget=\(config.displayTarget.isEmpty ? 0 : 1) " +
-                "hasIdentityFile=\(config.identityFile == nil ? 0 : 1) " +
-                "hasDetail=\(hasUnavailableDetail ? 1 : 0)"
-            )
-            #endif
-
-            fileExplorerStore.applyWorkspaceRoot(
-                .remoteSSH(
-                    workspaceId: tab.id,
-                    connection: SSHFileExplorerConnection(
-                        destination: config.destination,
-                        port: config.port,
-                        identityFile: config.identityFile,
-                        sshOptions: config.sshOptions
-                    ),
-                    displayTarget: config.displayTarget,
-                    rootPath: tab.trustedRemoteCurrentDirectory,
-                    isAvailable: tab.remoteConnectionState == .connected,
-                    unavailableDetail: unavailableDetail
-                )
-            )
+            fileExplorerStore.applyWorkspaceRoot(.none)
             return
         }
 
@@ -2542,7 +2438,6 @@ struct ContentView: View {
             return nil
         }
         if let focusedPanelId = tab.focusedPanelId,
-           !tab.isRemoteTerminalSurface(focusedPanelId),
            let panelDir = tab.reportedPanelDirectory(panelId: focusedPanelId)?.trimmingCharacters(in: .whitespacesAndNewlines),
            !panelDir.isEmpty {
             return panelDir
@@ -2779,11 +2674,6 @@ struct ContentView: View {
 #if DEBUG
                     cmuxDebugLog("startup.recovery tabCount=\(tabManager.tabs.count) selected=\(tabManager.selectedTabId?.uuidString.prefix(8) ?? "nil") mounted=\(mountedWorkspaceIds.count)")
 #endif
-                    sentryBreadcrumb("startup.recovery", data: [
-                        "tabCount": tabManager.tabs.count,
-                        "selectedTabId": tabManager.selectedTabId?.uuidString ?? "nil",
-                        "mountedCount": mountedWorkspaceIds.count
-                    ])
                 }
             }
         })
@@ -2969,63 +2859,6 @@ struct ContentView: View {
             attemptCommandPaletteFocusRestoreIfNeeded(focusTransactionId: focusTransactionId)
         })
 
-        view = AnyView(view.onReceive(NotificationCenter.default.publisher(for: .browserDidBecomeFirstResponderWebView)) { notification in
-            guard let webView = notification.object as? WKWebView,
-                  let selectedTabId = tabManager.selectedTabId,
-                  let selectedWorkspace = tabManager.selectedWorkspace,
-                  let focusedPanelId = selectedWorkspace.focusedPanelId,
-                  let focusedBrowser = selectedWorkspace.browserPanel(for: focusedPanelId),
-                  focusedBrowser.webView === webView else { return }
-            tabManager.workspaceSwitchCoordinator.noteBrowserInteractionReady(
-                workspaceID: selectedTabId,
-                webView: webView
-            )
-            clearWorkspaceSwitchPortalSignalsIfFinished()
-            AppDelegate.shared?.noteMainPanelKeyboardFocusIntent(
-                workspaceId: selectedTabId,
-                panelId: focusedPanelId,
-                in: observedWindow ?? webView.window
-            )
-            attemptCommandPaletteFocusRestoreIfNeeded()
-        })
-
-        view = AnyView(view.onReceive(NotificationCenter.default.publisher(for: .webViewDidReceiveClick)) { notification in
-            guard let webView = notification.object as? WKWebView,
-                  let selectedTabId = tabManager.selectedTabId,
-                  let selectedWorkspace = tabManager.selectedWorkspace,
-                  let focusedBrowser = selectedWorkspace.panels.values.compactMap({ $0 as? BrowserPanel })
-                    .first(where: { $0.webView === webView }) else { return }
-            tabManager.workspaceSwitchCoordinator.noteBrowserInteractionReady(
-                workspaceID: selectedTabId,
-                webView: webView
-            )
-            clearWorkspaceSwitchPortalSignalsIfFinished()
-            AppDelegate.shared?.noteMainPanelKeyboardFocusIntent(
-                workspaceId: selectedTabId,
-                panelId: focusedBrowser.id,
-                in: observedWindow ?? webView.window
-            )
-        })
-
-        view = AnyView(view.onReceive(NotificationCenter.default.publisher(for: .browserDidFocusAddressBar)) { notification in
-            guard let panelId = notification.object as? UUID,
-                  let selectedTabId = tabManager.selectedTabId,
-                  let selectedWorkspace = tabManager.selectedWorkspace,
-                  selectedWorkspace.focusedPanelId == panelId,
-                  let focusedBrowser = selectedWorkspace.browserPanel(for: panelId) else { return }
-            tabManager.workspaceSwitchCoordinator.noteBrowserInteractionReady(
-                workspaceID: selectedTabId,
-                webView: focusedBrowser.webView
-            )
-            clearWorkspaceSwitchPortalSignalsIfFinished()
-            AppDelegate.shared?.noteMainPanelKeyboardFocusIntent(
-                workspaceId: selectedTabId,
-                panelId: panelId,
-                in: observedWindow ?? focusedBrowser.webView.window
-            )
-            attemptCommandPaletteFocusRestoreIfNeeded()
-        })
-
         view = AnyView(view.onReceive(workspaceSwitchPortalSignalRouter.publisher(
             for: .terminalPortalVisibilityDidChange
         )) { notification in
@@ -3045,31 +2878,6 @@ struct ContentView: View {
         )) { notification in
             guard let hostedView = notification.object as? GhosttySurfaceScrollView else { return }
             noteTerminalPortalPresentedIfReady(hostedView)
-        })
-
-        view = AnyView(view.onReceive(workspaceSwitchPortalSignalRouter.publisher(
-            for: .browserPortalRegistryDidChange
-        )) { notification in
-            guard tabManager.workspaceSwitchCoordinator.isMeasuringSwitch,
-                  let webView = notification.object as? WKWebView,
-                  webView.window === (observedWindow ?? tabManager.window),
-                  BrowserWindowPortalRegistry.isPresented(webView) else {
-                return
-            }
-            tabManager.workspaceSwitchCoordinator.noteBrowserPortalPresented(webView: webView)
-            clearWorkspaceSwitchPortalSignalsIfFinished()
-        })
-
-        view = AnyView(view.onReceive(workspaceSwitchPortalSignalRouter.publisher(
-            for: .browserPortalDidBecomePresentable
-        )) { notification in
-            guard tabManager.workspaceSwitchCoordinator.isMeasuringSwitch,
-                  let webView = notification.object as? WKWebView,
-                  BrowserWindowPortalRegistry.isPresented(webView) else {
-                return
-            }
-            tabManager.workspaceSwitchCoordinator.noteBrowserPortalPresented(webView: webView)
-            clearWorkspaceSwitchPortalSignalsIfFinished()
         })
 
         view = AnyView(view.onReceive(NotificationCenter.default.publisher(
@@ -3296,17 +3104,6 @@ struct ContentView: View {
             _ = handleCommandPaletteRenameDeleteBackward(modifiers: [])
         })
 
-        view = AnyView(view.onReceive(NotificationCenter.default.publisher(for: .feedbackComposerRequested)) { notification in
-            let requestedWindow = notification.object as? NSWindow
-            guard Self.shouldHandleCommandPaletteRequest(
-                observedWindow: observedWindow,
-                requestedWindow: requestedWindow,
-                keyWindow: NSApp.keyWindow,
-                mainWindow: NSApp.mainWindow
-            ) else { return }
-            presentFeedbackComposer()
-        })
-
         view = AnyView(view.background(WindowAccessor(dedupeByWindow: false) { window in
             refreshTmuxWorkspacePaneWindowOverlay(in: window)
             let overlayController = commandPaletteWindowOverlayController(for: window)
@@ -3393,7 +3190,7 @@ struct ContentView: View {
 
         // Mirror of the `sidebarWidth` handler above for the RIGHT sidebar width.
         // The right sidebar can host the Dock — a Bonsplit tree of portal-hosted
-        // terminals/browsers. Like the left sidebar, its width is a pure SwiftUI
+        // terminals. Like the left sidebar, its width is a pure SwiftUI
         // layout change, so portal surfaces need an explicit coalesced geometry
         // resync each tick. Without this the Dock's surfaces miss the
         // interactive-resize flush path and the width drag renders laggily
@@ -3468,9 +3265,6 @@ struct ContentView: View {
         })
 
         view = AnyView(view.ignoresSafeArea())
-        view = AnyView(view.sheet(isPresented: $isFeedbackComposerPresented) {
-            SidebarFeedbackComposerSheet()
-        })
 
         view = AnyView(view.onDisappear {
             sidebarState.removeVisibilityWillChangeHandler(ownerId: windowId)
@@ -3549,11 +3343,6 @@ struct ContentView: View {
             windowBackgroundPolicy: windowChrome.windowBackgroundPolicy
         )
         windowChrome.nativeTitlebarBackdropCoordinator.removeNativeTitlebarBackdrop(in: window)
-#if DEBUG
-        if ProcessInfo.processInfo.environment["CMUX_UI_TEST_MODE"] == "1" {
-            AppDelegate.shared?.updateLog.append("ui test window accessor: id=\(windowIdentifier) visible=\(window.isVisible)")
-        }
-#endif
         let backdropResult = windowChrome.backdropController.apply(plan: backdropPlan, to: window)
         if backdropResult.didChangeGlassRoot {
             refreshTmuxWorkspacePaneWindowOverlay(in: window)
@@ -3565,7 +3354,6 @@ struct ContentView: View {
                     }
                 ) { commandPaletteOverlayView }
             TerminalWindowPortalRegistry.scheduleExternalGeometrySynchronize(for: window)
-            BrowserWindowPortalRegistry.scheduleExternalGeometrySynchronize(for: window)
         }
         AppDelegate.shared?.attachUpdateAccessory(to: window)
         AppDelegate.shared?.applyWindowDecorations(to: window)
@@ -3739,20 +3527,10 @@ struct ContentView: View {
             workspaceSwitchPortalSignalRouter.clearSources()
             return
         }
-        if let focusedPanelID = workspace.focusedPanelId,
-           let browserPanel = workspace.browserPanel(for: focusedPanelID) {
-            workspaceSwitchPortalSignalRouter.observe(
-                terminalHostedView: nil,
-                terminalSurface: nil,
-                browserWebView: browserPanel.webView
-            )
-            return
-        }
         if let terminalTarget = workspace.focusedTerminalInputTarget() {
             workspaceSwitchPortalSignalRouter.observe(
                 terminalHostedView: terminalTarget.panel.hostedView,
-                terminalSurface: terminalTarget.panel.surface,
-                browserWebView: nil
+                terminalSurface: terminalTarget.panel.surface
             )
             return
         }
@@ -3772,30 +3550,6 @@ struct ContentView: View {
             in: window,
             sourceWorkspaceID: sourceWorkspaceID
         )
-        if let focusedPanelID = workspace.focusedPanelId,
-           let browserPanel = workspace.browserPanel(for: focusedPanelID) {
-            let webView = browserPanel.webView
-            let portalPresented = BrowserWindowPortalRegistry.isPresented(webView)
-            let interactionReady =
-                window.flatMap { window in
-                    window.firstResponder.flatMap {
-                        browserPanel.ownedFocusIntent(for: $0, in: window)
-                    }
-                } != nil
-            return WorkspaceSwitchPresentationTarget(
-                workspaceID: workspaceID,
-                contentKind: .browser,
-                terminalSurfaceID: nil,
-                terminalView: nil,
-                terminalRendererPresented: false,
-                terminalRenderedFrameSequence: 0,
-                browserWebView: webView,
-                portalPresented: portalPresented,
-                interactionReady: interactionReady,
-                requiresInteraction: requiresInteraction
-            )
-        }
-
         if let target = workspace.focusedTerminalInputTarget() {
             let surface = target.panel.surface
             let hostedView = target.panel.hostedView
@@ -3812,7 +3566,6 @@ struct ContentView: View {
                 terminalRendererPresented: surface.isRendererPresented,
                 terminalRenderedFrameSequence:
                     hostedView.surfaceView.renderedFrameSequence,
-                browserWebView: nil,
                 portalPresented: portalPresented,
                 interactionReady: interactionReady,
                 requiresInteraction:
@@ -3838,7 +3591,6 @@ struct ContentView: View {
             terminalView: nil,
             terminalRendererPresented: false,
             terminalRenderedFrameSequence: 0,
-            browserWebView: nil,
             portalPresented: true,
             interactionReady: true,
             requiresInteraction: false
@@ -5976,8 +5728,8 @@ struct ContentView: View {
         workspaceId: UUID
     ) {
         // Switcher commands dismiss the palette after action dispatch.
-        // Defer focus mutation one turn so browser omnibar autofocus can run
-        // without being blocked by the palette-visibility guard.
+        // Defer focus mutation one turn so it runs after the palette has
+        // finished dismissing.
         DispatchQueue.main.async {
             _ = AppDelegate.shared?.focusMainWindow(windowId: windowId)
             tabManager.focusTab(
@@ -6379,7 +6131,7 @@ struct ContentView: View {
 
         let workspaceId = panelContext.workspace.id
         let panelId = panelContext.panelId
-        let isRemoteTerminal = panelContext.workspace.isRemoteTerminalSurface(panelId)
+        let isRemoteTerminal = false
         let panelKey = Self.commandPaletteForkableAgentPanelKey(workspaceId: workspaceId, panelId: panelId)
         let panelChanged = commandPaletteForkableAgentActivePanelKey != panelKey
         commandPaletteForkableAgentActivePanelKey = panelKey
@@ -7032,14 +6784,6 @@ struct ContentView: View {
             return "⌘⇧W"
         case "palette.openSettings":
             return "⌘,"
-        case "palette.browserBack":
-            return "⌘["
-        case "palette.browserForward":
-            return "⌘]"
-        case "palette.browserReload":
-            return "⌘R"
-        case "palette.browserFocusAddressBar":
-            return "⌘L"
         case "palette.browserZoomIn":
             return "⌘="
         case "palette.browserZoomOut":
@@ -7075,15 +6819,6 @@ struct ContentView: View {
         var snapshot = CommandPaletteContextSnapshot()
         snapshot.setBool(CommandPaletteContextKeys.workspaceMinimalModeEnabled, currentIsMinimalMode)
         snapshot.setBool(CommandPaletteContextKeys.sidebarMatchTerminalBackground, sidebarMatchTerminalBackground)
-        snapshot.setBool(CommandPaletteContextKeys.browserDisabled, BrowserAvailabilitySettings.isDisabled())
-        snapshot.setBool(CommandPaletteContextKeys.browserManagedByPolicy, BrowserAvailabilitySettings.isManagedByPolicy)
-        snapshot.setBool(CommandPaletteContextKeys.mobileRemoteControlManagedByPolicy, MobileRemoteControlPolicy.isDisabled)
-        snapshot.setBool(CommandPaletteContextKeys.computerUseUXEnabled, featureFlags.isComputerUseUXEnabled)
-        if let auth = AppDelegate.shared?.auth {
-            snapshot.setBool(CommandPaletteContextKeys.authSignedIn, auth.accountFlow.isAuthenticated)
-            snapshot.setBool(CommandPaletteContextKeys.proUpgradeEnabled, CmuxFeatureFlags.shared.isProUpgradeUIEnabled)
-            snapshot.setBool(CommandPaletteContextKeys.authWorking, auth.accountFlow.isWorkingOnAuth)
-        }
 
         if let workspace = tabManager.selectedWorkspace {
             let pinTarget = WorkspaceActionDispatcher.Target.single(workspace.id)
@@ -7093,10 +6828,6 @@ struct ContentView: View {
             snapshot.setBool(CommandPaletteContextKeys.workspaceHasCustomName, workspace.customTitle != nil)
             snapshot.setBool(CommandPaletteContextKeys.workspaceHasCustomDescription, workspace.hasCustomDescription)
             snapshot.setBool(CommandPaletteContextKeys.workspaceShouldPin, pinState?.pinned ?? !workspace.isPinned)
-            snapshot.setBool(
-                CommandPaletteContextKeys.workspaceHasPullRequests,
-                !workspace.sidebarPullRequestsInDisplayOrder().isEmpty
-            )
             snapshot.setBool(
                 CommandPaletteContextKeys.workspaceHasSplits,
                 (AppDelegate.shared?.focusedDockStoreForShortcut(
@@ -7124,76 +6855,14 @@ struct ContentView: View {
             )
         }
 
-        if let browserTarget = commandPaletteBrowserActionTarget,
-           let app = AppDelegate.shared,
-           let dock = app.dock(resolving: browserTarget),
-           let browserPanel = dock.browserPanel(
-               for: browserTarget.panelId
-           ),
-           let tabId = dock.surfaceId(
-               forPanelId: browserTarget.panelId
-           ),
-           let tab = dock.bonsplitController.tab(tabId) {
-                snapshot.setBool(
-                    CommandPaletteContextKeys.hasFocusedPanel,
-                    true
-                )
-                snapshot.setString(
-                    CommandPaletteContextKeys.panelName,
-                    tab.title
-                )
-                snapshot.setBool(
-                    CommandPaletteContextKeys.panelIsBrowser,
-                    true
-                )
-                snapshot.setBool(
-                    CommandPaletteContextKeys.panelBrowserFocusModeActive,
-                    browserPanel.isBrowserFocusModeActive
-                )
-                snapshot.setBool(
-                    CommandPaletteContextKeys.panelBrowserOmnibarVisible,
-                    browserPanel.isOmnibarVisible
-                )
-                snapshot.setBool(
-                    CommandPaletteContextKeys.panelHasPane,
-                    dock.paneId(forPanelId: browserTarget.panelId) != nil
-                )
-                snapshot.setBool(
-                    CommandPaletteContextKeys.panelSupportsDeepLinks,
-                    false
-                )
-                snapshot.setBool(
-                    CommandPaletteContextKeys.panelHasCustomName,
-                    tab.hasCustomTitle
-                )
-                snapshot.setBool(
-                    CommandPaletteContextKeys.panelShouldPin,
-                    !tab.isPinned
-                )
-                snapshot.setBool(
-                    CommandPaletteContextKeys.panelCanMoveToNewWorkspace,
-                    dock.panels.count > 1
-                )
-                snapshot.setBool(
-                    CommandPaletteContextKeys.workspaceHasSplits,
-                    dock.bonsplitController.allPaneIds.count > 1
-                )
-                snapshot.setBool(
-                    CommandPaletteContextKeys.panelHasUnread,
-                    dock.panelIsUnread(browserTarget.panelId)
-                )
-        } else if let panelContext = focusedPanelContext {
+        if let panelContext = focusedPanelContext {
             let workspace = panelContext.workspace
             let panelId = panelContext.panelId
             let panelIsTerminal = panelContext.panel.panelType == .terminal
-            let panelIsRemoteTerminal = workspace.isRemoteTerminalSurface(panelId)
+            let panelIsRemoteTerminal = false
             snapshot.setBool(CommandPaletteContextKeys.hasFocusedPanel, true)
             snapshot.setString(CommandPaletteContextKeys.panelName, panelDisplayName(workspace: workspace, panelId: panelId, fallback: panelContext.panel.displayTitle))
-            snapshot.setBool(CommandPaletteContextKeys.panelIsBrowser, panelContext.panel.panelType == .browser)
             snapshot.setBool(CommandPaletteContextKeys.panelIsSimulator, panelContext.panel.panelType == .simulator)
-            if let browserPanel = panelContext.panel as? BrowserPanel {
-                snapshot.setBool(CommandPaletteContextKeys.panelBrowserFocusModeActive, browserPanel.isBrowserFocusModeActive)
-            }
             // Markdown zoom only affects the rendered preview, so don't surface
             // the zoom commands when the panel is in raw text-edit mode.
             snapshot.setBool(
@@ -7203,10 +6872,6 @@ struct ContentView: View {
             snapshot.setBool(
                 CommandPaletteContextKeys.panelIsFilePreviewTextEditor,
                 (panelContext.panel as? FilePreviewPanel)?.previewMode == .text
-            )
-            snapshot.setBool(
-                CommandPaletteContextKeys.panelBrowserOmnibarVisible,
-                (panelContext.panel as? BrowserPanel)?.isOmnibarVisible ?? true
             )
             snapshot.setBool(CommandPaletteContextKeys.panelIsTerminal, panelIsTerminal)
             snapshot.setBool(CommandPaletteContextKeys.panelHasPane, workspace.paneId(forPanelId: panelId) != nil)
@@ -7257,23 +6922,8 @@ struct ContentView: View {
             }
         }
 
-        if case .updateAvailable = updateViewModel.effectiveState {
-            snapshot.setBool(CommandPaletteContextKeys.updateHasAvailable, true)
-        }
-
         return snapshot
     }
-
-    /// Search keywords for the mobile pairing command palette entry.
-    ///
-    /// Kept as a single source of truth so the contribution and its behavioral
-    /// test agree on what queries (e.g. `ios`, `ipados`) must surface the
-    /// command. These are platform/technical terms that read the same across
-    /// locales, so they are not localized.
-    static let commandPaletteMobileConnectKeywords: [String] = [
-        "tailscale", "iroh", "mobile", "connect", "pair", "pairing", "device",
-        "ios", "ipados", "iphone", "ipad", "phone", "tablet", "qr",
-    ]
 
     private func commandPaletteCommandContributions() -> [CommandPaletteCommandContribution] {
         func constant(_ value: String) -> (CommandPaletteContextSnapshot) -> String {
@@ -7288,11 +6938,6 @@ struct ContentView: View {
         func panelSubtitle(_ context: CommandPaletteContextSnapshot) -> String {
             let name = context.string(CommandPaletteContextKeys.panelName) ?? String(localized: "commandPalette.subtitle.tabFallback", defaultValue: "Tab")
             return String(localized: "commandPalette.subtitle.tabWithName", defaultValue: "Tab • \(name)")
-        }
-
-        func browserPanelSubtitle(_ context: CommandPaletteContextSnapshot) -> String {
-            let name = context.string(CommandPaletteContextKeys.panelName) ?? String(localized: "commandPalette.subtitle.tabFallback", defaultValue: "Tab")
-            return String(localized: "commandPalette.subtitle.browserWithName", defaultValue: "Browser • \(name)")
         }
 
         func terminalPanelSubtitle(_ context: CommandPaletteContextSnapshot) -> String {
@@ -7334,8 +6979,6 @@ struct ContentView: View {
         }
 
         var contributions: [CommandPaletteCommandContribution] = []
-        contributions.append(contentsOf: Self.commandPaletteCloudCommandContributions())
-        contributions.append(contentsOf: Self.commandPaletteComputerUseContributions())
 
         contributions.append(
             CommandPaletteCommandContribution(
@@ -7343,15 +6986,6 @@ struct ContentView: View {
                 title: constant(String(localized: "command.newWorkspace.title", defaultValue: "New Workspace")),
                 subtitle: constant(String(localized: "command.newWorkspace.subtitle", defaultValue: "Workspace")),
                 keywords: ["create", "new", "workspace"]
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.newBrowserWorkspace",
-                title: constant(String(localized: "command.newBrowserWorkspace.title", defaultValue: "New Browser Workspace")),
-                subtitle: constant(String(localized: "command.newBrowserWorkspace.subtitle", defaultValue: "Workspace")),
-                keywords: ["create", "new", "browser", "workspace", "web"],
-                when: { !$0.bool(CommandPaletteContextKeys.browserDisabled) }
             )
         )
         contributions.append(contentsOf: Self.commandPaletteNewAgentChatContributions())
@@ -7391,25 +7025,6 @@ struct ContentView: View {
         )
         contributions.append(
             CommandPaletteCommandContribution(
-                commandId: "palette.openFolderInVSCodeInline",
-                title: constant(
-                    String(
-                        localized: "command.openFolderInVSCodeInline.title",
-                        defaultValue: "Open Folder in VS Code (Inline)…"
-                    )
-                ),
-                subtitle: constant(
-                    String(
-                        localized: "command.openFolderInVSCodeInline.subtitle",
-                        defaultValue: "VS Code Inline"
-                    )
-                ),
-                keywords: ["open", "folder", "directory", "project", "vs", "code", "inline", "editor", "browser"],
-                when: { _ in TerminalDirectoryOpenTarget.vscodeInline.isAvailable() }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
                 commandId: "palette.reopenPreviousSession",
                 title: constant(String(localized: "command.reopenPreviousSession.title", defaultValue: "Restore Previous App Launch")),
                 subtitle: constant(String(localized: "command.reopenPreviousSession.subtitle", defaultValue: "History")),
@@ -7423,16 +7038,6 @@ struct ContentView: View {
                 subtitle: constant(String(localized: "command.newTerminalTab.subtitle", defaultValue: "Tab")),
                 shortcutHint: "⌘T",
                 keywords: ["new", "terminal", "tab"]
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.newBrowserTab",
-                title: constant(String(localized: "command.newBrowserTab.title", defaultValue: "New Tab (Browser)")),
-                subtitle: constant(String(localized: "command.newBrowserTab.subtitle", defaultValue: "Tab")),
-                shortcutHint: "⌘⇧L",
-                keywords: ["new", "browser", "tab", "web"],
-                when: { !$0.bool(CommandPaletteContextKeys.browserDisabled) }
             )
         )
         if CmuxFeatureFlags.shared.isSimulatorEnabled {
@@ -7618,18 +7223,6 @@ struct ContentView: View {
         )
         contributions.append(
             CommandPaletteCommandContribution(
-                commandId: "palette.mobileConnect",
-                title: constant(
-                    String(localized: "command.mobileConnect.title", defaultValue: "Open Mobile Pairing")
-                ),
-                subtitle: constant(String(localized: "command.mobileConnect.subtitle", defaultValue: "Mobile")),
-                keywords: Self.commandPaletteMobileConnectKeywords,
-                when: { !$0.bool(CommandPaletteContextKeys.mobileRemoteControlManagedByPolicy) }
-            )
-        )
-        contributions.append(contentsOf: Self.commandPaletteAuthCommandContributions() + Self.commandPaletteProCommandContributions())
-        contributions.append(
-            CommandPaletteCommandContribution(
                 commandId: "palette.makeDefaultTerminal",
                 title: constant(
                     String(
@@ -7642,7 +7235,7 @@ struct ContentView: View {
                 ),
                 keywords: String(
                     localized: "command.makeDefaultTerminal.keywords",
-                    defaultValue: "default,terminal,ssh,launch,services,handler,command,tool,executable"
+                    defaultValue: "default,terminal,launch,services,handler,command,tool,executable"
                 )
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -7652,59 +7245,10 @@ struct ContentView: View {
         )
         contributions.append(
             CommandPaletteCommandContribution(
-                commandId: "palette.checkForUpdates",
-                title: constant(String(localized: "command.checkForUpdates.title", defaultValue: "Check for Updates")),
-                subtitle: constant(String(localized: "command.checkForUpdates.subtitle", defaultValue: "Global")),
-                keywords: ["update", "upgrade", "release"]
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.applyUpdateIfAvailable",
-                title: constant(String(localized: "command.applyUpdateIfAvailable.title", defaultValue: "Apply Update (If Available)")),
-                subtitle: constant(String(localized: "command.applyUpdateIfAvailable.subtitle", defaultValue: "Global")),
-                keywords: ["apply", "install", "update", "available"],
-                when: { $0.bool(CommandPaletteContextKeys.updateHasAvailable) }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.attemptUpdate",
-                title: constant(String(localized: "command.attemptUpdate.title", defaultValue: "Attempt Update")),
-                subtitle: constant(String(localized: "command.attemptUpdate.subtitle", defaultValue: "Global")),
-                keywords: ["attempt", "check", "update", "upgrade", "release"]
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
                 commandId: "palette.restartSocketListener",
                 title: constant(String(localized: "command.restartSocketListener.title", defaultValue: "Restart CLI Listener")),
                 subtitle: constant(String(localized: "command.restartSocketListener.subtitle", defaultValue: "Global")),
                 keywords: ["restart", "socket", "listener", "cli", "cmux", "control"]
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.disableBrowser",
-                title: constant(String(localized: "command.disableBrowser.title", defaultValue: "Disable cmux Browser")),
-                subtitle: constant(String(localized: "command.browserAvailability.subtitle", defaultValue: "Browser")),
-                keywords: ["browser", "disable", "external", "default", "open", "auth"],
-                when: {
-                    !$0.bool(CommandPaletteContextKeys.browserDisabled)
-                        && !$0.bool(CommandPaletteContextKeys.browserManagedByPolicy)
-                }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.enableBrowser",
-                title: constant(String(localized: "command.enableBrowser.title", defaultValue: "Enable cmux Browser")),
-                subtitle: constant(String(localized: "command.browserAvailability.subtitle", defaultValue: "Browser")),
-                keywords: ["browser", "enable", "embedded", "open"],
-                when: {
-                    $0.bool(CommandPaletteContextKeys.browserDisabled)
-                        && !$0.bool(CommandPaletteContextKeys.browserManagedByPolicy)
-                }
             )
         )
         contributions.append(contentsOf: Self.commandPaletteSettingsToggleCommandContributions())
@@ -7939,145 +7483,6 @@ struct ContentView: View {
             contentsOf: Self.commandPaletteSurfaceNavigationContributions()
         )
 
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.openWorkspacePullRequests",
-                title: constant(String(localized: "command.openWorkspacePRLinks.title", defaultValue: "Open All Workspace PR Links")),
-                subtitle: workspaceSubtitle,
-                keywords: ["pull", "request", "review", "merge", "pr", "mr", "open", "links", "workspace"],
-                when: {
-                    $0.bool(CommandPaletteContextKeys.hasWorkspace) &&
-                    $0.bool(CommandPaletteContextKeys.workspaceHasPullRequests)
-                }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.openDiffViewer",
-                title: constant(String(localized: "command.openDiffViewer.title", defaultValue: "Open Diff Viewer")),
-                subtitle: workspaceSubtitle,
-                keywords: ["diff", "changes", "git", "review", "branch", "unstaged", "codeview", "agent", "codex", "claude"],
-                when: {
-                    $0.bool(CommandPaletteContextKeys.hasWorkspace) &&
-                    !$0.bool(CommandPaletteContextKeys.browserDisabled)
-                }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.openDirectoryDiffViewer",
-                title: constant(String(localized: "command.openDirectoryDiffViewer.title", defaultValue: "Open Directory Diff Viewer")),
-                subtitle: workspaceSubtitle,
-                keywords: ["diff", "changes", "git", "review", "branch", "unstaged", "codeview", "directory", "cwd", "folder"],
-                when: {
-                    $0.bool(CommandPaletteContextKeys.hasWorkspace) &&
-                    !$0.bool(CommandPaletteContextKeys.browserDisabled)
-                }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserBack",
-                title: constant(String(localized: "command.browserBack.title", defaultValue: "Back")),
-                subtitle: browserPanelSubtitle,
-                shortcutHint: "⌘[",
-                keywords: ["browser", "back", "history"],
-                when: { $0.bool(CommandPaletteContextKeys.panelIsBrowser) }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserForward",
-                title: constant(String(localized: "command.browserForward.title", defaultValue: "Forward")),
-                subtitle: browserPanelSubtitle,
-                shortcutHint: "⌘]",
-                keywords: ["browser", "forward", "history"],
-                when: { $0.bool(CommandPaletteContextKeys.panelIsBrowser) }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserReload",
-                title: constant(String(localized: "command.browserReload.title", defaultValue: "Reload Page")),
-                subtitle: browserPanelSubtitle,
-                shortcutHint: "⌘R",
-                keywords: ["browser", "reload", "refresh"],
-                when: { $0.bool(CommandPaletteContextKeys.panelIsBrowser) }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserOpenDefault",
-                title: constant(String(localized: "command.browserOpenDefault.title", defaultValue: "Open Current Page in Default Browser")),
-                subtitle: browserPanelSubtitle,
-                keywords: ["open", "default", "external", "browser"],
-                when: { $0.bool(CommandPaletteContextKeys.panelIsBrowser) }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserFocusAddressBar",
-                title: constant(String(localized: "command.browserFocusAddressBar.title", defaultValue: "Focus Address Bar")),
-                subtitle: browserPanelSubtitle,
-                shortcutHint: "⌘L",
-                keywords: ["browser", "address", "omnibar", "url"],
-                when: { $0.bool(CommandPaletteContextKeys.panelIsBrowser) }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserFocusMode",
-                title: { context in
-                    context.bool(CommandPaletteContextKeys.panelBrowserFocusModeActive)
-                        ? String(localized: "command.browserFocusMode.exit.title", defaultValue: "Exit Browser Focus Mode")
-                        : String(localized: "command.browserFocusMode.enter.title", defaultValue: "Enter Browser Focus Mode")
-                },
-                subtitle: browserPanelSubtitle,
-                keywords: ["browser", "focus", "mode", "keyboard", "shortcuts", "webview"],
-                when: { $0.bool(CommandPaletteContextKeys.panelIsBrowser) }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserToggleOmnibar",
-                title: { context in
-                    if context.bool(CommandPaletteContextKeys.panelBrowserOmnibarVisible) {
-                        return String(localized: "command.browserHideOmnibar.title", defaultValue: "Hide Browser Omnibar")
-                    }
-                    return String(localized: "command.browserShowOmnibar.title", defaultValue: "Show Browser Omnibar")
-                },
-                subtitle: browserPanelSubtitle,
-                keywords: ["browser", "address", "omnibar", "url", "toolbar", "chrome", "show", "hide"],
-                when: { $0.bool(CommandPaletteContextKeys.panelIsBrowser) }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserToggleDevTools",
-                title: constant(String(localized: "command.browserToggleDevTools.title", defaultValue: "Toggle Developer Tools")),
-                subtitle: browserPanelSubtitle,
-                keywords: ["browser", "devtools", "inspector"],
-                when: { $0.bool(CommandPaletteContextKeys.panelIsBrowser) }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserConsole",
-                title: constant(String(localized: "command.browserConsole.title", defaultValue: "Show JavaScript Console")),
-                subtitle: browserPanelSubtitle,
-                keywords: ["browser", "console", "javascript"],
-                when: { $0.bool(CommandPaletteContextKeys.panelIsBrowser) }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserReactGrab",
-                title: constant(String(localized: "command.browserReactGrab.title", defaultValue: "Toggle React Grab")),
-                subtitle: browserPanelSubtitle,
-                keywords: ["browser", "react", "grab", "inspect", "element"],
-                when: { $0.bool(CommandPaletteContextKeys.panelIsBrowser) }
-            )
-        )
         Self.appendViewZoomCommandContributions(to: &contributions, panelSubtitle: panelSubtitle)
         contributions.append(
             CommandPaletteCommandContribution(
@@ -8106,51 +7511,6 @@ struct ContentView: View {
                 when: { $0.bool(CommandPaletteContextKeys.panelIsMarkdown) }
             )
         )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserClearHistory",
-                title: constant(String(localized: "command.browserClearHistory.title", defaultValue: "Clear Browser History")),
-                subtitle: constant(String(localized: "command.browserClearHistory.subtitle", defaultValue: "Browser")),
-                keywords: ["browser", "history", "clear"],
-                when: { $0.bool(CommandPaletteContextKeys.panelIsBrowser) }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserSplitRight",
-                title: constant(String(localized: "command.browserSplitRight.title", defaultValue: "Split Browser Right")),
-                subtitle: constant(String(localized: "command.browserSplitRight.subtitle", defaultValue: "Browser Layout")),
-                keywords: ["browser", "split", "right"],
-                when: {
-                    $0.bool(CommandPaletteContextKeys.panelIsBrowser) &&
-                    !$0.bool(CommandPaletteContextKeys.browserDisabled)
-                }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserSplitDown",
-                title: constant(String(localized: "command.browserSplitDown.title", defaultValue: "Split Browser Down")),
-                subtitle: constant(String(localized: "command.browserSplitDown.subtitle", defaultValue: "Browser Layout")),
-                keywords: ["browser", "split", "down"],
-                when: {
-                    $0.bool(CommandPaletteContextKeys.panelIsBrowser) &&
-                    !$0.bool(CommandPaletteContextKeys.browserDisabled)
-                }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.browserDuplicateRight",
-                title: constant(String(localized: "command.browserDuplicateRight.title", defaultValue: "Duplicate Browser to the Right")),
-                subtitle: constant(String(localized: "command.browserDuplicateRight.subtitle", defaultValue: "Browser Layout")),
-                keywords: ["browser", "duplicate", "clone", "split"],
-                when: {
-                    $0.bool(CommandPaletteContextKeys.panelIsBrowser) &&
-                    !$0.bool(CommandPaletteContextKeys.browserDisabled)
-                }
-            )
-        )
 
         for target in TerminalDirectoryOpenTarget.commandPaletteShortcutTargets {
             contributions.append(
@@ -8165,30 +7525,6 @@ struct ContentView: View {
                 )
             )
         }
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.vscodeServeWebStop",
-                title: constant(String(localized: "command.vscodeServeWebStop.title", defaultValue: "Stop VS Code Inline Server")),
-                subtitle: terminalPanelSubtitle,
-                keywords: ["vscode", "inline", "serve-web", "stop", "server"],
-                when: { context in
-                    context.bool(CommandPaletteContextKeys.panelIsTerminal)
-                        && context.bool(CommandPaletteContextKeys.terminalOpenTargetAvailable(.vscodeInline))
-                }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.vscodeServeWebRestart",
-                title: constant(String(localized: "command.vscodeServeWebRestart.title", defaultValue: "Restart VS Code Inline Server")),
-                subtitle: terminalPanelSubtitle,
-                keywords: ["vscode", "inline", "serve-web", "restart", "server"],
-                when: { context in
-                    context.bool(CommandPaletteContextKeys.panelIsTerminal)
-                        && context.bool(CommandPaletteContextKeys.terminalOpenTargetAvailable(.vscodeInline))
-                }
-            )
-        )
         contributions.append(
             CommandPaletteCommandContribution(
                 commandId: "palette.findInDirectory",
@@ -8389,30 +7725,6 @@ struct ContentView: View {
         )
         contributions.append(
             CommandPaletteCommandContribution(
-                commandId: "palette.terminalSplitBrowserRight",
-                title: constant(String(localized: "command.terminalSplitBrowserRight.title", defaultValue: "Split Browser Right")),
-                subtitle: constant(String(localized: "command.terminalSplitBrowserRight.subtitle", defaultValue: "Terminal Layout")),
-                keywords: ["terminal", "split", "browser", "right"],
-                when: {
-                    $0.bool(CommandPaletteContextKeys.panelIsTerminal) &&
-                    !$0.bool(CommandPaletteContextKeys.browserDisabled)
-                }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
-                commandId: "palette.terminalSplitBrowserDown",
-                title: constant(String(localized: "command.terminalSplitBrowserDown.title", defaultValue: "Split Browser Down")),
-                subtitle: constant(String(localized: "command.terminalSplitBrowserDown.subtitle", defaultValue: "Terminal Layout")),
-                keywords: ["terminal", "split", "browser", "down"],
-                when: {
-                    $0.bool(CommandPaletteContextKeys.panelIsTerminal) &&
-                    !$0.bool(CommandPaletteContextKeys.browserDisabled)
-                }
-            )
-        )
-        contributions.append(
-            CommandPaletteCommandContribution(
                 commandId: "palette.toggleSplitZoom",
                 title: constant(String(localized: "command.toggleSplitZoom.title", defaultValue: "Toggle Pane Zoom")),
                 subtitle: constant(String(localized: "command.toggleSplitZoom.subtitle", defaultValue: "Terminal Layout")),
@@ -8565,39 +7877,11 @@ struct ContentView: View {
     }
 
     private func registerCommandPaletteHandlers(_ registry: inout CommandPaletteHandlerRegistry) {
-        let browserTarget = commandPaletteBrowserActionTarget
-        let browserDispatcher = AppDelegate.shared.map {
-            BrowserActionDispatcher(appDelegate: $0)
-        }
-        let dockBrowserStore = browserTarget.flatMap {
-            AppDelegate.shared?.dock(resolving: $0)
-        }
-        let dockBrowserTarget = dockBrowserStore == nil ? nil : browserTarget
-        let performBrowserAction: (BrowserAction) -> Bool = {
-            action in
-            guard let browserTarget, let browserDispatcher else {
-                return false
-            }
-            return browserDispatcher.perform(action, on: browserTarget)
-        }
-
         registry.register(commandId: "palette.newWorkspace") {
             AppDelegate.shared?.performNewWorkspaceAction(
                 tabManager: tabManager,
                 debugSource: "palette.newWorkspace"
             )
-        }
-        registry.register(commandId: "palette.newBrowserWorkspace") {
-            // Let command-palette dismissal complete first so omnibar focus
-            // is not blocked by the palette visibility guard.
-            DispatchQueue.main.async {
-                _ = tabManager.acquireOptionalWorkspaceIfActive {
-                    AppDelegate.shared?.performNewBrowserWorkspaceAction(
-                        tabManager: tabManager,
-                        debugSource: "palette.newBrowserWorkspace"
-                    )
-                }
-            }
         }
         registerAgentChatCommandPaletteHandler(&registry)
         registry.register(commandId: "palette.openFolder") {
@@ -8616,11 +7900,6 @@ struct ContentView: View {
                 }
             }
         }
-        registry.register(commandId: "palette.openFolderInVSCodeInline") {
-            DispatchQueue.main.async {
-                AppDelegate.shared?.showOpenFolderInInlineVSCodePanel(tabManager: tabManager)
-            }
-        }
         registry.register(commandId: "palette.reopenPreviousSession") {
             if AppDelegate.shared?.reopenPreviousSession() != true {
                 NSSound.beep()
@@ -8637,75 +7916,12 @@ struct ContentView: View {
             AppDelegate.shared?.uninstallCmuxCLIInPath(nil)
         }
         registry.register(commandId: "palette.newTerminalTab") {
-            if let dockBrowserStore, let browserTarget {
-                guard let paneId = dockBrowserStore.paneId(
-                    forPanelId: browserTarget.panelId
-                ), let panelId = dockBrowserStore.newSurface(
-                    kind: .terminal,
-                    inPane: paneId,
-                    sourcePanelId: browserTarget.panelId,
-                    focus: false
-                ) else {
-                    NSSound.beep()
-                    return
-                }
-                dockBrowserStore.focusPanelFromDockInteraction(
-                    panelId,
-                    window: AppDelegate.shared?.mainWindow(for: windowId)
-                )
-                return
-            }
             if !executeConfiguredAction(id: CmuxSurfaceTabBarBuiltInAction.newTerminal.configID) {
                 tabManager.newSurface()
             }
         }
-        registry.register(commandId: "palette.newBrowserTab") {
-            if let dockBrowserStore, let browserTarget {
-                Task { @MainActor in
-                    await Task.yield()
-                    guard let paneId = dockBrowserStore.paneId(
-                        forPanelId: browserTarget.panelId
-                    ),
-                    let panelId = dockBrowserStore.newSurface(
-                        kind: .browser,
-                        inPane: paneId,
-                        sourcePanelId: browserTarget.panelId,
-                        focus: false
-                    ) else {
-                        NSSound.beep()
-                        return
-                    }
-                    dockBrowserStore.focusPanelFromDockInteraction(
-                        panelId,
-                        window: AppDelegate.shared?.mainWindow(for: windowId)
-                    )
-                }
-                return
-            }
-            if executeConfiguredAction(id: CmuxSurfaceTabBarBuiltInAction.newBrowser.configID) {
-                return
-            }
-            // Let command-palette dismissal complete first so omnibar focus
-            // is not blocked by the palette visibility guard.
-            DispatchQueue.main.async {
-                _ = AppDelegate.shared?.openBrowserAndFocusAddressBar()
-            }
-        }
         registry.registerNewSimulatorPane(tabManager: tabManager, windowId: windowId)
         registry.register(commandId: "palette.closeTab") {
-            if let dockBrowserStore, let browserTarget {
-                guard dockBrowserStore.containsPanel(
-                    browserTarget.panelId
-                ) else {
-                    NSSound.beep()
-                    return
-                }
-                _ = dockBrowserStore.closePanel(
-                    browserTarget.panelId,
-                    force: false
-                )
-                return
-            }
             tabManager.closeCurrentPanelWithConfirmation()
         }
         registry.register(commandId: "palette.closeWorkspace") {
@@ -8730,14 +7946,6 @@ struct ContentView: View {
             window.toggleFullScreen(nil)
         }
         registry.register(commandId: "palette.reopenClosedBrowserTab") {
-            if let dockBrowserStore {
-                if !dockBrowserStore.performShortcutCommand(
-                    .reopenClosedPanel
-                ) {
-                    NSSound.beep()
-                }
-                return
-            }
             if let appDelegate = AppDelegate.shared {
                 _ = appDelegate.reopenMostRecentlyClosedItem(preferredTabManager: tabManager)
             } else {
@@ -8790,8 +7998,6 @@ struct ContentView: View {
         }
         registerViewCommandHandlers(&registry)
         registerCanvasCommandHandlers(&registry)
-        registerCloudCommandHandlers(&registry)
-        registerComputerUseCommandPaletteHandlers(&registry)
         registerSavedLayoutCommandHandlers(&registry)
         registry.register(commandId: "palette.showNotifications") {
             AppDelegate.shared?.toggleNotificationsPopover(animated: false)
@@ -8834,41 +8040,11 @@ struct ContentView: View {
 #endif
             GhosttyApp.shared.openConfigurationInTextEdit()
         }
-        registry.register(commandId: "palette.mobileConnect") {
-#if DEBUG
-            cmuxDebugLog("palette.mobileConnect.invoke")
-#endif
-            _ = AppDelegate.shared?.performMobileConnectWorkspaceAction(
-                tabManager: tabManager,
-                preferredWindow: observedWindow,
-                enforceFeatureFlag: false,
-                debugSource: "palette.mobileConnect"
-            )
-        }
-        registerAuthCommandHandlers(&registry)
-        registerProCommandHandlers(&registry)
         registry.register(commandId: "palette.makeDefaultTerminal") {
             DefaultTerminalUserAction.setAsDefault(debugSource: "palette.makeDefaultTerminal")
         }
-        registry.register(commandId: "palette.checkForUpdates") {
-            AppDelegate.shared?.checkForUpdates(nil)
-        }
-        registry.register(commandId: "palette.applyUpdateIfAvailable") {
-            AppDelegate.shared?.applyUpdateIfAvailable(nil)
-        }
-        registry.register(commandId: "palette.attemptUpdate") {
-            AppDelegate.shared?.attemptUpdate(nil)
-        }
         registry.register(commandId: "palette.restartSocketListener") {
             AppDelegate.shared?.restartSocketListener(nil)
-        }
-        registry.register(commandId: "palette.disableBrowser") {
-            guard !BrowserAvailabilitySettings.isManagedByPolicy else { return }
-            BrowserAvailabilitySettings.setDisabled(true)
-        }
-        registry.register(commandId: "palette.enableBrowser") {
-            guard !BrowserAvailabilitySettings.isManagedByPolicy else { return }
-            BrowserAvailabilitySettings.setDisabled(false)
         }
         registerSettingsToggleCommandHandlers(&registry)
 
@@ -8963,24 +8139,12 @@ struct ContentView: View {
             }
             notificationStore.markUnread(forTabId: workspaceId)
         }
-        registerIdentifierCopyCommandHandlers(
-            &registry,
-            dockTarget: dockBrowserTarget
-        )
+        registerIdentifierCopyCommandHandlers(&registry)
 
         registry.register(commandId: "palette.renameTab") {
             beginRenameTabFlow()
         }
         registry.register(commandId: "palette.clearTabName") {
-            if let dockBrowserStore, let browserTarget {
-                if !dockBrowserStore.setDockPanelCustomTitle(
-                    panelId: browserTarget.panelId,
-                    title: nil
-                ) {
-                    NSSound.beep()
-                }
-                return
-            }
             guard let panelContext = focusedPanelContext else {
                 NSSound.beep()
                 return
@@ -8988,33 +8152,9 @@ struct ContentView: View {
             panelContext.workspace.setPanelCustomTitle(panelId: panelContext.panelId, title: nil)
         }
         registry.register(commandId: "palette.moveTabToNewWorkspace") {
-            if dockBrowserStore != nil {
-                guard performBrowserAction(.moveToNewWorkspace) else {
-                    NSSound.beep()
-                    return
-                }
-                return
-            }
             guard moveFocusedPanelToNewWorkspace() else { NSSound.beep(); return }
         }
         registry.register(commandId: "palette.toggleTabPin") {
-            if let dockBrowserStore, let browserTarget {
-                guard let tabId = dockBrowserStore.surfaceId(
-                    forPanelId: browserTarget.panelId
-                ), let tab = dockBrowserStore.bonsplitController.tab(
-                    tabId
-                ) else {
-                    NSSound.beep()
-                    return
-                }
-                if !dockBrowserStore.setDockPanelPinned(
-                    panelId: browserTarget.panelId,
-                    pinned: !tab.isPinned
-                ) {
-                    NSSound.beep()
-                }
-                return
-            }
             guard let panelContext = focusedPanelContext else {
                 NSSound.beep()
                 return
@@ -9025,14 +8165,6 @@ struct ContentView: View {
             )
         }
         registry.register(commandId: "palette.toggleTabUnread") {
-            if let dockBrowserStore, let browserTarget {
-                if !dockBrowserStore.togglePanelUnread(
-                    browserTarget.panelId
-                ) {
-                    NSSound.beep()
-                }
-                return
-            }
             guard let panelContext = focusedPanelContext else {
                 NSSound.beep()
                 return
@@ -9043,94 +8175,21 @@ struct ContentView: View {
                 NSSound.beep()
             }
         }
-        registerSurfaceNavigationCommandHandlers(
-            &registry,
-            dock: dockBrowserStore
-        ) { observedWindow }
-        registry.register(commandId: "palette.openWorkspacePullRequests") {
-            DispatchQueue.main.async {
-                if !openWorkspacePullRequestsInConfiguredBrowser() {
-                    NSSound.beep()
-                }
-            }
-        }
-        registry.register(commandId: "palette.openDiffViewer") {
-            if AppDelegate.shared?.openDiffViewerForFocusedWorkspace(for: tabManager) != true {
-                NSSound.beep()
-            }
-        }
-        registry.register(commandId: "palette.openDirectoryDiffViewer") {
-            if AppDelegate.shared?.openDirectoryDiffViewerForFocusedWorkspace(for: tabManager) != true {
-                NSSound.beep()
-            }
-        }
-
-        registry.register(commandId: "palette.browserBack") {
-            _ = performBrowserAction(.back)
-        }
-        registry.register(commandId: "palette.browserForward") {
-            _ = performBrowserAction(.forward)
-        }
-        registry.register(commandId: "palette.browserReload") {
-            _ = performBrowserAction(.reload)
-        }
-        registry.register(commandId: "palette.browserOpenDefault") {
-            if !performBrowserAction(.openInDefaultBrowser) {
-                NSSound.beep()
-            }
-        }
-        registry.register(commandId: "palette.browserFocusAddressBar") {
-            if !performBrowserAction(.focusAddressBar) {
-                NSSound.beep()
-            }
-        }
-        registry.register(commandId: "palette.browserFocusMode") {
-            if !performBrowserAction(
-                .toggleFocusMode(reason: "commandPalette")
-            ) {
-                NSSound.beep()
-            }
-        }
-        registry.register(commandId: "palette.browserToggleOmnibar") {
-            if !performBrowserAction(.toggleOmnibar) {
-                NSSound.beep()
-            }
-        }
-        registry.register(commandId: "palette.browserToggleDevTools") {
-            if !performBrowserAction(.toggleDeveloperTools) {
-                NSSound.beep()
-            }
-        }
-        registry.register(commandId: "palette.browserConsole") {
-            if !performBrowserAction(.showJavaScriptConsole) {
-                NSSound.beep()
-            }
-        }
-        registry.register(commandId: "palette.browserReactGrab") {
-            if !performBrowserAction(.toggleReactGrab) {
-                NSSound.beep()
-            }
-        }
+        registerSurfaceNavigationCommandHandlers(&registry) { observedWindow }
         registry.register(commandId: "palette.browserZoomIn") {
-            let handled = browserTarget != nil
-                ? performBrowserAction(.zoomIn)
-                : tabManager.zoomInFocusedBrowserOrTextFilePreview()
+            let handled = tabManager.zoomInFocusedTextFilePreview()
             if !handled {
                 NSSound.beep()
             }
         }
         registry.register(commandId: "palette.browserZoomOut") {
-            let handled = browserTarget != nil
-                ? performBrowserAction(.zoomOut)
-                : tabManager.zoomOutFocusedBrowserOrTextFilePreview()
+            let handled = tabManager.zoomOutFocusedTextFilePreview()
             if !handled {
                 NSSound.beep()
             }
         }
         registry.register(commandId: "palette.browserZoomReset") {
-            let handled = browserTarget != nil
-                ? performBrowserAction(.resetZoom)
-                : tabManager.resetZoomFocusedBrowserOrTextFilePreview()
+            let handled = tabManager.resetZoomFocusedTextFilePreview()
             if !handled {
                 NSSound.beep()
             }
@@ -9150,22 +8209,10 @@ struct ContentView: View {
                 NSSound.beep()
             }
         }
-        registry.register(commandId: "palette.browserClearHistory") {
-            BrowserHistoryStore.shared.clearHistory()
-        }
         registry.register(commandId: "palette.findInDirectory") {
             _ = AppDelegate.shared?.focusFileSearchInActiveMainWindow(
                 preferredWindow: NSApp.keyWindow ?? NSApp.mainWindow
             )
-        }
-        registry.register(commandId: "palette.browserSplitRight") {
-            _ = performBrowserAction(.split(.right))
-        }
-        registry.register(commandId: "palette.browserSplitDown") {
-            _ = performBrowserAction(.split(.down))
-        }
-        registry.register(commandId: "palette.browserDuplicateRight") {
-            _ = performBrowserAction(.duplicateRight)
         }
 
         for target in TerminalDirectoryOpenTarget.commandPaletteShortcutTargets {
@@ -9173,14 +8220,6 @@ struct ContentView: View {
                 if !openFocusedDirectory(in: target) {
                     NSSound.beep()
                 }
-            }
-        }
-        registry.register(commandId: "palette.vscodeServeWebStop") {
-            stopInlineVSCodeServeWeb()
-        }
-        registry.register(commandId: "palette.vscodeServeWebRestart") {
-            if !restartInlineVSCodeServeWeb() {
-                NSSound.beep()
             }
         }
         registry.register(commandId: "palette.terminalFind") {
@@ -9251,44 +8290,17 @@ struct ContentView: View {
                 tabManager.createSplit(direction: .down)
             }
         }
-        registry.register(commandId: "palette.terminalSplitBrowserRight") {
-            _ = tabManager.createBrowserSplit(direction: .right)
-        }
-        registry.register(commandId: "palette.terminalSplitBrowserDown") {
-            _ = tabManager.createBrowserSplit(direction: .down)
-        }
         registry.register(commandId: "palette.toggleSplitZoom") {
             if !tabManager.toggleFocusedSplitZoom() {
                 NSSound.beep()
             }
         }
         registry.register(commandId: "palette.toggleFullWidthTab") {
-            if let dockBrowserStore, let browserTarget {
-                if !dockBrowserStore.toggleDockFullWidthTab(
-                    panelId: browserTarget.panelId
-                ) {
-                    NSSound.beep()
-                }
-                return
-            }
             if !tabManager.toggleFocusedFullWidthTab() {
                 NSSound.beep()
             }
         }
         registry.register(commandId: "palette.equalizeSplits") {
-            if let dockBrowserStore {
-                if !dockBrowserStore.performShortcutCommand(
-                    .equalizeSplits
-                ) {
-#if DEBUG
-                    cmuxDebugLog(
-                        "palette.equalizeSplits result=noSplitOrFailed " +
-                            "dock=\(dockBrowserStore.workspaceId)"
-                    )
-#endif
-                }
-                return
-            }
             if let workspace = tabManager.selectedWorkspace, !tabManager.equalizeSplits(tabId: workspace.id) {
 #if DEBUG
                 cmuxDebugLog("palette.equalizeSplits result=noSplitOrFailed workspaceId=\(workspace.id)")
@@ -9549,13 +8561,8 @@ struct ContentView: View {
             terminalPanel = tabManager.tabs.first(where: { $0.id == workspaceId })?
                 .panels[target.panelId] as? TerminalPanel
         case .workspaceDock, .windowDock:
-            let dock = AppDelegate.shared?.dock(
-                resolving: BrowserActionTarget(
-                    host: target.host,
-                    panelId: target.panelId
-                )
-            )
-            terminalPanel = dock?.panels[target.panelId] as? TerminalPanel
+            terminalPanel = commandPaletteDockStore(for: target.host)?
+                .panels[target.panelId] as? TerminalPanel
         }
         guard let terminalPanel else { return false }
         terminalPanel.hostedView.forwardKeyDownToSurface(event); return true
@@ -9801,12 +8808,6 @@ struct ContentView: View {
 #endif
     }
 
-    private func presentFeedbackComposer() {
-        DispatchQueue.main.async {
-            isFeedbackComposerPresented = true
-        }
-    }
-
     static func shouldHandleCommandPaletteRequest(
         observedWindow: NSWindow?,
         requestedWindow: NSWindow?,
@@ -9824,14 +8825,6 @@ struct ContentView: View {
             return mainWindow === observedWindow
         }
         return false
-    }
-
-    static func shouldRestoreBrowserAddressBarAfterCommandPaletteDismiss(
-        focusedPanelIsBrowser: Bool,
-        focusedBrowserAddressBarPanelId: UUID?,
-        focusedPanelId: UUID?
-    ) -> Bool {
-        focusedPanelIsBrowser && focusedBrowserAddressBarPanelId == focusedPanelId
     }
 
     static func commandPalettePostRunRestoreFocusIntent(forCommandId commandId: String) -> PanelFocusIntent? {
@@ -9888,24 +8881,7 @@ struct ContentView: View {
     private func presentCommandPalette(initialQuery: String) {
         refreshCachedDefaultTerminalStatus(refreshSearchCorpusIfPresented: false)
         commandPaletteFocusRestoreCoordinator.clear()
-        let browserTarget = AppDelegate.shared?.focusedBrowserActionTarget(
-            preferredWindow: observedWindow ?? NSApp.keyWindow
-                ?? NSApp.mainWindow
-        )
-        commandPaletteBrowserActionTarget = browserTarget
-        if let browserTarget,
-           let browserPanel = AppDelegate.shared?.browserPanel(
-               resolving: browserTarget
-           ) {
-            commandPaletteRestoreFocusTarget =
-                CommandPaletteRestoreFocusTarget(
-                    host: browserTarget.host,
-                    panelId: browserTarget.panelId,
-                    intent: browserPanel.captureFocusIntent(
-                        in: observedWindow
-                    )
-                )
-        } else if let panelContext = focusedPanelContext {
+        if let panelContext = focusedPanelContext {
             commandPaletteRestoreFocusTarget = CommandPaletteRestoreFocusTarget(
                 workspaceId: panelContext.workspace.id,
                 panelId: panelContext.panelId,
@@ -9955,7 +8931,7 @@ struct ContentView: View {
         }
 
         // Other local monitors have no ordering contract. Reconcile a clicked
-        // terminal/browser target directly after hiding the overlay; the returned
+        // terminal target directly after hiding the overlay; the returned
         // mouse-down can still replace this provisional focus during dispatch.
         let clickedFocusTarget = commandPalettePointerFocusTarget(
             atWindowPoint: event.locationInWindow,
@@ -9980,34 +8956,6 @@ struct ContentView: View {
                 panelId: panelId,
                 intent: workspace.panels[panelId]?.captureFocusIntent(in: window) ?? .terminal(.surface)
             )
-        }
-
-        guard let webView = BrowserWindowPortalRegistry.webViewAtWindowPoint(windowPoint, in: window) else {
-            return nil
-        }
-        if let app = AppDelegate.shared,
-           let browserPanel = app.browserPanel(owning: webView),
-           let target = app.browserActionTarget(for: browserPanel) {
-            return CommandPaletteRestoreFocusTarget(
-                host: target.host,
-                panelId: target.panelId,
-                intent: browserPanel.captureFocusIntent(in: window)
-            )
-        }
-        let selectedWorkspaceId = tabManager.selectedTabId
-        let orderedWorkspaces = tabManager.tabs.filter { $0.id == selectedWorkspaceId }
-            + tabManager.tabs.filter { $0.id != selectedWorkspaceId }
-        for workspace in orderedWorkspaces {
-            for (panelId, panel) in workspace.panels {
-                guard let browserPanel = panel as? BrowserPanel, browserPanel.webView === webView else {
-                    continue
-                }
-                return CommandPaletteRestoreFocusTarget(
-                    workspaceId: workspace.id,
-                    panelId: panelId,
-                    intent: panel.captureFocusIntent(in: window)
-                )
-            }
         }
         return nil
     }
@@ -10056,7 +9004,6 @@ struct ContentView: View {
         isCommandPaletteSearchFocused = false
         isCommandPaletteRenameFocused = false
         commandPaletteRestoreFocusTarget = nil
-        commandPaletteBrowserActionTarget = nil
         commandPaletteSearchCorpus = []
         commandPaletteSearchCorpusByID = [:]
         commandPaletteSearchCommandsByID = [:]
@@ -10099,8 +9046,8 @@ struct ContentView: View {
             preferredWindow: observedWindow
         )
         let currentHost: PanelHost?
-        if let activeDock, let app = AppDelegate.shared {
-            currentHost = app.panelHost(for: activeDock)
+        if let activeDock {
+            currentHost = commandPalettePanelHost(for: activeDock)
         } else {
             currentHost = tabManager.selectedTabId.map(PanelHost.workspace)
         }
@@ -10117,12 +9064,7 @@ struct ContentView: View {
             }
             targetPanelExists = workspace.panels[target.panelId] != nil
         case .workspaceDock, .windowDock:
-            guard let dock = AppDelegate.shared?.dock(
-                resolving: BrowserActionTarget(
-                    host: target.host,
-                    panelId: target.panelId
-                )
-            ) else {
+            guard let dock = commandPaletteDockStore(for: target.host) else {
                 commandPaletteFocusRestoreCoordinator.clear()
                 return
             }
@@ -10153,12 +9095,7 @@ struct ContentView: View {
             panel = tabManager.tabs.first(where: { $0.id == workspaceId })?
                 .panels[target.panelId]
         case .workspaceDock, .windowDock:
-            let dock = AppDelegate.shared?.dock(
-                resolving: BrowserActionTarget(
-                    host: target.host,
-                    panelId: target.panelId
-                )
-            )
+            let dock = commandPaletteDockStore(for: target.host)
             dock?.focusPanelFromDockInteraction(
                 target.panelId,
                 window: observedWindow
@@ -10167,6 +9104,33 @@ struct ContentView: View {
         }
         guard panel?.restoreFocusIntent(target.intent) == true else { return }
         commandPaletteFocusRestoreCoordinator.clear()
+    }
+
+    private func commandPalettePanelHost(for dock: DockSplitStore) -> PanelHost {
+        switch dock.scope {
+        case .workspace:
+            return .workspaceDock(dock.workspaceId)
+        case .global:
+            return .windowDock(dock.workspaceId)
+        }
+    }
+
+    private func commandPaletteDockStore(for host: PanelHost) -> DockSplitStore? {
+        let scope: DockScope
+        let ownerId: UUID
+        switch host {
+        case .workspace:
+            return nil
+        case .workspaceDock(let workspaceId):
+            scope = .workspace
+            ownerId = workspaceId
+        case .windowDock(let windowId):
+            scope = .global
+            ownerId = windowId
+        }
+        return DockSplitStore.liveStores.first {
+            $0.scope == scope && $0.workspaceId == ownerId
+        }
     }
 
 #if DEBUG
@@ -10180,12 +9144,6 @@ struct ContentView: View {
             return "terminal.findField"
         case .terminal(.textBoxInput):
             return "terminal.textBoxInput"
-        case .browser(.webView):
-            return "browser.webView"
-        case .browser(.addressBar):
-            return "browser.addressBar"
-        case .browser(.findField):
-            return "browser.findField"
         case .filePreview(.textEditor):
             return "filePreview.textEditor"
         case .filePreview(.pdfCanvas):
@@ -10471,27 +9429,6 @@ struct ContentView: View {
     }
 
     private func beginRenameTabFlow() {
-        if let browserTarget = commandPaletteBrowserActionTarget,
-           let dock = AppDelegate.shared?.dock(
-               resolving: browserTarget
-           ) {
-            guard let tabId = dock.surfaceId(
-                forPanelId: browserTarget.panelId
-            ), let tab = dock.bonsplitController.tab(tabId) else {
-                NSSound.beep()
-                return
-            }
-            startRenameFlow(
-                CommandPaletteRenameTarget(
-                    kind: .tab(
-                        workspaceId: dock.workspaceId,
-                        panelId: browserTarget.panelId
-                    ),
-                    currentName: tab.title
-                )
-            )
-            return
-        }
         guard let panelContext = focusedPanelContext else {
             NSSound.beep()
             return
@@ -10554,16 +9491,7 @@ struct ContentView: View {
         case .workspace(let workspaceId):
             tabManager.setCustomTitle(tabId: workspaceId, title: normalizedName)
         case .tab(let workspaceId, let panelId):
-            if let browserTarget = commandPaletteBrowserActionTarget,
-               browserTarget.panelId == panelId,
-               let dock = AppDelegate.shared?.dock(
-                   resolving: browserTarget
-               ), dock.setDockPanelCustomTitle(
-                   panelId: panelId,
-                   title: normalizedName
-               ) {
-                break
-            } else if let workspace = tabManager.tabs.first(where: {
+            if let workspace = tabManager.tabs.first(where: {
                 $0.id == workspaceId
             }) {
                 workspace.setPanelCustomTitle(
@@ -10625,31 +9553,6 @@ struct ContentView: View {
         dismissCommandPalette()
     }
 
-    private func openWorkspacePullRequestsInConfiguredBrowser() -> Bool {
-        guard let workspace = tabManager.selectedWorkspace else { return false }
-        let pullRequests = workspace.sidebarPullRequestsInDisplayOrder()
-        guard !pullRequests.isEmpty else { return false }
-
-        var openedCount = 0
-        if BrowserLinkOpenSettings.openSidebarPullRequestLinksInCmuxBrowser() {
-            for pullRequest in pullRequests {
-                if tabManager.openBrowser(url: pullRequest.url, insertAtEnd: true) != nil {
-                    openedCount += 1
-                } else if NSWorkspace.shared.open(pullRequest.url) {
-                    openedCount += 1
-                }
-            }
-            return openedCount > 0
-        }
-
-        for pullRequest in pullRequests {
-            if NSWorkspace.shared.open(pullRequest.url) {
-                openedCount += 1
-            }
-        }
-        return openedCount > 0
-    }
-
     private func openFocusedDirectory(in target: TerminalDirectoryOpenTarget) -> Bool {
         guard let directoryURL = focusedTerminalDirectoryURL() else { return false }
         return openFocusedDirectory(directoryURL, in: target)
@@ -10660,34 +9563,12 @@ struct ContentView: View {
         case .finder:
             NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: directoryURL.path)
             return true
-        case .vscodeInline:
-            return openFocusedDirectoryInInlineVSCode(directoryURL)
         default:
             guard let applicationURL = target.applicationURL() else { return false }
             let configuration = NSWorkspace.OpenConfiguration()
             NSWorkspace.shared.open([directoryURL], withApplicationAt: applicationURL, configuration: configuration)
             return true
         }
-    }
-
-    private func openFocusedDirectoryInInlineVSCode(_ directoryURL: URL) -> Bool {
-        AppDelegate.shared?.openDirectoryInInlineVSCode(directoryURL, tabManager: tabManager) ?? false
-    }
-
-    private func stopInlineVSCodeServeWeb() {
-        VSCodeServeWebController.shared.stop()
-    }
-
-    private func restartInlineVSCodeServeWeb() -> Bool {
-        guard let vscodeApplicationURL = TerminalDirectoryOpenTarget.vscodeInline.applicationURL() else {
-            return false
-        }
-        VSCodeServeWebController.shared.restart(vscodeApplicationURL: vscodeApplicationURL) { serveWebURL in
-            if serveWebURL == nil {
-                NSSound.beep()
-            }
-        }
-        return true
     }
 
     private func focusedTerminalDirectoryURL() -> URL? {
@@ -10702,7 +9583,6 @@ struct ContentView: View {
                     return requestedDirectory
                 }
             }
-            guard !workspace.isRemoteWorkspace else { return "" }
             return workspace.currentDirectory
         }()
         let trimmed = rawDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -11137,7 +10017,6 @@ struct VerticalTabsSidebar: View, Equatable {
     static func == (lhs: VerticalTabsSidebar, rhs: VerticalTabsSidebar) -> Bool {
         lhs.windowId == rhs.windowId
             && lhs.observedWindowReference.window === rhs.observedWindowReference.window
-            && lhs.updateViewModel === rhs.updateViewModel
             && lhs.fileExplorerState === rhs.fileExplorerState
             && lhs.featureFlags === rhs.featureFlags
             && lhs.sidebarUnread === rhs.sidebarUnread
@@ -11146,14 +10025,12 @@ struct VerticalTabsSidebar: View, Equatable {
             && lhs.chromeBackgroundColor.isEqual(rhs.chromeBackgroundColor)
     }
 
-    var updateViewModel: UpdateStateModel
     @ObservedObject var fileExplorerState: FileExplorerState
     var featureFlags: CmuxFeatureFlags = .shared
     var isPresented: Bool = true
     let sidebarUnread: SidebarUnreadModel
     let titlebarControlsLayoutModel: TitlebarControlsLayoutModel
     let windowId: UUID
-    let onSendFeedback: () -> Void
     let onToggleSidebar: () -> Void
     let onNewTab: () -> Void
     let observedWindowReference: WeakWindowReference
@@ -11539,9 +10416,6 @@ struct VerticalTabsSidebar: View, Equatable {
         let workspaceById: [UUID: Workspace]
         let workspaceGroupIdByWorkspaceId: [UUID: UUID?]
         let selectedContextTargetIds: [UUID]
-        let selectedRemoteContextMenuWorkspaceIds: [UUID]
-        let allSelectedRemoteContextMenuTargetsConnecting: Bool
-        let allSelectedRemoteContextMenuTargetsDisconnected: Bool
         let workspaceGroups: [WorkspaceGroup]
         let workspaceGroupById: [UUID: WorkspaceGroup]
         let memberWorkspaceIdsByGroupId: [UUID: [UUID]]
@@ -11646,16 +10520,6 @@ struct VerticalTabsSidebar: View, Equatable {
         )
         let orderedSelectedTabs = tabs.filter { selectedTabIds.contains($0.id) }
         let selectedContextTargetIds = orderedSelectedTabs.map(\.id)
-        let selectedRemoteContextMenuTargets = orderedSelectedTabs.filter {
-            $0.isRemoteWorkspace && !$0.isManagedCloudVMWorkspace
-        }
-        let selectedRemoteContextMenuWorkspaceIds = selectedRemoteContextMenuTargets.map(\.id)
-        let allSelectedRemoteContextMenuTargetsConnecting = !selectedRemoteContextMenuTargets.isEmpty &&
-            selectedRemoteContextMenuTargets.allSatisfy {
-                $0.remoteConnectionState == .connecting || $0.remoteConnectionState == .reconnecting
-            }
-        let allSelectedRemoteContextMenuTargetsDisconnected = !selectedRemoteContextMenuTargets.isEmpty &&
-            selectedRemoteContextMenuTargets.allSatisfy { $0.remoteConnectionState == .disconnected }
         let workspaceGroups = isPresented ? tabManager.workspaceGroups : []
         let workspaceGroupById = Dictionary(uniqueKeysWithValues: workspaceGroups.map { ($0.id, $0) })
         let workspaceGroupIdByWorkspaceId = SidebarWorkspaceRenderItem.effectiveGroupIdByWorkspaceId(
@@ -11720,9 +10584,6 @@ struct VerticalTabsSidebar: View, Equatable {
             workspaceById: workspaceById,
             workspaceGroupIdByWorkspaceId: workspaceGroupIdByWorkspaceId,
             selectedContextTargetIds: selectedContextTargetIds,
-            selectedRemoteContextMenuWorkspaceIds: selectedRemoteContextMenuWorkspaceIds,
-            allSelectedRemoteContextMenuTargetsConnecting: allSelectedRemoteContextMenuTargetsConnecting,
-            allSelectedRemoteContextMenuTargetsDisconnected: allSelectedRemoteContextMenuTargetsDisconnected,
             workspaceGroups: workspaceGroups,
             workspaceGroupById: workspaceGroupById,
             memberWorkspaceIdsByGroupId: memberWorkspaceIdsByGroupId,
@@ -11739,10 +10600,8 @@ struct VerticalTabsSidebar: View, Equatable {
             }
             if isPresented {
                 SidebarFooter(
-                    updateViewModel: updateViewModel,
                     fileExplorerState: fileExplorerState,
-                    modifierKeyMonitor: modifierKeyMonitor,
-                    onSendFeedback: onSendFeedback
+                    modifierKeyMonitor: modifierKeyMonitor
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -12266,7 +11125,7 @@ struct VerticalTabsSidebar: View, Equatable {
             selectedContextTargetIds: renderContext.selectedContextTargetIds,
             anchorWorkspaceIds: Set(renderContext.workspaceGroups.compactMap(\.liveAnchorWorkspaceId)),
             workspaceGroupMenuSnapshot: renderContext.workspaceGroupMenuSnapshot,
-            canCreateEmptyGroup: tabManager.selectedTab?.isRemoteTmuxMirror != true,
+            canCreateEmptyGroup: true,
             notificationIndex: notificationIndex
         )
         return renderContext.workspaceRenderItems.compactMap { item -> SidebarWorkspaceTableRowConfiguration? in
@@ -12306,14 +11165,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 tabManager.closeWorkspaceWithConfirmation(workspace)
             },
             createWorkspaceAtEnd: {
-                if tabManager.selectedTab?.isRemoteTmuxMirror == true {
-                    _ = AppDelegate.shared?.performNewWorkspaceAction(
-                        tabManager: tabManager,
-                        debugSource: "sidebar.emptyArea.remoteTmux"
-                    )
-                } else {
-                    tabManager.addWorkspaceIfActive(placementOverride: .end)
-                }
+                tabManager.addWorkspaceIfActive(placementOverride: .end)
                 if let selectedId = tabManager.selectedTabId {
                     selectedTabIds = [selectedId]
                     lastSidebarSelectionIndex = tabManager.tabs.firstIndex { $0.id == selectedId }
@@ -12523,9 +11375,6 @@ struct VerticalTabsSidebar: View, Equatable {
             notificationStore: notificationStore,
             index: input.index,
             contextMenuWorkspaceIds: rowSnapshot.contextMenu.targetWorkspaceIds,
-            remoteContextMenuWorkspaceIds: rowSnapshot.contextMenu.remoteTargetWorkspaceIds,
-            allRemoteContextMenuTargetsConnecting: rowSnapshot.contextMenu.allRemoteTargetsConnecting,
-            allRemoteContextMenuTargetsDisconnected: rowSnapshot.contextMenu.allRemoteTargetsDisconnected,
             contextMenuPinState: rowSnapshot.contextMenu.pinState,
             workspaceGroupMenuSnapshot: rowSnapshot.contextMenu.groupMenuSnapshot,
             colorScheme: environment.colorScheme,
@@ -12539,19 +11388,6 @@ struct VerticalTabsSidebar: View, Equatable {
             setSelectionToTabs: { selection = .tabs },
             snapshotProvider: { [snapshot = input.workspace] in snapshot }
         )
-        let openInBrowser: @MainActor (URL, Bool) -> Void = { [weak tabManager, workspaceId = tab.id] url, preferBrowser in
-            if preferBrowser,
-               let tabManager,
-               tabManager.openBrowser(
-                   inWorkspace: workspaceId,
-                   url: url,
-                   preferSplitRight: true,
-                   insertAtEnd: true
-               ) != nil {
-                return
-            }
-            NSWorkspace.shared.open(url)
-        }
         let rowActions = SidebarAppKitRowActions(
             commands: commands,
             onOpenStatusURL: { url in
@@ -12560,12 +11396,9 @@ struct VerticalTabsSidebar: View, Equatable {
             onOpenWorkspaceDescriptionURL: { url in
                 NSWorkspace.shared.open(url)
             },
-            onOpenPullRequest: { [prefer = input.settings.openPullRequestLinksInCmuxBrowser] url in
-                openInBrowser(url, prefer)
-            },
-            onOpenPort: { [prefer = input.settings.openPortLinksInCmuxBrowser] port in
+            onOpenPort: { port in
                 guard let url = URL(string: "http://localhost:\(port)") else { return }
-                openInBrowser(url, prefer)
+                NSWorkspace.shared.open(url)
             },
             onToggleChecklistExpansion: { [tabId = tab.id] in
                 if expandedChecklistWorkspaceIds.contains(tabId) {
@@ -12684,7 +11517,6 @@ struct VerticalTabsSidebar: View, Equatable {
 
     private func extensionSidebarScrollArea(renderContext: WorkspaceListRenderContext) -> some View {
         extensionSidebarScrollAreaContent(renderContext: renderContext)
-            .sidebarCloudBindingObservations(ids: renderContext.workspaceIds, models: renderContext.tabs.map(\.cloudBindingState)) { refreshExtensionSidebarSnapshot() }
             .sidebarProcessTitleObservations(ids: renderContext.workspaceIds, models: renderContext.tabs.map(\.sidebarProcessTitleObservation)) { refreshExtensionSidebarSnapshot() }
             .onAppear { refreshExtensionSidebarObservationPublishers(tabs: renderContext.tabs) }
             .onChange(of: renderContext.workspaceIds) { _, _ in
@@ -13129,30 +11961,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 tabManager.selectWorkspace(workspace)
             }
             let panel = workspace.newTerminalSurfaceInFocusedPane(focus: true, initialInput: nil)
-            if panel == nil, workspace.isRemoteTmuxMirror {
-                // Routed to the remote as a tmux `new-window`; the tab arrives
-                // asynchronously via the mirror, so this is success, not failure.
-                return CmuxSidebarActionResult(
-                    accepted: true,
-                    message: String(localized: "sidebar.extensions.action.remoteTmuxWindowRequested", defaultValue: "Remote tmux window requested")
-                )
-            }
             return panel.map { CmuxSidebarActionResult(accepted: true, message: $0.id.uuidString) }
-                ?? .rejected(String(localized: "sidebar.extensions.action.surfaceCreateRejected", defaultValue: "Surface could not be created"))
-
-        case .createBrowserSurface(let workspaceId, let urlString):
-            let validatedURL = cmuxSidebarExtensionOptionalHTTPURL(from: urlString)
-            guard validatedURL.accepted else {
-                return .rejected(String(localized: "sidebar.extensions.action.urlRejected", defaultValue: "URL could not be opened"))
-            }
-            guard let workspace = workspaceId.flatMap({ id in tabManager.tabs.first(where: { $0.id == id }) }) ?? tabManager.selectedWorkspace else {
-                return .rejected(String(localized: "sidebar.extensions.action.workspaceNotFound", defaultValue: "Workspace not found"))
-            }
-            if tabManager.selectedTabId != workspace.id {
-                tabManager.selectWorkspace(workspace)
-            }
-            let panelId = tabManager.createBrowserSplit(direction: .right, url: validatedURL.url)
-            return panelId.map { CmuxSidebarActionResult(accepted: true, message: $0.uuidString) }
                 ?? .rejected(String(localized: "sidebar.extensions.action.surfaceCreateRejected", defaultValue: "Surface could not be created"))
 
         case .selectSurface(let workspaceId, let surfaceId):
@@ -13189,22 +11998,6 @@ struct VerticalTabsSidebar: View, Equatable {
             }
             return CmuxSidebarActionResult(accepted: true, message: outcome.panel?.id.uuidString)
 
-        case .splitBrowser(let workspaceId, let surfaceId, let direction, let urlString):
-            let validatedURL = cmuxSidebarExtensionOptionalHTTPURL(from: urlString)
-            guard validatedURL.accepted else {
-                return .rejected(String(localized: "sidebar.extensions.action.urlRejected", defaultValue: "URL could not be opened"))
-            }
-            guard let splitDirection = splitDirection(from: direction),
-                  let tab = tabManager.tabs.first(where: { $0.id == workspaceId }),
-                  tab.panels[surfaceId] != nil else {
-                return .rejected(String(localized: "sidebar.extensions.action.surfaceCreateRejected", defaultValue: "Surface could not be created"))
-            }
-            tabManager.selectWorkspace(tab)
-            tab.focusPanel(surfaceId)
-            let panelId = tabManager.createBrowserSplit(direction: splitDirection, url: validatedURL.url)
-            return panelId.map { CmuxSidebarActionResult(accepted: true, message: $0.uuidString) }
-                ?? .rejected(String(localized: "sidebar.extensions.action.surfaceCreateRejected", defaultValue: "Surface could not be created"))
-
         case .toggleSurfaceZoom(let workspaceId, let surfaceId):
             guard tabManager.toggleSplitZoom(tabId: workspaceId, surfaceId: surfaceId) else {
                 return .rejected(String(localized: "sidebar.extensions.action.surfaceNotFound", defaultValue: "Surface not found"))
@@ -13221,16 +12014,6 @@ struct VerticalTabsSidebar: View, Equatable {
             }
             return .accepted
         }
-    }
-
-    private func cmuxSidebarExtensionOptionalHTTPURL(from urlString: String?) -> (url: URL?, accepted: Bool) {
-        guard let urlString, !urlString.isEmpty else {
-            return (nil, true)
-        }
-        guard let url = cmuxSidebarExtensionRequiredHTTPURL(from: urlString) else {
-            return (nil, false)
-        }
-        return (url, true)
     }
 
     private func cmuxSidebarExtensionRequiredHTTPURL(from urlString: String) -> URL? {
@@ -13284,14 +12067,13 @@ struct VerticalTabsSidebar: View, Equatable {
             rootPath: rootPath,
             projectRootPath: workspace.extensionSidebarProjectRootPath,
             branchSummary: workspace.sidebarGitBranchesInDisplayOrder().first?.branch,
-            remoteDisplayTarget: workspace.remoteDisplayTarget,
-            remoteConnectionState: workspace.remoteConnectionState.rawValue,
+            remoteDisplayTarget: nil,
+            remoteConnectionState: nil,
             unreadCount: unreadSnapshot.unreadCount(forWorkspaceId: workspace.id),
             latestNotificationText: unreadSnapshot.latestNotificationText(forWorkspaceId: workspace.id),
             latestSubmittedMessage: workspace.latestSubmittedMessage,
             latestSubmittedAt: workspace.latestSubmittedAt,
             listeningPorts: workspace.listeningPorts,
-            pullRequestURLs: workspace.sidebarPullRequestsInDisplayOrder().map { $0.url.absoluteString },
             panelDirectories: workspace.sidebarFilesystemDirectoriesInDisplayOrder(),
             gitBranches: workspace.sidebarGitBranchesInDisplayOrder().map {
                 CmuxSidebarProviderGitBranch(branch: $0.branch, isDirty: $0.isDirty)
@@ -14002,7 +12784,7 @@ struct VerticalTabsSidebar: View, Equatable {
             selectedContextTargetIds: renderContext.selectedContextTargetIds,
             anchorWorkspaceIds: Set(renderContext.workspaceGroups.compactMap(\.liveAnchorWorkspaceId)),
             workspaceGroupMenuSnapshot: renderContext.workspaceGroupMenuSnapshot,
-            canCreateEmptyGroup: tabManager.selectedTab?.isRemoteTmuxMirror != true,
+            canCreateEmptyGroup: true,
             notificationIndex: notificationIndex
         )
         let actionFactory = makeWorkspaceRowActionFactory()
@@ -14758,37 +13540,25 @@ struct VerticalTabsSidebar: View, Equatable {
         syncWorkspaceRowSelectionAfterMutation()
     }
 
-    private func openWorkspaceRowPullRequest(
+    private func openWorkspaceRowLink(
         _ url: URL,
         workspace: Workspace,
-        index: Int,
-        opensInCmuxBrowser: Bool
+        index: Int
     ) {
         selectWorkspaceRow(workspace, index: index, modifiers: NSEvent.modifierFlags)
-        if opensInCmuxBrowser,
-           tabManager.openBrowser(
-               inWorkspace: workspace.id,
-               url: url,
-               preferSplitRight: true,
-               insertAtEnd: true
-           ) != nil {
-            return
-        }
         NSWorkspace.shared.open(url)
     }
 
     private func openWorkspaceRowPort(
         _ port: Int,
         workspace: Workspace,
-        index: Int,
-        opensInCmuxBrowser: Bool
+        index: Int
     ) {
         guard let url = URL(string: "http://localhost:\(port)") else { return }
-        openWorkspaceRowPullRequest(
+        openWorkspaceRowLink(
             url,
             workspace: workspace,
-            index: index,
-            opensInCmuxBrowser: opensInCmuxBrowser
+            index: index
         )
     }
 
@@ -14905,8 +13675,6 @@ struct VerticalTabsSidebar: View, Equatable {
             isChecklistExpanded: expandedChecklistWorkspaceIds.contains(tab.id),
             checklistAddFieldActivationToken: checklistAddFieldActivationTokens[tab.id] ?? 0,
             isChecklistPopoverPresented: checklistPopoverWorkspaceId == tab.id,
-            isRemoteContextMenuEligible: tab.isRemoteWorkspace && !tab.isManagedCloudVMWorkspace,
-            remoteConnectionState: tab.remoteConnectionState,
             contextMenuPinState: contextMenuPinState,
             inferredTaskStatus: workspaceSnapshot.taskStatusInput.inferred,
             activeTodoOverride: workspaceSnapshot.taskStatusInput.activeOverride,
@@ -14924,7 +13692,6 @@ struct VerticalTabsSidebar: View, Equatable {
         return { input in
         let tabId = input.workspaceId
         let index = input.index
-        let settings = input.settings
         let rowId = SidebarWorkspaceRenderItemID.workspace(tabId)
         let workspace: @MainActor () -> Workspace? = {
             tabManager.tabs.first { $0.id == tabId }
@@ -15084,18 +13851,6 @@ struct VerticalTabsSidebar: View, Equatable {
                     tabManager.removeWorkspaceFromGroup(workspaceId: workspaceId)
                 }
             },
-            reconnectTargets: { workspaceIds in
-                for workspaceId in workspaceIds {
-                    tabManager.tabs.first { $0.id == workspaceId }?
-                        .reconnectRemoteConnection()
-                }
-            },
-            disconnectTargets: { workspaceIds in
-                for workspaceId in workspaceIds {
-                    tabManager.tabs.first { $0.id == workspaceId }?
-                        .disconnectRemoteConnection(clearConfiguration: false)
-                }
-            },
             applyColor: { hex, workspaceIds in
                 tabManager.applyWorkspaceColor(hex, toWorkspaceIds: workspaceIds)
             },
@@ -15151,22 +13906,12 @@ struct VerticalTabsSidebar: View, Equatable {
                     resolvingStableIdsFrom: tabManager.tabs
                 )
             },
-            openPullRequest: { url in
-                guard let tab = workspace() else { return }
-                openWorkspaceRowPullRequest(
-                    url,
-                    workspace: tab,
-                    index: index,
-                    opensInCmuxBrowser: settings.openPullRequestLinksInCmuxBrowser
-                )
-            },
             openPort: { port in
                 guard let tab = workspace() else { return }
                 openWorkspaceRowPort(
                     port,
                     workspace: tab,
-                    index: index,
-                    opensInCmuxBrowser: settings.openPortLinksInCmuxBrowser
+                    index: index
                 )
             },
             checklist: checklistActions,
@@ -15259,16 +14004,14 @@ struct SidebarWorkspaceRowFramePreferenceKey: PreferenceKey {
 }
 
 private struct SidebarFooter: View {
-    var updateViewModel: UpdateStateModel
     @ObservedObject var fileExplorerState: FileExplorerState
     let modifierKeyMonitor: WindowScopedShortcutHintModifierMonitor
-    let onSendFeedback: () -> Void
 
     var body: some View {
 #if DEBUG
-        SidebarDevFooter(updateViewModel: updateViewModel, fileExplorerState: fileExplorerState, modifierKeyMonitor: modifierKeyMonitor, onSendFeedback: onSendFeedback)
+        SidebarDevFooter(fileExplorerState: fileExplorerState, modifierKeyMonitor: modifierKeyMonitor)
 #else
-        SidebarFooterButtons(updateViewModel: updateViewModel, fileExplorerState: fileExplorerState, modifierKeyMonitor: modifierKeyMonitor, onSendFeedback: onSendFeedback)
+        SidebarFooterButtons(fileExplorerState: fileExplorerState, modifierKeyMonitor: modifierKeyMonitor)
             .padding(.leading, 6)
             .padding(.trailing, 10)
             .padding(.bottom, 6)
@@ -15277,12 +14020,8 @@ private struct SidebarFooter: View {
 }
 
 struct SidebarFooterButtons: View {
-    var updateViewModel: UpdateStateModel
     @ObservedObject var fileExplorerState: FileExplorerState
     let modifierKeyMonitor: WindowScopedShortcutHintModifierMonitor
-    let onSendFeedback: () -> Void
-    @State private var extensionBrowserAnchorView: NSView?
-    @LiveSetting(\.betaFeatures.extensions) private var extensionsExperimentalEnabled
     // Reuse the exact Command-hold shortcut-hint signal that drives the per-row
     // shortcut badges (`showModifierHoldHints && modifierKeyMonitor.isModifierPressed`,
     // see `resolvedShowsModifierShortcutHints`). Reading `isModifierPressed`
@@ -15304,49 +14043,18 @@ struct SidebarFooterButtons: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            if shows(.account) || shows(.mobileConnect) || shows(.help) {
+            if shows(.help) {
                 HStack(spacing: 0) {
-                    if shows(.account), CmuxFeatureFlags.shared.isSidebarAccountButtonEnabled {
-                        SidebarAccountMenuButton()
-                    }
-                    if shows(.mobileConnect), CmuxFeatureFlags.shared.isMobileConnectButtonEnabled {
-                        SidebarMobileConnectButton()
-                    }
                     if shows(.help) {
-                        SidebarHelpMenuButton(onSendFeedback: onSendFeedback)
+                        SidebarHelpMenuButton()
                     }
                 }
             }
-            // Command-hold reveal: appears immediately before Upgrade. It stays
+            // Command-hold reveal: appears after the help controls. It stays
             // mounted while its popover is open so releasing ⌘ does not dismiss it.
             if shows(.shortcutDiscovery),
                (showModifierHoldHints && modifierKeyMonitor.isModifierPressed) || isShortcutPopoverPresented {
                 ShortcutDiscoveryButton(isPopoverPresented: $isShortcutPopoverPresented)
-            }
-            if shows(.upgrade) {
-                SidebarProBadge()
-            }
-            // The puzzle button opens the extensions browser; it only shows
-            // while the experimental Extensions feature is enabled.
-            if shows(.extensions), extensionsExperimentalEnabled {
-                Button {
-                    _ = AppDelegate.shared?.openSidebarExtensionBrowser(
-                        from: extensionBrowserAnchorView,
-                        title: String(localized: "sidebar.extensions.browser.title", defaultValue: "Sidebar Extensions")
-                    )
-                } label: {
-                    CmuxSystemSymbolImage(magnified: "puzzlepiece.extension", pointSize: 12, weight: .medium, tint: Color(nsColor: .secondaryLabelColor))
-                        .frame(width: 22, height: 22, alignment: .center)
-                }
-                .buttonStyle(SidebarFooterIconButtonStyle())
-                .frame(width: 22, height: 22, alignment: .center)
-                .safeHelp(String(localized: "sidebar.extensions.browser.title", defaultValue: "Sidebar Extensions"))
-                .accessibilityLabel(String(localized: "sidebar.extensions.browser.title", defaultValue: "Sidebar Extensions"))
-                .accessibilityIdentifier("SidebarExtensionMenuButton")
-                .background(TitlebarControlAnchorView { extensionBrowserAnchorView = $0 })
-            }
-            if shows(.update), let updateActionsHost = AppDelegate.shared {
-                UpdatePill(model: updateViewModel, accent: cmuxAccentColor(), actions: updateActionsHost)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -15354,16 +14062,12 @@ struct SidebarFooterButtons: View {
 }
 
 private enum SidebarHelpMenuAction {
-    case upgrade
-    case importBrowserData
     case keyboardShortcuts
     case docs
     case changelog
     case github
     case githubIssues
     case discord
-    case checkForUpdates
-    case sendFeedback
     case welcome
 }
 
@@ -15381,10 +14085,6 @@ private struct SidebarHelpMenuButton: View {
     @AppStorage(SidebarFooterHelpIconDebugSettings.weightKey)
     private var debugIconWeight = SidebarFooterHelpIconDebugSettings.defaultWeight.rawValue
 #endif
-    @State private var keyboardShortcutSettingsObserver = KeyboardShortcutSettingsObserver.shared
-
-    let onSendFeedback: () -> Void
-
     @State private var isPopoverPresented = false
 
     private var iconSize: CGFloat {
@@ -15402,11 +14102,6 @@ private struct SidebarHelpMenuButton: View {
 #else
         SidebarFooterCircularIconStyle.standard.weight
 #endif
-    }
-
-    private var sendFeedbackShortcutHint: String {
-        let _ = keyboardShortcutSettingsObserver.revision
-        return KeyboardShortcutSettings.shortcut(for: .sendFeedback).displayString
     }
 
     var body: some View {
@@ -15439,33 +14134,10 @@ private struct SidebarHelpMenuButton: View {
                 accessibilityIdentifier: "SidebarHelpMenuOptionWelcome",
                 isExternalLink: false
             )
-            if CmuxFeatureFlags.shared.isProUpgradeUIEnabled {
-                helpOptionButton(
-                    title: String(localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to cmux Pro…"),
-                    action: .upgrade,
-                    accessibilityIdentifier: "SidebarHelpMenuOptionUpgrade",
-                    isExternalLink: false,
-                    trailingSystemImage: "sparkles"
-                )
-            }
-            helpOptionButton(
-                title: String(localized: "sidebar.help.sendFeedback", defaultValue: "Send Feedback"),
-                action: .sendFeedback,
-                accessibilityIdentifier: "SidebarHelpMenuOptionSendFeedback",
-                isExternalLink: false,
-                shortcutHint: sendFeedbackShortcutHint,
-                trailingSystemImage: "bubble.left.and.text.bubble.right"
-            )
             helpOptionButton(
                 title: String(localized: "settings.section.keyboardShortcuts", defaultValue: "Keyboard Shortcuts"),
                 action: .keyboardShortcuts,
                 accessibilityIdentifier: "SidebarHelpMenuOptionKeyboardShortcuts",
-                isExternalLink: false
-            )
-            helpOptionButton(
-                title: String(localized: "menu.view.importFromBrowser", defaultValue: "Import Browser Data…"),
-                action: .importBrowserData,
-                accessibilityIdentifier: "SidebarHelpMenuOptionImportBrowserData",
                 isExternalLink: false
             )
             if docsURL != nil {
@@ -15508,12 +14180,6 @@ private struct SidebarHelpMenuButton: View {
                     isExternalLink: true
                 )
             }
-            helpOptionButton(
-                title: String(localized: "command.checkForUpdates.title", defaultValue: "Check for Updates"),
-                action: .checkForUpdates,
-                accessibilityIdentifier: "SidebarHelpMenuOptionCheckForUpdates",
-                isExternalLink: false
-            )
         }
         .padding(8)
         .frame(minWidth: 200)
@@ -15568,13 +14234,6 @@ private struct SidebarHelpMenuButton: View {
 
     private func perform(_ action: SidebarHelpMenuAction) {
         switch action {
-        case .upgrade:
-            ProUpgradePresenter.present(source: .sidebarHelpMenu)
-        case .importBrowserData:
-            isPopoverPresented = false
-            DispatchQueue.main.async {
-                BrowserDataImportCoordinator.shared.presentImportDialog()
-            }
         case .keyboardShortcuts:
             isPopoverPresented = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
@@ -15604,13 +14263,6 @@ private struct SidebarHelpMenuButton: View {
         case .discord:
             guard let discordURL else { return }
             NSWorkspace.shared.open(discordURL)
-        case .checkForUpdates:
-            Task { @MainActor in
-                AppDelegate.shared?.checkForUpdates(nil)
-            }
-        case .sendFeedback:
-            isPopoverPresented = false
-            onSendFeedback()
         case .welcome:
             isPopoverPresented = false
             Task { @MainActor in
@@ -15714,10 +14366,6 @@ struct TabItemView: View, Equatable {
 
     private var sidebarShowGitBranchIcon: Bool {
         settings.showsGitBranchIcon
-    }
-
-    private var sidebarShowSSH: Bool {
-        settings.showsSSH
     }
 
     private var activeTabIndicatorStyle: WorkspaceIndicatorStyle {
@@ -15862,55 +14510,6 @@ struct TabItemView: View, Equatable {
         (showsModifierShortcutHints || alwaysShowShortcutHints) && workspaceShortcutLabel != nil
     }
 
-    @ViewBuilder
-    private func remoteWorkspaceSection(
-        snapshot workspaceSnapshot: SidebarWorkspaceSnapshotBuilder.Snapshot
-    ) -> some View {
-        if !settings.hidesAllDetails, sidebarShowSSH, let remoteWorkspaceSidebarText = workspaceSnapshot.remoteWorkspaceSidebarText {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(remoteWorkspaceSidebarText)
-                        .font(magnifiedFont(scaledFontSize(10), design: .monospaced))
-                        .foregroundColor(activeSecondaryColor(0.8))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    Spacer(minLength: 0)
-
-                    Text(workspaceSnapshot.remoteConnectionStatusText)
-                        .font(magnifiedFont(scaledFontSize(9), weight: .medium))
-                        .foregroundColor(activeSecondaryColor(0.58))
-                        .lineLimit(1)
-
-                    if workspaceSnapshot.showsRemoteReconnectAffordance {
-                        Button {
-                            actions.reconnectTargets([workspaceId])
-                        } label: {
-                            Label(
-                                String(localized: "sidebar.remote.reconnect.button", defaultValue: "Reconnect"),
-                                systemImage: "arrow.clockwise"
-                            )
-                            .labelStyle(.titleAndIcon)
-                            .font(magnifiedFont(scaledFontSize(9), weight: .semibold))
-                        }
-                        .buttonStyle(.borderless)
-                        .foregroundColor(activeSecondaryColor(0.9))
-                        .safeHelp(String(
-                            format: String(
-                                localized: "sidebar.remote.reconnect.help",
-                                defaultValue: "Reconnect to %@"
-                            ),
-                            locale: .current,
-                            remoteWorkspaceSidebarText
-                        ))
-                    }
-                }
-            }
-            .padding(.top, latestNotificationText == nil ? 1 : 2)
-            .safeHelp(workspaceSnapshot.remoteStateHelpText)
-        }
-    }
-
     func copyWorkspaceIdsToPasteboard(_ ids: [UUID], includeRefs: Bool = false) {
         WorkspaceSurfaceIdentifierClipboardText.copyWorkspaceIds(ids, includeRefs: includeRefs)
     }
@@ -15996,16 +14595,6 @@ struct TabItemView: View, Equatable {
                         .safeHelp(String(localized: "sidebar.mutedWorkspace.tooltip", defaultValue: "Notifications muted for this workspace"))
                 }
 
-                // Chrome-style media-activity glyphs: a noisy or capturing
-                // background browser pane is surfaced on its workspace row,
-                // styled like the pin indicator. Audio is the must-have signal;
-                // mic/camera follow the macOS orange/green convention.
-                SidebarMediaActivityIndicators(
-                    mediaActivity: workspaceSnapshot.mediaActivity,
-                    symbolPointSize: scaledFontSize(9),
-                    audioColor: activeSecondaryColor(0.8)
-                )
-
                 let manualTaskStatusIndicator = SidebarWorkspaceManualTaskStatusIndicatorModel(
                     featureEnabled: todoControlsEnabled,
                     taskStatus: workspaceSnapshot.taskStatus,
@@ -16028,8 +14617,6 @@ struct TabItemView: View, Equatable {
                     .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
                     .transition(.opacity)
                 }
-
-                SidebarCloudWorkspaceBadgeView(label: workspaceSnapshot.cloudWorkspaceLabel, pointSize: scaledFontSize(10), tint: activeSecondaryColor(0.7))
 
                 if isEditing {
                     SidebarInlineRenameField(
@@ -16102,8 +14689,6 @@ struct TabItemView: View, Equatable {
                 isPopoverPresented: isChecklistPopoverPresented,
                 canAddItems: todoControlsEnabled
             )
-            remoteWorkspaceSection(snapshot: workspaceSnapshot)
-
             if detailVisibility.showsMetadata {
                 let metadataEntries = workspaceSnapshot.metadataEntries
                 let metadataBlocks = workspaceSnapshot.metadataBlocks
@@ -16251,38 +14836,6 @@ struct TabItemView: View, Equatable {
                             color: activeSecondaryColor(0.75),
                             fontScale: fontScale
                         )
-                    }
-                }
-            }
-
-            // Pull request rows
-            if detailVisibility.showsPullRequests, !workspaceSnapshot.pullRequestRows.isEmpty {
-                VStack(alignment: .leading, spacing: 1) {
-                    ForEach(workspaceSnapshot.pullRequestRows) { pullRequest in
-                        let pullRequestNumber = String(pullRequest.number)
-                        let pullRequestTitle = "\(pullRequest.label) #\(pullRequestNumber)"
-                        let rowContent = HStack(alignment: .center, spacing: 4) {
-                            PullRequestStatusIcon(
-                                status: pullRequest.status,
-                                color: pullRequestForegroundColor,
-                                fontScale: fontScale
-                            )
-                            Text(pullRequestTitle).underline(settings.makesPullRequestsClickable).lineLimit(1).truncationMode(.tail)
-                            Text(pullRequestStatusLabel(pullRequest.status)).lineLimit(1)
-                            Spacer(minLength: 0)
-                        }
-                        .font(magnifiedFont(scaledFontSize(10), weight: .semibold))
-                        .foregroundColor(pullRequestForegroundColor)
-                        .opacity(pullRequest.isStale ? 0.5 : 1)
-                        if settings.makesPullRequestsClickable {
-                            Button(action: { openPullRequestLink(pullRequest.url) }) { rowContent }
-                                .buttonStyle(.plain)
-                                .tint(pullRequestForegroundColor)
-                                .safeHelp(String(localized: "sidebar.pullRequest.openTooltip", defaultValue: "Open \(pullRequestTitle)"))
-                                .accessibilityIdentifier("SidebarPullRequestRow")
-                        } else {
-                            rowContent.accessibilityElement(children: .combine).accessibilityIdentifier("SidebarPullRequestRow")
-                        }
                     }
                 }
             }
@@ -16496,24 +15049,8 @@ struct TabItemView: View, Equatable {
         actions.select(NSEvent.modifierFlags)
     }
 
-    private var pullRequestForegroundColor: Color {
-        isActive ? activeSecondaryColor(0.75) : .secondary
-    }
-
-    private func openPullRequestLink(_ url: URL) {
-        actions.openPullRequest(url)
-    }
-
     private func openPortLink(_ port: Int) {
         actions.openPort(port)
-    }
-
-    private func pullRequestStatusLabel(_ status: SidebarPullRequestStatus) -> String {
-        switch status {
-        case .open: return String(localized: "sidebar.pullRequest.statusOpen", defaultValue: "open")
-        case .merged: return String(localized: "sidebar.pullRequest.statusMerged", defaultValue: "merged")
-        case .closed: return String(localized: "sidebar.pullRequest.statusClosed", defaultValue: "closed")
-        }
     }
 
     private func logLevelIcon(_ level: SidebarLogLevel) -> String {
@@ -16560,113 +15097,6 @@ struct TabItemView: View, Equatable {
             return "~" + trimmed.dropFirst(home.count)
         }
         return trimmed
-    }
-
-    private struct PullRequestStatusIcon: View {
-        let status: SidebarPullRequestStatus
-        let color: Color
-        var fontScale: CGFloat = 1
-        private static let closedFrameSize: CGFloat = 12
-        private static let customFrameSize: CGFloat = 13
-
-        private var closedFrameSize: CGFloat {
-            Self.closedFrameSize * fontScale
-        }
-
-        private var customFrameSize: CGFloat {
-            Self.customFrameSize * fontScale
-        }
-
-        var body: some View {
-            switch status {
-            case .open:
-                PullRequestOpenIcon(color: color)
-                    .scaleEffect(fontScale)
-                    .frame(width: customFrameSize, height: customFrameSize)
-            case .merged:
-                PullRequestMergedIcon(color: color)
-                    .scaleEffect(fontScale)
-                    .frame(width: customFrameSize, height: customFrameSize)
-            case .closed:
-                CmuxSystemSymbolImage(magnified: "xmark.circle", pointSize: 7 * fontScale, weight: .regular, tint: color)
-                    .frame(width: closedFrameSize, height: closedFrameSize)
-            }
-        }
-    }
-
-    private struct PullRequestOpenIcon: View {
-        let color: Color
-        private static let stroke = StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round)
-        private static let nodeDiameter: CGFloat = 3.0
-        private static let frameSize: CGFloat = 13
-
-        var body: some View {
-            ZStack {
-                Path { path in
-                    path.move(to: CGPoint(x: 3.0, y: 4.8))
-                    path.addLine(to: CGPoint(x: 3.0, y: 9.2))
-
-                    path.move(to: CGPoint(x: 4.8, y: 3.0))
-                    path.addLine(to: CGPoint(x: 9.4, y: 3.0))
-                    path.addLine(to: CGPoint(x: 11.0, y: 4.6))
-                    path.addLine(to: CGPoint(x: 11.0, y: 9.2))
-                }
-                .stroke(color, style: Self.stroke)
-
-                Circle()
-                    .stroke(color, lineWidth: Self.stroke.lineWidth)
-                    .frame(width: Self.nodeDiameter, height: Self.nodeDiameter)
-                    .position(x: 3.0, y: 3.0)
-
-                Circle()
-                    .stroke(color, lineWidth: Self.stroke.lineWidth)
-                    .frame(width: Self.nodeDiameter, height: Self.nodeDiameter)
-                    .position(x: 3.0, y: 11.0)
-
-                Circle()
-                    .stroke(color, lineWidth: Self.stroke.lineWidth)
-                    .frame(width: Self.nodeDiameter, height: Self.nodeDiameter)
-                    .position(x: 11.0, y: 11.0)
-            }
-            .frame(width: Self.frameSize, height: Self.frameSize)
-        }
-    }
-
-    private struct PullRequestMergedIcon: View {
-        let color: Color
-        private static let stroke = StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round)
-        private static let nodeDiameter: CGFloat = 3.0
-        private static let frameSize: CGFloat = 13
-
-        var body: some View {
-            ZStack {
-                Path { path in
-                    path.move(to: CGPoint(x: 4.6, y: 4.6))
-                    path.addLine(to: CGPoint(x: 7.1, y: 7.0))
-                    path.addLine(to: CGPoint(x: 9.2, y: 7.0))
-
-                    path.move(to: CGPoint(x: 4.6, y: 9.4))
-                    path.addLine(to: CGPoint(x: 7.1, y: 7.0))
-                }
-                .stroke(color, style: Self.stroke)
-
-                Circle()
-                    .stroke(color, lineWidth: Self.stroke.lineWidth)
-                    .frame(width: Self.nodeDiameter, height: Self.nodeDiameter)
-                    .position(x: 3.0, y: 3.0)
-
-                Circle()
-                    .stroke(color, lineWidth: Self.stroke.lineWidth)
-                    .frame(width: Self.nodeDiameter, height: Self.nodeDiameter)
-                    .position(x: 3.0, y: 11.0)
-
-                Circle()
-                    .stroke(color, lineWidth: Self.stroke.lineWidth)
-                    .frame(width: Self.nodeDiameter, height: Self.nodeDiameter)
-                    .position(x: 11.0, y: 7.0)
-            }
-            .frame(width: Self.frameSize, height: Self.frameSize)
-        }
     }
 
     func applyTabColor(_ hex: String?, targetIds: [UUID]) {

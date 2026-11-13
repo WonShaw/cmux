@@ -7,8 +7,6 @@ import Testing
 import struct CmuxSettings.AppCatalogSection
 import struct CmuxSettings.QuitConfirmationStore
 import enum CmuxSettings.ConfirmQuitMode
-import enum CmuxSettings.BrowserSearchEngine
-import struct CmuxSettings.BrowserSearchSettingsStore
 import struct CmuxSettings.NotificationSoundOverride
 import struct CmuxSettings.NotificationSoundOverrides
 import enum CmuxSettings.NotificationSoundAlertType
@@ -40,68 +38,6 @@ final class KeyboardShortcutSettingsFileStoreStartupTests: XCTestCase {
         AppearanceSettingsUserDefaultsObserver.shared.startObserving()
         KeyboardShortcutSettings.resetAll()
         super.tearDown()
-    }
-
-    func testSettingsFileStoreParsesNumberedShortcutWithoutConsultingActiveShortcutStore() throws {
-        let directoryURL = try makeTemporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directoryURL) }
-
-        let activeSettingsFileURL = directoryURL.appendingPathComponent("active.json", isDirectory: false)
-        try writeSettingsFile(
-            """
-            {
-              "shortcuts": {
-                "openBrowser": "cmd+3"
-              }
-            }
-            """,
-            to: activeSettingsFileURL
-        )
-
-        KeyboardShortcutSettings.settingsFileStore = KeyboardShortcutSettingsFileStore(
-            primaryPath: activeSettingsFileURL.path,
-            fallbackPath: nil,
-            startWatching: false
-        )
-        XCTAssertEqual(
-            KeyboardShortcutSettings.shortcut(for: .openBrowser),
-            StoredShortcut(key: "3", command: true, shift: false, option: false, control: false)
-        )
-
-        let parsedSettingsFileURL = directoryURL.appendingPathComponent("parsed.json", isDirectory: false)
-        try writeSettingsFile(
-            """
-            {
-              "shortcuts": {
-                "selectWorkspaceByNumber": "cmd+7"
-              }
-            }
-            """,
-            to: parsedSettingsFileURL
-        )
-
-        let store = KeyboardShortcutSettingsFileStore(
-            primaryPath: parsedSettingsFileURL.path,
-            fallbackPath: nil,
-            startWatching: false
-        )
-
-        XCTAssertEqual(
-            store.override(for: .selectWorkspaceByNumber),
-            StoredShortcut(key: "1", command: true, shift: false, option: false, control: false)
-        )
-    }
-
-    func testSettingsFileShortcutNormalizationAcceptsRecorderConflictingShortcut() {
-        KeyboardShortcutSettings.resetAll()
-        defer { KeyboardShortcutSettings.resetAll() }
-
-        let shortcut = StoredShortcut(key: "t", command: true, shift: false, option: false, control: false)
-
-        XCTAssertEqual(
-            KeyboardShortcutSettings.Action.openBrowser.normalizedSettingsFileShortcut(shortcut),
-            shortcut
-        )
     }
 
     func testSettingsFileStoreRestoresAbsentAppIconBackupDuringStartupWithoutTouchingAppKit() throws {
@@ -1229,55 +1165,6 @@ final class KeyboardShortcutSettingsFileStoreStartupTests: XCTestCase {
         }
     }
 
-    func testSettingsFileStoreAppliesCustomBrowserSearchEngine() throws {
-        let defaults = UserDefaults.standard
-        try preservingDefaults(keys: [
-            BrowserSearchSettingsStore.searchEngineKey,
-            BrowserSearchSettingsStore.customSearchEngineNameKey,
-            BrowserSearchSettingsStore.customSearchEngineURLTemplateKey,
-            settingsFileBackupsDefaultsKey,
-            importedManagedDefaultsKey,
-        ]) {
-            defaults.removeObject(forKey: BrowserSearchSettingsStore.searchEngineKey)
-            defaults.removeObject(forKey: BrowserSearchSettingsStore.customSearchEngineNameKey)
-            defaults.removeObject(forKey: BrowserSearchSettingsStore.customSearchEngineURLTemplateKey)
-            defaults.removeObject(forKey: settingsFileBackupsDefaultsKey)
-            defaults.removeObject(forKey: importedManagedDefaultsKey)
-
-            let directoryURL = try makeTemporaryDirectory()
-            defer { try? FileManager.default.removeItem(at: directoryURL) }
-
-            let settingsFileURL = directoryURL.appendingPathComponent("cmux.json", isDirectory: false)
-            try writeSettingsFile(
-                """
-                {
-                  "browser": {
-                    "defaultSearchEngine": "custom",
-                    "customSearchEngineName": "Kagi Site Search",
-                    "customSearchEngineURLTemplate": "https://kagi.com/search?q={query}"
-                  }
-                }
-                """,
-                to: settingsFileURL
-            )
-
-            _ = KeyboardShortcutSettingsFileStore(
-                primaryPath: settingsFileURL.path,
-                fallbackPath: nil,
-                additionalFallbackPaths: [],
-                startWatching: false
-            )
-
-            let configuration = BrowserSearchSettingsStore(defaults: defaults).currentConfiguration
-            let url = try XCTUnwrap(configuration.searchURL(query: "browser settings"))
-
-            XCTAssertEqual(configuration.engine, .custom)
-            XCTAssertEqual(configuration.displayName, "Kagi Site Search")
-            XCTAssertEqual(url.host, "kagi.com")
-            XCTAssertTrue(url.absoluteString.contains("q=browser%20settings"))
-        }
-    }
-
     func testSettingsFileStoreAppliesBrowserDefaultZoomLevel() throws {
         let defaults = UserDefaults.standard
         let key = "browserDefaultZoomLevel"
@@ -1309,65 +1196,6 @@ final class KeyboardShortcutSettingsFileStoreStartupTests: XCTestCase {
             )
 
             XCTAssertEqual(defaults.double(forKey: key), 0.8)
-        }
-    }
-
-    func testSettingsFileStoreAppliesBlankCustomBrowserSearchNameAndIgnoresInvalidCustomURLWithoutAbortingBrowserSection() throws {
-        let defaults = UserDefaults.standard
-        try preservingDefaults(keys: [
-            BrowserSearchSettingsStore.searchEngineKey,
-            BrowserSearchSettingsStore.customSearchEngineNameKey,
-            BrowserSearchSettingsStore.customSearchEngineURLTemplateKey,
-            BrowserSearchSettingsStore.searchSuggestionsEnabledKey,
-            BrowserThemeSettings.modeKey,
-            settingsFileBackupsDefaultsKey,
-            importedManagedDefaultsKey,
-        ]) {
-            defaults.removeObject(forKey: BrowserSearchSettingsStore.searchEngineKey)
-            defaults.removeObject(forKey: BrowserSearchSettingsStore.customSearchEngineNameKey)
-            defaults.removeObject(forKey: BrowserSearchSettingsStore.customSearchEngineURLTemplateKey)
-            defaults.removeObject(forKey: BrowserSearchSettingsStore.searchSuggestionsEnabledKey)
-            defaults.removeObject(forKey: BrowserThemeSettings.modeKey)
-            defaults.removeObject(forKey: settingsFileBackupsDefaultsKey)
-            defaults.removeObject(forKey: importedManagedDefaultsKey)
-
-            let directoryURL = try makeTemporaryDirectory()
-            defer { try? FileManager.default.removeItem(at: directoryURL) }
-
-            let settingsFileURL = directoryURL.appendingPathComponent("cmux.json", isDirectory: false)
-            try writeSettingsFile(
-                """
-                {
-                  "browser": {
-                    "defaultSearchEngine": "google",
-                    "customSearchEngineName": "   ",
-                    "customSearchEngineURLTemplate": "ftp://search.example.test?q={query}",
-                    "showSearchSuggestions": false,
-                    "theme": "dark"
-                  }
-                }
-                """,
-                to: settingsFileURL
-            )
-
-            _ = KeyboardShortcutSettingsFileStore(
-                primaryPath: settingsFileURL.path,
-                fallbackPath: nil,
-                additionalFallbackPaths: [],
-                startWatching: false
-            )
-
-            XCTAssertEqual(defaults.string(forKey: BrowserSearchSettingsStore.searchEngineKey), BrowserSearchEngine.google.rawValue)
-            XCTAssertEqual(
-                defaults.string(forKey: BrowserSearchSettingsStore.customSearchEngineNameKey),
-                BrowserSearchSettingsStore.defaultCustomSearchEngineName
-            )
-            XCTAssertNotEqual(
-                defaults.string(forKey: BrowserSearchSettingsStore.customSearchEngineURLTemplateKey),
-                "ftp://search.example.test?q={query}"
-            )
-            XCTAssertEqual(defaults.object(forKey: BrowserSearchSettingsStore.searchSuggestionsEnabledKey) as? Bool, false)
-            XCTAssertEqual(defaults.string(forKey: BrowserThemeSettings.modeKey), BrowserThemeMode.dark.rawValue)
         }
     }
 

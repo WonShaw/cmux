@@ -9,71 +9,14 @@ extension TerminalController {
     func controlTabManager(surfaceID: UUID) -> TabManager? {
         AppDelegate.shared?.locateSurface(surfaceId: surfaceID)?.tabManager
             ?? locateDockSurface(surfaceID)?.tabManager
-            ?? locateRemoteTmuxControlSurface(surfaceID)?.tabManager
     }
 
     func controlTabManager(paneID: UUID) -> TabManager? {
         v2LocatePane(paneID)?.tabManager
             ?? locateDockPane(paneID)?.tabManager
-            ?? locateRemoteTmuxControlPane(paneID)?.tabManager
     }
 
-    func locateRemoteTmuxControlSurface(
-        _ surfaceID: UUID
-    ) -> (windowId: UUID, workspaceId: UUID, tabManager: TabManager)? {
-        guard let app = AppDelegate.shared else { return nil }
-        for summary in app.listMainWindowSummaries() {
-            guard let tabManager = app.tabManagerFor(windowId: summary.windowId) else { continue }
-            if let workspace = tabManager.tabs.first(where: {
-                $0.remoteTmuxControlPane(surfaceID: surfaceID) != nil
-            }) {
-                return (summary.windowId, workspace.id, tabManager)
-            }
-        }
-        return nil
-    }
-
-    func locateRemoteTmuxControlPane(
-        _ paneID: UUID
-    ) -> (windowId: UUID, tabManager: TabManager, workspace: Workspace, paneId: PaneID)? {
-        guard let app = AppDelegate.shared else { return nil }
-        for summary in app.listMainWindowSummaries() {
-            guard let tabManager = app.tabManagerFor(windowId: summary.windowId) else { continue }
-            for workspace in tabManager.tabs {
-                guard let location = workspace.remoteTmuxControlPane(paneID: paneID) else { continue }
-                return (summary.windowId, tabManager, workspace, location.pane.paneID)
-            }
-        }
-        return nil
-    }
-
-    func locateRemoteTmuxMirrorContainer(
-        _ surfaceID: UUID
-    ) -> (windowId: UUID, tabManager: TabManager, workspace: Workspace)? {
-        guard let app = AppDelegate.shared else { return nil }
-        for summary in app.listMainWindowSummaries() {
-            guard let tabManager = app.tabManagerFor(windowId: summary.windowId) else { continue }
-            if let workspace = tabManager.tabs.first(where: {
-                $0.isRemoteTmuxControlContainer(surfaceID)
-            }) {
-                return (summary.windowId, tabManager, workspace)
-            }
-        }
-        return nil
-    }
-
-    func remoteTmuxMirrorContainerID(in params: [String: JSONValue]) -> UUID? {
-        for key in ["surface_id", "before_surface_id", "after_surface_id"] {
-            guard let rawID = params[key]?.foundationObject as? String,
-                  let surfaceID = UUID(uuidString: rawID) else { continue }
-            if locateRemoteTmuxMirrorContainer(surfaceID) != nil { return surfaceID }
-        }
-        return nil
-    }
-
-    /// Reorders the workspace-owned tab behind a control-plane surface. Remote
-    /// pane surfaces project to their tmux-window container, while the response
-    /// preserves the advertised surface identity supplied by the caller.
+    /// Reorders the workspace-owned tab behind a control-plane surface.
     func controlSurfaceReorder(
         surfaceID: UUID,
         inputs: ControlSurfaceReorderInputs,
@@ -81,11 +24,8 @@ extension TerminalController {
     ) -> ControlSurfaceReorderResolution {
         let focus = v2FocusAllowed(requested: requestedFocus)
         guard let tabManager = controlTabManager(surfaceID: surfaceID),
-              let ws = tabManager.tabs.first(where: {
-                  $0.controlReorderContainerPanelID(for: surfaceID) != nil
-              }),
-              let sourcePanelID = ws.controlReorderContainerPanelID(for: surfaceID),
-              let sourcePane = ws.paneId(forPanelId: sourcePanelID),
+              let ws = tabManager.tabs.first(where: { $0.panels[surfaceID] != nil }),
+              let sourcePane = ws.paneId(forPanelId: surfaceID),
               let windowID = v2ResolveWindowId(tabManager: tabManager) else {
             return .surfaceNotFound(surfaceID)
         }
@@ -95,21 +35,21 @@ extension TerminalController {
             // The CLI sends a final tab position; reorderSurface takes a bonsplit insertion gap.
             // Moving a tab to a higher slot must target index + 1 so the gap lands after the tab
             // currently occupying that slot; otherwise a move to sourceIndex + 1 is a silent no-op.
-            guard let currentIndex = ws.indexInPane(forPanelId: sourcePanelID) else { return .reorderFailed }
+            guard let currentIndex = ws.indexInPane(forPanelId: surfaceID) else { return .reorderFailed }
             targetIndex = index > currentIndex ? index + 1 : index
         } else if let beforeSurfaceID = inputs.beforeSurfaceID {
-            guard let anchorPanelID = ws.controlReorderContainerPanelID(for: beforeSurfaceID),
-                  let anchorPane = ws.paneId(forPanelId: anchorPanelID),
+            guard ws.panels[beforeSurfaceID] != nil,
+                  let anchorPane = ws.paneId(forPanelId: beforeSurfaceID),
                   anchorPane == sourcePane,
-                  let anchorIndex = ws.indexInPane(forPanelId: anchorPanelID) else {
+                  let anchorIndex = ws.indexInPane(forPanelId: beforeSurfaceID) else {
                 return .anchorNotInSamePane
             }
             targetIndex = anchorIndex
         } else if let afterSurfaceID = inputs.afterSurfaceID {
-            guard let anchorPanelID = ws.controlReorderContainerPanelID(for: afterSurfaceID),
-                  let anchorPane = ws.paneId(forPanelId: anchorPanelID),
+            guard ws.panels[afterSurfaceID] != nil,
+                  let anchorPane = ws.paneId(forPanelId: afterSurfaceID),
                   anchorPane == sourcePane,
-                  let anchorIndex = ws.indexInPane(forPanelId: anchorPanelID) else {
+                  let anchorIndex = ws.indexInPane(forPanelId: afterSurfaceID) else {
                 return .anchorNotInSamePane
             }
             targetIndex = anchorIndex + 1
@@ -117,7 +57,7 @@ extension TerminalController {
             return .reorderFailed
         }
 
-        guard ws.reorderSurface(panelId: sourcePanelID, toIndex: targetIndex, focus: focus) else {
+        guard ws.reorderSurface(panelId: surfaceID, toIndex: targetIndex, focus: focus) else {
             return .reorderFailed
         }
         return .reordered(
@@ -161,38 +101,17 @@ extension TerminalController {
                 ControlPanePixelFrame(x: $0.x, y: $0.y, width: $0.width, height: $0.height)
             }
 
-            var summaries = panelIDs.flatMap { containerPanelID -> [ControlPaneSummary] in
-                workspace.remoteTmuxControlPanes(containerPanelID: containerPanelID).map { location in
-                    let pane = location.pane
-                    return ControlPaneSummary(
-                        paneID: pane.paneID.id,
-                        isFocused: workspace.focusedPanelId == containerPanelID && pane.isFocused,
-                        surfaceIDs: [pane.panel.id],
-                        selectedSurfaceID: pane.panel.id,
-                        pixelFrame: nil,
-                        gridSize: controlGridSize(panel: pane.panel)
-                    )
-                }
-            }
-
-            let standardSurfaceIDs = panelIDs.filter {
-                !workspace.isRemoteTmuxControlContainer($0)
-            }
-            guard !standardSurfaceIDs.isEmpty else { return summaries }
-            let selectedStandardSurfaceID = selectedPanelID.flatMap { panelID in
-                workspace.isRemoteTmuxControlContainer(panelID) ? nil : panelID
-            }
-            summaries.append(ControlPaneSummary(
+            guard !panelIDs.isEmpty else { return [] }
+            return [ControlPaneSummary(
                 paneID: paneID.id,
-                isFocused: paneID == focusedPaneId && selectedStandardSurfaceID != nil,
-                surfaceIDs: standardSurfaceIDs,
-                selectedSurfaceID: selectedStandardSurfaceID,
+                isFocused: paneID == focusedPaneId && selectedPanelID != nil,
+                surfaceIDs: panelIDs,
+                selectedSurfaceID: selectedPanelID,
                 pixelFrame: frame,
-                gridSize: selectedStandardSurfaceID
+                gridSize: selectedPanelID
                     .flatMap { workspace.terminalPanel(for: $0) }
                     .flatMap { controlGridSize(panel: $0) }
-            ))
-            return summaries
+            )]
         }
     }
 
@@ -216,34 +135,6 @@ extension TerminalController {
         paneID requestedPaneID: UUID?,
         tabManager: TabManager
     ) -> ControlPaneSurfacesSnapshot? {
-        let remoteLocation = requestedPaneID.flatMap { workspace.remoteTmuxControlPane(paneID: $0) }
-        let remotePane: RemoteTmuxControlPane?
-        if let remoteLocation {
-            remotePane = remoteLocation.pane
-        } else if requestedPaneID == nil,
-                  let focusedPanelID = workspace.focusedPanelId,
-                  workspace.isRemoteTmuxControlContainer(focusedPanelID) {
-            guard let activePane = workspace.activeRemoteTmuxControlPane(
-                containerPanelID: focusedPanelID
-            ) else { return nil }
-            remotePane = activePane.pane
-        } else {
-            remotePane = nil
-        }
-        if let remotePane {
-            return ControlPaneSurfacesSnapshot(
-                workspaceID: workspace.id,
-                paneID: remotePane.paneID.id,
-                windowID: v2ResolveWindowId(tabManager: tabManager),
-                surfaces: [ControlPaneSurfaceSummary(
-                    surfaceID: remotePane.panel.id,
-                    title: remotePane.title,
-                    typeRawValue: remotePane.panel.panelType.rawValue,
-                    isSelected: true
-                )]
-            )
-        }
-
         let paneID: PaneID?
         if let requestedPaneID {
             paneID = workspace.bonsplitController.allPaneIds.first(where: {
@@ -256,8 +147,7 @@ extension TerminalController {
         let selectedTab = workspace.bonsplitController.selectedTab(inPane: paneID)
         let surfaces = workspace.bonsplitController.tabs(inPane: paneID).compactMap {
             tab -> ControlPaneSurfaceSummary? in
-            guard let panelID = workspace.panelIdFromSurfaceId(tab.id),
-                  !workspace.isRemoteTmuxControlContainer(panelID) else {
+            guard let panelID = workspace.panelIdFromSurfaceId(tab.id) else {
                 return nil
             }
             let panel = workspace.panels[panelID]
@@ -282,20 +172,6 @@ extension TerminalController {
         paneID requestedPaneID: UUID,
         tabManager: TabManager
     ) -> ControlPaneFocusResolution {
-        if let location = workspace.remoteTmuxControlPane(paneID: requestedPaneID) {
-            guard focusRemoteTmuxControlPane(
-                location,
-                workspace: workspace,
-                tabManager: tabManager
-            ) else {
-                return .paneNotFound(requestedPaneID)
-            }
-            return .focused(
-                windowID: v2ResolveWindowId(tabManager: tabManager),
-                workspaceID: workspace.id,
-                paneID: requestedPaneID
-            )
-        }
         guard let paneID = workspace.bonsplitController.allPaneIds.first(where: {
             $0.id == requestedPaneID
         }) else {
@@ -332,27 +208,6 @@ extension TerminalController {
         }
 
         return orderedPanels(in: workspace).flatMap { panel -> [ControlSurfaceSummary] in
-            if workspace.isRemoteTmuxControlContainer(panel.id) {
-                return workspace.remoteTmuxControlPanes(containerPanelID: panel.id).map { location in
-                    let remotePane = location.pane
-                    return ControlSurfaceSummary(
-                        surfaceID: remotePane.panel.id,
-                        typeRawValue: remotePane.panel.panelType.rawValue,
-                        title: remotePane.title,
-                        isFocused: panel.id == workspace.focusedPanelId && remotePane.isFocused,
-                        paneID: remotePane.paneID.id,
-                        indexInPane: 0,
-                        selectedInPane: true,
-                        developerToolsVisible: nil,
-                        requestedWorkingDirectory: v2NonEmptyString(remotePane.panel.requestedWorkingDirectory),
-                        initialCommand: v2NonEmptyString(remotePane.panel.surface.debugInitialCommand()),
-                        tmuxStartCommand: v2NonEmptyString(remotePane.panel.surface.debugTmuxStartCommand()),
-                        isTerminal: true,
-                        resumeBinding: nil,
-                        renderHealthRawValue: remotePane.panel.surface.renderHealth.rawValue
-                    )
-                }
-            }
             let terminalPanel = panel as? TerminalPanel
             let simulatorPanel = panel as? SimulatorPanel
             return [ControlSurfaceSummary(
@@ -363,7 +218,6 @@ extension TerminalController {
                 paneID: paneByPanelID[panel.id],
                 indexInPane: indexInPaneByPanelID[panel.id],
                 selectedInPane: selectedInPaneByPanelID[panel.id],
-                developerToolsVisible: (panel as? BrowserPanel)?.isDeveloperToolsVisible(),
                 requestedWorkingDirectory: terminalPanel.flatMap {
                     v2NonEmptyString($0.requestedWorkingDirectory)
                 },
@@ -388,11 +242,6 @@ extension TerminalController {
     }
 
     func controlSurfacePanels(workspace: Workspace) -> [any Panel] {
-        orderedPanels(in: workspace).flatMap { panel -> [any Panel] in
-            if workspace.isRemoteTmuxControlContainer(panel.id) {
-                return workspace.remoteTmuxControlPanes(containerPanelID: panel.id).map { $0.pane.panel }
-            }
-            return [panel]
-        }
+        orderedPanels(in: workspace)
     }
 }

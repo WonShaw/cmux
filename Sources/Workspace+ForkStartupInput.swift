@@ -11,14 +11,8 @@ extension Workspace {
     @MainActor
     func authoritativeForkSnapshot(
         selected: SessionRestorableAgentSnapshot,
-        panelId: UUID,
-        isRemoteContext: Bool
+        panelId: UUID
     ) async -> SessionRestorableAgentSnapshot? {
-        // Remote SSH/tmux forks keep their provider command on the remote
-        // host and do not persist a local continuation record.
-        if isRemoteContext {
-            return selected
-        }
         if let lifecycleSnapshot = restoredAgentSnapshotForContinuation(panelId: panelId),
            Self.forkSnapshotsMatch(lifecycleSnapshot, selected) {
             return await validatedForkSnapshot(

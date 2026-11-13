@@ -129,12 +129,6 @@ enum CmuxSocketEventMapper {
             return DomainEventMapping(name: "app.focus_override.changed", category: "app", params: .unchanged)
         case "app.simulate_active":
             return DomainEventMapping(name: "app.simulated_active", category: "app", params: .unchanged)
-        case "browser.navigate", "browser.back", "browser.forward", "browser.reload":
-            return DomainEventMapping(name: "browser.navigation", category: "browser", params: .unchanged)
-        case "browser.click", "browser.dblclick", "browser.hover", "browser.focus", "browser.press", "browser.keydown", "browser.keyup", "browser.check", "browser.uncheck", "browser.select", "browser.scroll", "browser.scroll_into_view":
-            return DomainEventMapping(name: "browser.interaction", category: "browser", params: .unchanged)
-        case "browser.type", "browser.fill":
-            return DomainEventMapping(name: "browser.input", category: "browser", params: .redactedInput)
         default:
             return nil
         }
@@ -162,7 +156,7 @@ enum CmuxSocketEventMapper {
         switch name {
         case "new_window", "focus_window", "close_window":
             break
-        case "new_workspace", "select_workspace", "close_workspace", "new_split", "new_pane", "new_surface", "open_browser":
+        case "new_workspace", "select_workspace", "close_workspace", "new_split", "new_pane", "new_surface":
             break
         case "focus_surface", "focus_surface_by_panel", "focus_pane":
             break

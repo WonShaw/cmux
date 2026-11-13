@@ -26,7 +26,6 @@ public struct CommandPaletteContextKeys: Hashable, Sendable {
     /// Whether the workspace should offer pinning.
     public static let workspaceShouldPin = CommandPaletteContextKeys(rawValue: "workspace.shouldPin")
     /// Whether the workspace has pull requests.
-    public static let workspaceHasPullRequests = CommandPaletteContextKeys(rawValue: "workspace.hasPullRequests")
     /// Whether the workspace has splits.
     public static let workspaceHasSplits = CommandPaletteContextKeys(rawValue: "workspace.hasSplits")
     /// Whether the workspace uses the canvas layout mode.
@@ -47,12 +46,6 @@ public struct CommandPaletteContextKeys: Hashable, Sendable {
     public static let hasFocusedPanel = CommandPaletteContextKeys(rawValue: "panel.hasFocus")
     /// Focused panel display name.
     public static let panelName = CommandPaletteContextKeys(rawValue: "panel.name")
-    /// Whether the focused panel is a browser.
-    public static let panelIsBrowser = CommandPaletteContextKeys(rawValue: "panel.isBrowser")
-    /// Whether browser focus mode is active.
-    public static let panelBrowserFocusModeActive = CommandPaletteContextKeys(rawValue: "panel.browserFocusModeActive")
-    /// Whether the browser omnibar is visible.
-    public static let panelBrowserOmnibarVisible = CommandPaletteContextKeys(rawValue: "panel.browser.omnibarVisible")
     /// Whether the focused panel is markdown.
     public static let panelIsMarkdown = CommandPaletteContextKeys(rawValue: "panel.isMarkdown")
     /// Whether the focused panel is a native Simulator.
@@ -77,26 +70,10 @@ public struct CommandPaletteContextKeys: Hashable, Sendable {
     public static let panelHasUnread = CommandPaletteContextKeys(rawValue: "panel.hasUnread")
     /// Whether the focused panel can move to a new workspace.
     public static let panelCanMoveToNewWorkspace = CommandPaletteContextKeys(rawValue: "panel.canMoveToNewWorkspace")
-    /// Whether an app update is available.
-    public static let updateHasAvailable = CommandPaletteContextKeys(rawValue: "update.hasAvailable")
     /// Whether the cmux CLI is installed in PATH.
     public static let cliInstalledInPATH = CommandPaletteContextKeys(rawValue: "cli.installedInPATH")
     /// Whether cmux is the default terminal.
     public static let defaultTerminalIsDefault = CommandPaletteContextKeys(rawValue: "defaultTerminal.isDefault")
-    /// Whether the browser surface is disabled.
-    public static let browserDisabled = CommandPaletteContextKeys(rawValue: "browser.disabled")
-    /// Whether an MDM configuration profile disables the browser (locked:
-    /// the enable/disable commands are hidden because they cannot take effect).
-    public static let browserManagedByPolicy = CommandPaletteContextKeys(rawValue: "browser.managedByPolicy")
-    /// Whether an MDM configuration profile disables iOS remote control
-    /// (hides pairing commands that cannot take effect).
-    public static let mobileRemoteControlManagedByPolicy = CommandPaletteContextKeys(rawValue: "mobile.remoteControlManagedByPolicy")
-    /// Whether the user is signed in.
-    public static let authSignedIn = CommandPaletteContextKeys(rawValue: "auth.signedIn")
-    /// Whether an auth operation is in flight.
-    public static let authWorking = CommandPaletteContextKeys(rawValue: "auth.working")
-    /// Whether the Computer Use UX and its onboarding actions are available.
-    public static let computerUseUXEnabled = CommandPaletteContextKeys(rawValue: "computerUse.uxEnabled")
 
     /// Key for one terminal open-target's availability; `rawValue` is the
     /// target's raw identifier (the app layers a typed overload on top).

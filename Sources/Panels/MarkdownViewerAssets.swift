@@ -90,38 +90,6 @@ final class MarkdownViewerAssets {
                 localized: "markdown.web.remoteImageBlocked",
                 defaultValue: "Remote image blocked"
             ),
-            "remoteImageConsentMessage": String(
-                localized: "markdown.web.remoteImageConsentMessage",
-                defaultValue: "cmux will not contact this image URL until you load this image."
-            ),
-            "remoteImageLoadImage": String(
-                localized: "markdown.web.remoteImageLoadImage",
-                defaultValue: "Load this image"
-            ),
-            "remoteImageLoading": String(
-                localized: "markdown.web.remoteImageLoading",
-                defaultValue: "Loading"
-            ),
-            "remoteImageHTTPSOnly": String(
-                localized: "markdown.web.remoteImageHTTPSOnly",
-                defaultValue: "Only HTTPS remote images can be loaded in the viewer."
-            ),
-            "remoteImageCopyURL": String(
-                localized: "markdown.web.remoteImageCopyURL",
-                defaultValue: "Copy image URL"
-            ),
-            "remoteImageCopied": String(
-                localized: "markdown.web.remoteImageCopied",
-                defaultValue: "Copied"
-            ),
-            "remoteImageOpenURL": String(
-                localized: "markdown.web.remoteImageOpenURL",
-                defaultValue: "Open image URL"
-            ),
-            "remoteImageNotAllowed": String(
-                localized: "markdown.web.remoteImageNotAllowed",
-                defaultValue: "This remote image URL cannot be loaded in the viewer."
-            ),
             "remoteImageURL": String(
                 localized: "markdown.web.remoteImageURL",
                 defaultValue: "Image URL: {url}"

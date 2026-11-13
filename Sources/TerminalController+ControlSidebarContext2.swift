@@ -1,11 +1,10 @@
 import CmuxControlSocket
-import CmuxRemoteSession
 import Foundation
 import CmuxWorkspaces
 import CmuxSidebar
 
 /// The live-app half of the v1 sidebar telemetry/report commands
-/// (`report_git_branch` / `report_pr` / `report_ports` / `report_pwd` /
+/// (`report_git_branch` / `report_ports` / `report_pwd` /
 /// `report_shell_state` / `report_tty` / `ports_kick` / `sidebar_state` /
 /// `reset_sidebar` / `right_sidebar`): the exact mutation/read bodies the
 /// former `TerminalController` v1 handlers ran.
@@ -55,8 +54,6 @@ extension TerminalController {
         guard let tab = controlSidebarResolveTabForReport(tabArg: tabArg) else {
             return false
         }
-        if tab.cloudVMBinding != nil { tab.clearSidebarGitMetadata(); return true }
-        if let focusedPanelId = tab.focusedPanelId, tab.cloudDirectoryProvenanceRequired(panelId: focusedPanelId) { tab.clearPanelGitBranch(panelId: focusedPanelId); return true }
         guard SidebarWorkspaceDetailDefaults.gitMetadataActivity(defaults: .standard).acceptsPassiveReports else {
             tab.gitBranch = nil
             return true
@@ -98,85 +95,6 @@ extension TerminalController {
         }
         tab.gitBranch = nil
         return true
-    }
-
-    // MARK: - Pull requests (panel metadata mutations)
-
-    nonisolated func controlSidebarIsValidPullRequestState(_ raw: String) -> Bool {
-        SidebarPullRequestStatus(rawValue: raw) != nil
-    }
-
-    /// PR metadata mutations intentionally do NOT coalesce:
-    /// `shouldReplacePullRequest` applies an ordering guard against the state
-    /// current at drain, so collapsing an update chain to its newest entry
-    /// could drop an intermediate update the guard would have accepted. The
-    /// traffic is poller-cadence, not per-prompt, so unbounded growth is not
-    /// a practical concern on this path.
-    nonisolated func controlSidebarSchedulePanelPullRequestUpdate(
-        target: ControlSidebarPanelMutationTarget,
-        number: Int,
-        label: String,
-        url: URL,
-        statusRawValue: String,
-        branch: String?
-    ) {
-        guard let status = SidebarPullRequestStatus(rawValue: statusRawValue) else {
-            // Unreachable: the coordinator validates the state first.
-            return
-        }
-        controlSidebarSchedulePanelMetadataMutation(target: target) { tab, surfaceId in
-            guard SidebarWorkspaceDetailDefaults.pullRequestActivity(defaults: .standard).acceptsPassiveReports else {
-                tab.clearPanelPullRequest(panelId: surfaceId)
-                return
-            }
-
-            guard Self.shouldReplacePullRequest(
-                current: tab.panelPullRequests[surfaceId],
-                number: number,
-                label: label,
-                url: url,
-                status: status,
-                branch: branch
-            ) else {
-                return
-            }
-
-            tab.updatePanelPullRequest(
-                panelId: surfaceId,
-                number: number,
-                label: label,
-                url: url,
-                status: status,
-                branch: branch
-            )
-        }
-    }
-
-    nonisolated func controlSidebarSchedulePanelPullRequestClear(target: ControlSidebarPanelMutationTarget) {
-        controlSidebarSchedulePanelMetadataMutation(target: target) { tab, surfaceId in
-            tab.clearPanelPullRequest(panelId: surfaceId)
-        }
-    }
-
-    nonisolated func controlSidebarSchedulePanelPullRequestAction(
-        target: ControlSidebarPanelMutationTarget,
-        action: String,
-        actionTarget: String?
-    ) {
-        controlSidebarSchedulePanelMetadataMutation(target: target) { tab, surfaceId in
-            guard SidebarWorkspaceDetailDefaults.pullRequestActivity(defaults: .standard).acceptsPassiveReports else {
-                tab.clearPanelPullRequest(panelId: surfaceId)
-                return
-            }
-
-            guard let tabManager = AppDelegate.shared?.tabManagerFor(tabId: tab.id) else { return }
-            tabManager.handleWorkspacePullRequestCommandHint(
-                tabId: tab.id,
-                surfaceId: surfaceId,
-                action: action,
-                target: actionTarget
-            )
-        }
     }
 
     // MARK: - Ports / pwd / shell state / tty / kick
@@ -324,12 +242,7 @@ extension TerminalController {
             tab.pruneSurfaceMetadata(validSurfaceIds: validSurfaceIds)
             guard validSurfaceIds.contains(scope.panelID) else { return }
             tab.registerReportedSurfaceTTYName(ttyName, panelId: scope.panelID)
-            if tab.isRemoteWorkspace {
-                tab.syncRemotePortScanTTYs()
-                _ = tab.applyPendingRemoteSurfacePortKickIfNeeded(to: scope.panelID)
-            } else {
-                PortScanner.shared.registerTTY(workspaceId: scope.workspaceID, panelId: scope.panelID, ttyName: ttyName)
-            }
+            PortScanner.shared.registerTTY(workspaceId: scope.workspaceID, panelId: scope.panelID, ttyName: ttyName)
         }
     }
 
@@ -341,27 +254,17 @@ extension TerminalController {
             requireLiveSurface: true
         ) { tab, surfaceId in
             tab.registerReportedSurfaceTTYName(ttyName, panelId: surfaceId)
-            if tab.isRemoteWorkspace {
-                tab.syncRemotePortScanTTYs()
-                _ = tab.applyPendingRemoteSurfacePortKickIfNeeded(to: surfaceId)
-            } else {
-                PortScanner.shared.registerTTY(workspaceId: tab.id, panelId: surfaceId, ttyName: ttyName)
-            }
+            PortScanner.shared.registerTTY(workspaceId: tab.id, panelId: surfaceId, ttyName: ttyName)
         }
     }
 
     nonisolated func controlSidebarScheduleScopedPortsKick(scope: ControlSidebarPanelScope, reasonRawValue: String) {
-        guard let reason = PortScanKickReason(rawValue: reasonRawValue) else {
-            // Unreachable: the coordinator only forwards a value this app produced.
-            return
-        }
-        // Keyed by reason: a kick is an idempotent rescan trigger, so
-        // same-reason duplicates collapse while distinct reasons each run.
+        // A kick is an idempotent rescan trigger, so duplicates collapse.
         TerminalMutationBus.shared.enqueueReplacingMainActorMutation(
             replaceKey: TerminalMutationReplaceKey.scoped(
                 tabId: scope.workspaceID,
                 surfaceId: scope.panelID,
-                kind: .portsKick(reason)
+                kind: .portsKick
             )
         ) {
             guard let tabManager = AppDelegate.shared?.tabManagerFor(tabId: scope.workspaceID),
@@ -371,30 +274,18 @@ extension TerminalController {
             let validSurfaceIds = Set(tab.panels.keys)
             tab.pruneSurfaceMetadata(validSurfaceIds: validSurfaceIds)
             guard validSurfaceIds.contains(scope.panelID) else { return }
-            if tab.isRemoteWorkspace {
-                tab.kickRemotePortScan(panelId: scope.panelID, reason: reason)
-            } else {
-                PortScanner.shared.kick(workspaceId: scope.workspaceID, panelId: scope.panelID)
-            }
+            PortScanner.shared.kick(workspaceId: scope.workspaceID, panelId: scope.panelID)
         }
     }
 
     func controlSidebarPortsKick(tabArg: String?, panelArg: String?, reasonRawValue: String) -> ControlSidebarPanelWriteResolution {
-        guard let reason = PortScanKickReason(rawValue: reasonRawValue) else {
-            // Unreachable: the coordinator only forwards a value this app produced.
-            return .tabNotFound
-        }
-        return controlSidebarResolvePanelWrite(
+        controlSidebarResolvePanelWrite(
             tabArg: tabArg,
             panelArg: panelArg,
             prune: false,
             requireLiveSurface: false
         ) { tab, surfaceId in
-            if tab.isRemoteWorkspace {
-                tab.kickRemotePortScan(panelId: surfaceId, reason: reason)
-            } else {
-                PortScanner.shared.kick(workspaceId: tab.id, panelId: surfaceId)
-            }
+            PortScanner.shared.kick(workspaceId: tab.id, panelId: surfaceId)
         }
     }
 
@@ -415,15 +306,6 @@ extension TerminalController {
             ControlSidebarGitBranchInfo(branch: $0.branch, isDirty: $0.isDirty)
         }
 
-        let firstPullRequest = tab.sidebarPullRequestsInDisplayOrder().first.map {
-            ControlSidebarPullRequestInfo(
-                number: $0.number,
-                statusRawValue: $0.status.rawValue,
-                urlAbsoluteString: $0.url.absoluteString,
-                label: $0.label
-            )
-        }
-
         let progress = tab.progress.map {
             ControlSidebarProgressInfo(value: $0.value, label: $0.label)
         }
@@ -434,7 +316,6 @@ extension TerminalController {
             currentDirectory: tab.presentedCurrentDirectory ?? "",
             focusedPanel: focusedPanel,
             gitBranch: gitBranch,
-            firstPullRequest: firstPullRequest,
             listeningPorts: tab.listeningPorts,
             progress: progress,
             statusEntries: tab.sidebarStatusEntriesInDisplayOrder().map {

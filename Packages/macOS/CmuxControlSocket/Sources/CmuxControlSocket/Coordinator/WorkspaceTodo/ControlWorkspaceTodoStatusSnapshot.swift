@@ -15,12 +15,6 @@ public struct ControlWorkspaceTodoStatusSnapshot: Sendable, Equatable {
         public let anyAgentNeedsInput: Bool
         /// Whether any agent is running.
         public let anyAgentRunning: Bool
-        /// Whether any sidebar pull request is open.
-        public let anyOpenPullRequest: Bool
-        /// Whether the workspace has any sidebar pull requests.
-        public let hasPullRequests: Bool
-        /// Whether every sidebar pull request is merged or closed.
-        public let allPullRequestsMergedOrClosed: Bool
         /// Whether any tracked git working tree is dirty.
         public let isGitDirty: Bool
 
@@ -28,16 +22,10 @@ public struct ControlWorkspaceTodoStatusSnapshot: Sendable, Equatable {
         public init(
             anyAgentNeedsInput: Bool,
             anyAgentRunning: Bool,
-            anyOpenPullRequest: Bool,
-            hasPullRequests: Bool,
-            allPullRequestsMergedOrClosed: Bool,
             isGitDirty: Bool
         ) {
             self.anyAgentNeedsInput = anyAgentNeedsInput
             self.anyAgentRunning = anyAgentRunning
-            self.anyOpenPullRequest = anyOpenPullRequest
-            self.hasPullRequests = hasPullRequests
-            self.allPullRequestsMergedOrClosed = allPullRequestsMergedOrClosed
             self.isGitDirty = isGitDirty
         }
     }

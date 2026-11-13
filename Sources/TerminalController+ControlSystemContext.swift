@@ -1,7 +1,6 @@
 import AppKit
 import Bonsplit
 import CmuxControlSocket
-import CmuxFeedback
 import Foundation
 
 /// The system-domain witnesses: the byte-faithful bodies of the former
@@ -140,7 +139,6 @@ extension TerminalController: ControlSystemContext {
         for (surfaceIndex, surface) in surfaceSummaries.enumerated() {
             let panel = workspace.controlSurfaceTarget(for: surface.surfaceID)?.panel ??
                 dockStores.lazy.compactMap { $0.panels[surface.surfaceID] }.first
-            let browserPanel = panel as? BrowserPanel
             let node = ControlSystemTreeSurfaceNode(
                 surfaceID: surface.surfaceID,
                 index: surfaceIndex,
@@ -152,8 +150,6 @@ extension TerminalController: ControlSystemContext {
                 paneID: surface.paneID,
                 indexInPane: surface.indexInPane,
                 tty: workspace.surfaceTTYNames[surface.surfaceID],
-                isBrowser: browserPanel != nil,
-                url: browserPanel?.currentURL?.absoluteString,
                 renderHealthRawValue: (panel as? TerminalPanel)?.surface.renderHealth.rawValue,
                 dockScopeRawValue: surface.dockScopeRawValue
             )
@@ -282,34 +278,6 @@ extension TerminalController: ControlSystemContext {
         }
     }
 
-    func controlFeedbackOpen(workspaceID: UUID?, windowID: UUID?, requestedActivate: Bool) {
-        let shouldActivate = v2FocusAllowed(requested: requestedActivate)
-        DispatchQueue.main.async {
-            let targetWindow: NSWindow?
-            if let windowID, let app = AppDelegate.shared {
-                targetWindow = app.mainWindow(for: windowID)
-            } else if let workspaceID, let app = AppDelegate.shared {
-                targetWindow = app.mainWindowContainingWorkspace(workspaceID)
-            } else {
-                targetWindow = nil
-            }
-
-            if shouldActivate {
-                if let targetWindow {
-                    _ = AppDelegate.shared?.focusWindowForAppActivation(targetWindow, reason: .feedback)
-                } else {
-                    // The legacy body also passed .activateIgnoringOtherApps; the
-                    // option is deprecated and documented as a no-op on macOS 14+
-                    // (this target's minimum), so dropping it is behavior-neutral
-                    // and keeps this file deprecation-warning-free.
-                    NSRunningApplication.current.activate(options: [.activateAllWindows])
-                }
-            }
-
-            FeedbackComposerBridge().openComposer(in: targetWindow)
-        }
-    }
-
     // MARK: - extension.sidebar.snapshot
 
     func controlExtensionSidebarSnapshot(routing: ControlRoutingSelectors) -> ControlExtensionSidebarSnapshot? {
@@ -359,9 +327,6 @@ extension TerminalController: ControlSystemContext {
             rootPath: trimmedPresentedDirectory.isEmpty ? nil : trimmedPresentedDirectory,
             projectRootPath: workspace.extensionSidebarProjectRootPath,
             branchSummary: workspace.sidebarGitBranchesInDisplayOrder().first?.branch,
-            remoteDisplayTarget: workspace.remoteDisplayTarget,
-            remoteConnectionStateRawValue: workspace.remoteConnectionState.rawValue,
-            remotePayload: JSONValue(foundationObject: workspace.remoteStatusPayload()) ?? .object([:]),
             currentDirectory: presentedDirectory,
             customColor: workspace.customColor,
             unreadCount: TerminalNotificationStore.shared.unreadCount(forTabId: workspace.id),
@@ -370,7 +335,7 @@ extension TerminalController: ControlSystemContext {
             latestSubmittedMessage: workspace.latestSubmittedMessage,
             latestSubmittedAtISO: workspace.latestSubmittedAt.map(CmuxEventBus.isoTimestamp),
             listeningPorts: workspace.listeningPorts,
-            pullRequestURLs: workspace.sidebarPullRequestsInDisplayOrder().map { $0.url.absoluteString },
+            pullRequestURLs: [],
             panelDirectories: workspace.sidebarFilesystemDirectoriesInDisplayOrder(),
             gitBranches: workspace.sidebarGitBranchesInDisplayOrder().map {
                 ControlExtensionSidebarWorkspace.GitBranch(branch: $0.branch, isDirty: $0.isDirty)
@@ -392,12 +357,4 @@ extension TerminalController: ControlSystemContext {
             return .err(code: code, message: message, data: data.flatMap { JSONValue(foundationObject: $0) })
         }
     }
-
-#if DEBUG
-    // MARK: - mobile.dev_stack_auth.configure (DEBUG)
-
-    func controlMobileDevStackAuthSetToken(_ token: String?) {
-        MobileHostService.shared.debugConfigureAcceptedStackAuthTokenForTesting(token)
-    }
-#endif
 }

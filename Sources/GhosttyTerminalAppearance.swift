@@ -1,4 +1,5 @@
 import AppKit
+import CmuxAppKitSupportUI
 import CmuxFoundation
 import Foundation
 
@@ -108,4 +109,79 @@ enum GhosttyNotificationKey {
     static let cursorTextColor = "ghostty.cursorTextColor"
     static let selectionBackground = "ghostty.selectionBackground"
     static let selectionForeground = "ghostty.selectionForeground"
+}
+
+enum GhosttyBackgroundTheme {
+    static func clampedOpacity(_ opacity: Double) -> CGFloat {
+        WindowAppearanceSnapshot.clampedOpacity(opacity)
+    }
+
+    static func color(backgroundColor: NSColor, opacity: Double) -> NSColor {
+        WindowAppearanceSnapshot.compositedTerminalColor(
+            backgroundColor: backgroundColor,
+            opacity: opacity
+        )
+    }
+
+    static func color(
+        from notification: Notification?,
+        fallbackColor: NSColor,
+        fallbackOpacity: Double
+    ) -> NSColor {
+        let userInfo = notification?.userInfo
+        let backgroundColor =
+            (userInfo?[GhosttyNotificationKey.backgroundColor] as? NSColor)
+            ?? fallbackColor
+
+        let opacity: Double
+        if let value = userInfo?[GhosttyNotificationKey.backgroundOpacity] as? Double {
+            opacity = value
+        } else if let value = userInfo?[GhosttyNotificationKey.backgroundOpacity] as? NSNumber {
+            opacity = value.doubleValue
+        } else {
+            opacity = fallbackOpacity
+        }
+
+        return color(backgroundColor: backgroundColor, opacity: opacity)
+    }
+
+    static func color(from notification: Notification?) -> NSColor {
+        color(
+            from: notification,
+            fallbackColor: GhosttyApp.shared.defaultBackgroundColor,
+            fallbackOpacity: GhosttyApp.shared.defaultBackgroundOpacity
+        )
+    }
+
+    /// Resolves a live background notification against the terminal theme's
+    /// concrete light/dark base. This is the variant used by detached browser
+    /// and Dock chrome; the legacy `color(from:)` helper remains available for
+    /// callers that explicitly need the window ambient composition.
+    static func resolvedColor(from notification: Notification?) -> NSColor {
+        let userInfo = notification?.userInfo
+        let backgroundColor =
+            (userInfo?[GhosttyNotificationKey.backgroundColor] as? NSColor)
+            ?? GhosttyApp.shared.defaultBackgroundColor
+        let opacity: Double
+        if let value = userInfo?[GhosttyNotificationKey.backgroundOpacity] as? Double {
+            opacity = value
+        } else if let value = userInfo?[GhosttyNotificationKey.backgroundOpacity] as? NSNumber {
+            opacity = value.doubleValue
+        } else {
+            opacity = GhosttyApp.shared.defaultBackgroundOpacity
+        }
+        return WindowAppearanceSnapshot.resolvedChromeBackgroundColor(
+            backgroundColor: backgroundColor,
+            opacity: opacity,
+            colorScheme: GhosttyApp.shared.effectiveTerminalColorSchemePreference == .dark ? .dark : .light
+        )
+    }
+
+    static func currentColor() -> NSColor {
+        WindowAppearanceSnapshot.resolvedChromeBackgroundColor(
+            backgroundColor: GhosttyApp.shared.defaultBackgroundColor,
+            opacity: GhosttyApp.shared.defaultBackgroundOpacity,
+            colorScheme: GhosttyApp.shared.effectiveTerminalColorSchemePreference == .dark ? .dark : .light
+        )
+    }
 }

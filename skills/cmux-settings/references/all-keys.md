@@ -22,7 +22,6 @@ General app preferences from Settings > App.
 | `app.openMarkdownInCmuxViewer` | boolean | `true` | When enabled, Cmd-clicking .md/.markdown/.mkd/.mdx files opens the rendered cmux markdown viewer panel (with live reload) instead of the generic file preview. |
 | `app.reorderOnNotification` | boolean | `true` | Move workspaces with new notifications toward the top. |
 | `app.iMessageMode` | boolean | `false` | Move a workspace to the top and show the submitted message when sending an agent prompt. |
-| `app.sendAnonymousTelemetry` | boolean | `true` | Allow anonymous telemetry. |
 | `app.warnBeforeQuit` | boolean | `true` | Show a confirmation before quitting cmux. |
 | `app.warnBeforeClosingTab` | boolean | `true` | Show a confirmation before closing a tab. |
 | `app.renameSelectsExistingName` | boolean | `true` | Select the current name when opening rename flows. |
@@ -66,8 +65,6 @@ Sidebar content and metadata visibility from Settings > Sidebar.
 | `sidebar.showBranchDirectory` | boolean | `true` | Show the workspace working directory. |
 | `sidebar.showPullRequests` | boolean | `true` | Show pull request metadata in the sidebar. |
 | `sidebar.makePullRequestsClickable` | boolean | `true` | Allow sidebar pull request metadata to open links when clicked. |
-| `sidebar.openPullRequestLinksInCmuxBrowser` | boolean | `true` | Open sidebar pull request links in the embedded cmux browser. |
-| `sidebar.openPortLinksInCmuxBrowser` | boolean | `true` | Open sidebar port links in the embedded cmux browser. |
 | `sidebar.showSSH` | boolean | `true` | Show SSH connection details. |
 | `sidebar.showPorts` | boolean | `true` | Show listening ports. |
 | `sidebar.showLog` | boolean | `true` | Show recent log snippets. |
@@ -113,24 +110,6 @@ Socket control and automation settings from Settings > Automation.
 | `automation.geminiIntegration` | boolean | `true` | Enable cmux integration hooks for Gemini. |
 | `automation.portBase` | integer | `9100` | Starting value for workspace CMUX_PORT assignments. |
 | `automation.portRange` | integer | `10` | Number of ports reserved per workspace. |
-
-## browser
-
-Embedded browser settings from Settings > Browser.
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `browser.defaultSearchEngine` | `"google"` or `"duckduckgo"` or `"bing"` or `"kagi"` or `"startpage"` | `"google"` | Default search engine for non-URL queries. |
-| `browser.showSearchSuggestions` | boolean | `true` | Show omnibar search suggestions. |
-| `browser.theme` | `"system"` or `"light"` or `"dark"` | `"system"` | Embedded browser theme. |
-| `browser.defaultZoomLevel` | number | `1` | Default page zoom factor for newly opened browser pages (0.25–5; 1 = 100%). |
-| `browser.openTerminalLinksInCmuxBrowser` | boolean | `true` | Open clicked terminal links in the embedded browser. |
-| `browser.interceptTerminalOpenCommandInCmuxBrowser` | boolean | `true` | Intercept terminal open http(s) commands and route them through the embedded browser. |
-| `browser.hostsToOpenInEmbeddedBrowser` | array<string> | `[]` | Allowlist of hosts that should stay inside the embedded browser. |
-| `browser.urlsToAlwaysOpenExternally` | array<string> | `[]` | Rules that always open matching URLs in the system browser. |
-| `browser.insecureHttpHostsAllowedInEmbeddedBrowser` | array<string> | `["localhost", "*.localhost", "127.0.0.1", "::1", "0.0.0.0", "*.localtest.me"]` | HTTP hosts allowed in the embedded browser without a warning prompt. |
-| `browser.showImportHintOnBlankTabs` | boolean | `true` | Show the browser import hint on blank tabs. |
-| `browser.reactGrabVersion` | string | `"0.1.29"` | Pinned react-grab version for the browser toolbar helper. |
 
 ## shortcuts
 

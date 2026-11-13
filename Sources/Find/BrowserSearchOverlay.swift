@@ -405,3 +405,15 @@ private struct BrowserSearchTextFieldRepresentable: NSViewRepresentable {
         coordinator.parentField = nil
     }
 }
+
+/// Observable state for web-view find-in-page (markdown preview). Mirrors `TerminalSurface.SearchState`.
+@MainActor
+final class BrowserSearchState: ObservableObject {
+    @Published var needle: String
+    @Published var selected: UInt?
+    @Published var total: UInt?
+
+    init(needle: String = "") {
+        self.needle = needle
+    }
+}

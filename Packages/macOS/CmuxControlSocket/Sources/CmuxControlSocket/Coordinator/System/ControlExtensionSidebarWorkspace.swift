@@ -40,12 +40,6 @@ public struct ControlExtensionSidebarWorkspace: Sendable, Equatable {
     public let projectRootPath: String?
     /// The first display-ordered git branch name, if any.
     public let branchSummary: String?
-    /// The remote display target, if any.
-    public let remoteDisplayTarget: String?
-    /// The remote connection state's raw value.
-    public let remoteConnectionStateRawValue: String
-    /// The app-shaped remote status payload, bridged as a JSON value.
-    public let remotePayload: JSONValue
     /// The workspace's current directory.
     public let currentDirectory: String
     /// The custom tab color hex, if any.
@@ -81,9 +75,6 @@ public struct ControlExtensionSidebarWorkspace: Sendable, Equatable {
     ///   - rootPath: The trimmed non-empty current directory, if any.
     ///   - projectRootPath: The extension-sidebar project root, if any.
     ///   - branchSummary: The first display-ordered branch name, if any.
-    ///   - remoteDisplayTarget: The remote display target, if any.
-    ///   - remoteConnectionStateRawValue: The remote connection state.
-    ///   - remotePayload: The app-shaped remote status payload.
     ///   - currentDirectory: The current directory.
     ///   - customColor: The custom tab color hex, if any.
     ///   - unreadCount: The unread notification count.
@@ -105,9 +96,6 @@ public struct ControlExtensionSidebarWorkspace: Sendable, Equatable {
         rootPath: String?,
         projectRootPath: String?,
         branchSummary: String?,
-        remoteDisplayTarget: String?,
-        remoteConnectionStateRawValue: String,
-        remotePayload: JSONValue,
         currentDirectory: String,
         customColor: String?,
         unreadCount: Int,
@@ -129,9 +117,6 @@ public struct ControlExtensionSidebarWorkspace: Sendable, Equatable {
         self.rootPath = rootPath
         self.projectRootPath = projectRootPath
         self.branchSummary = branchSummary
-        self.remoteDisplayTarget = remoteDisplayTarget
-        self.remoteConnectionStateRawValue = remoteConnectionStateRawValue
-        self.remotePayload = remotePayload
         self.currentDirectory = currentDirectory
         self.customColor = customColor
         self.unreadCount = unreadCount

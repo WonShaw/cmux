@@ -77,29 +77,6 @@ private struct FixedLogLimitProvider: SidebarLogEntryLimitProviding {
         #expect(ordered.map(\.key) == ["c", "a", "b"])
     }
 
-    @Test func progressGitAndPullRequestUpdaters() {
-        let model = makeModel()
-        model.updateProgress(SidebarProgressState(value: 0.5, label: "half"))
-        #expect(model.progress?.label == "half")
-        model.updateProgress(nil)
-        #expect(model.progress == nil)
-
-        model.updateGitBranch(SidebarGitBranchState(branch: "main", isDirty: true))
-        #expect(model.gitBranch?.branch == "main")
-        #expect(model.gitBranch?.isDirty == true)
-
-        let pr = SidebarPullRequestState(
-            number: 7,
-            label: "PR 7",
-            url: URL(string: "https://example.com/7")!,
-            status: .open,
-            branch: "feat",
-            isStale: false
-        )
-        model.updatePullRequest(pr)
-        #expect(model.pullRequest?.number == 7)
-    }
-
     @Test func publisherSeedsCurrentValueThenEmitsChanges() {
         let model = makeModel()
         var received: [Int] = []

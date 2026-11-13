@@ -2,23 +2,6 @@ import Dispatch
 import Foundation
 
 extension GitMetadataService {
-    /// A synthesized `git remote -v`-style listing built by reading remote URLs
-    /// straight from the reachable config files (no `git` process). `nil` when
-    /// no remote URL is found.
-    nonisolated static func gitRemoteVOutput(repository: ResolvedGitRepository) -> String? {
-        var lines: [String] = []
-        var seenConfigPaths: Set<String> = []
-        for configURL in gitRootConfigURLs(repository: repository) {
-            appendGitRemoteVLines(
-                fromConfigURL: configURL,
-                repository: repository,
-                seenConfigPaths: &seenConfigPaths,
-                lines: &lines
-            )
-        }
-        return lines.isEmpty ? nil : lines.joined()
-    }
-
     /// The repository's top-level config files, including a linked worktree's
     /// `config.worktree` when that bounded regular file is present.
     nonisolated static func gitRootConfigURLs(repository: ResolvedGitRepository) -> [URL] {
@@ -50,107 +33,6 @@ extension GitMetadataService {
         }
 
         return urls
-    }
-
-    /// Parses a single config string into `git remote -v` fetch lines (used by
-    /// the test-only config entry point).
-    nonisolated static func gitRemoteVLines(fromConfig config: String) -> [String] {
-        var currentRemoteName: String?
-        var lines: [String] = []
-
-        for rawLine in config.components(separatedBy: .newlines) {
-            let line = gitConfigLineRemovingInlineComment(rawLine)
-                .trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("[") && line.hasSuffix("]") {
-                currentRemoteName = gitConfigRemoteName(fromSectionHeader: line)
-                continue
-            }
-
-            guard let currentRemoteName else { continue }
-            let parts = line.split(separator: "=", maxSplits: 1).map {
-                $0.trimmingCharacters(in: .whitespaces)
-            }
-            guard parts.count == 2, parts[0].lowercased() == "url" else {
-                continue
-            }
-            let remoteURL = gitConfigUnquotedValue(parts[1])
-            guard !remoteURL.isEmpty else {
-                continue
-            }
-            lines.append("\(currentRemoteName)\t\(remoteURL) (fetch)\n")
-        }
-
-        return lines
-    }
-
-    /// Appends `git remote -v` fetch lines from a config file (and its matching
-    /// includes) into `lines`, guarding against include cycles via
-    /// `seenConfigPaths`.
-    nonisolated static func appendGitRemoteVLines(
-        fromConfigURL configURL: URL,
-        repository: ResolvedGitRepository,
-        seenConfigPaths: inout Set<String>,
-        lines: inout [String]
-    ) {
-        let configURL = configURL.standardizedFileURL
-        guard seenConfigPaths.insert(configURL.path).inserted,
-              let config = try? String(contentsOf: configURL, encoding: .utf8) else {
-            return
-        }
-
-        var currentRemoteName: String?
-        var currentSectionAllowsIncludePath = false
-
-        for rawLine in config.components(separatedBy: .newlines) {
-            let line = gitConfigLineRemovingInlineComment(rawLine)
-                .trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("[") && line.hasSuffix("]") {
-                currentRemoteName = gitConfigRemoteName(fromSectionHeader: line)
-                if line.lowercased() == "[include]" {
-                    currentSectionAllowsIncludePath = true
-                } else if let condition = gitConfigIncludeIfCondition(fromSectionHeader: line) {
-                    currentSectionAllowsIncludePath = gitConfigIncludeIfConditionMatches(
-                        condition,
-                        repository: repository,
-                        configURL: configURL
-                    )
-                } else {
-                    currentSectionAllowsIncludePath = false
-                }
-                continue
-            }
-
-            let parts = line.split(separator: "=", maxSplits: 1).map {
-                $0.trimmingCharacters(in: .whitespaces)
-            }
-
-            if let currentRemoteName,
-               parts.count == 2,
-               parts[0].lowercased() == "url" {
-                let remoteURL = gitConfigUnquotedValue(parts[1])
-                guard !remoteURL.isEmpty else {
-                    continue
-                }
-                lines.append("\(currentRemoteName)\t\(remoteURL) (fetch)\n")
-                continue
-            }
-
-            guard currentSectionAllowsIncludePath,
-                  parts.count == 2,
-                  parts[0].lowercased() == "path",
-                  let includeURL = gitConfigIncludeURL(
-                      fromPathValue: parts[1],
-                      relativeTo: configURL
-                  ) else {
-                continue
-            }
-            appendGitRemoteVLines(
-                fromConfigURL: includeURL,
-                repository: repository,
-                seenConfigPaths: &seenConfigPaths,
-                lines: &lines
-            )
-        }
     }
 
     /// The config URLs included by `[include]`/`[includeIf "…"]` sections of a
@@ -273,21 +155,6 @@ extension GitMetadataService {
         }
 
         return result
-    }
-
-    /// The remote name from a `[remote "<name>"]` section header, or `nil`.
-    /// The section name is case-insensitive per git; the quoted subsection
-    /// (the remote name) is case-sensitive and extracted verbatim.
-    nonisolated static func gitConfigRemoteName(fromSectionHeader header: String) -> String? {
-        let prefix = "[remote \""
-        let suffix = "\"]"
-        guard header.count > prefix.count + suffix.count - 1,
-              header.lowercased().hasPrefix(prefix),
-              header.hasSuffix(suffix) else {
-            return nil
-        }
-        let name = header.dropFirst(prefix.count).dropLast(suffix.count)
-        return name.isEmpty ? nil : String(name)
     }
 
     /// The condition from an `[includeIf "<condition>"]` section header, or `nil`.

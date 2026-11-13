@@ -2,7 +2,7 @@
 ///
 /// Each case names one way the palette can be requested (open the command list,
 /// the workspace switcher, or one of the rename/edit prompts). The app target
-/// resolves the target `NSWindow`, clears browser focus mode, and posts the
+/// resolves the target `NSWindow` and posts the
 /// notification; the per-kind policy that decides *which* notification to post
 /// and whether the request marks a pending-open lives here so it stays pure and
 /// testable.

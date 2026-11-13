@@ -55,36 +55,6 @@ if ! command -v rustup &> /dev/null; then
     echo "Install via: https://rustup.rs"
     exit 1
 fi
-DIFF_RUST_TOOLCHAIN="$(awk -F '"' '/^[[:space:]]*channel[[:space:]]*=/{print $2; exit}' Native/DiffSidecar/rust-toolchain.toml)"
-rustup toolchain install "$DIFF_RUST_TOOLCHAIN" --profile minimal --component clippy,rustfmt
-rustup target add --toolchain "$DIFF_RUST_TOOLCHAIN" aarch64-apple-darwin x86_64-apple-darwin
-rustup run "$DIFF_RUST_TOOLCHAIN" cargo --version
-rustup run "$DIFF_RUST_TOOLCHAIN" rustc --version
-
-# Every app build also runs scripts/build-cmux-cua.sh, which compiles the
-# bundled cmux-cua engine with Cargo (default toolchain). Verify a working
-# cargo is on PATH so the first tagged reload does not fail mid-build.
-echo "==> Checking for cargo (bundled cmux-cua)..."
-if ! command -v cargo &> /dev/null || ! cargo --version &> /dev/null; then
-    echo "Error: a working Rust toolchain (cargo) is required to build the bundled cmux-cua."
-    echo "Install via rustup: https://rustup.rs"
-    echo "(Homebrew's rustup is keg-only and ships no rustup-init: add"
-    echo " \"\$(brew --prefix rustup)/bin\" to PATH, then run \`rustup default stable\`.)"
-    exit 1
-fi
-
-# The Cloud tunnel system extension embeds wireguard-go, built by
-# scripts/build-wireguard-go.sh. Release builds require Go; a Debug build
-# without it gets a stub engine (the extension cannot load in a Debug build
-# anyway), so this is advisory rather than fatal.
-echo "==> Checking for Go (Cloud tunnel extension)..."
-export PATH="/usr/local/go/bin:${HOME}/go/bin:${PATH}"
-if command -v go &> /dev/null; then
-    go version
-else
-    echo "Note: go is not installed; Debug builds will use a stub WireGuard engine."
-    echo "Install via: brew install go (required for Release builds)"
-fi
 
 "$SCRIPT_DIR/ensure-ghosttykit.sh"
 

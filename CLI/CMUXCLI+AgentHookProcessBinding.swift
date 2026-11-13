@@ -6,7 +6,7 @@ extension CMUXCLI {
         pid: Int?,
         client: SocketClient
     ) -> AgentHookProcessBindingProbe {
-        guard !client.isRelayBacked, let pid, pid > 0 else {
+        guard let pid, pid > 0 else {
             return .notAttempted
         }
 
@@ -85,8 +85,6 @@ extension CMUXCLI {
         pid: Int?,
         client: SocketClient
     ) -> AgentHookProcessBindingProbe {
-        guard !client.isRelayBacked else { return .notAttempted }
-
         var candidates: [Int] = []
         if let pid, pid > 0 {
             candidates.append(pid)

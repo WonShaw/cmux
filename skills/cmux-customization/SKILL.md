@@ -1,6 +1,6 @@
 ---
 name: cmux-customization
-description: "Customize cmux for an end user. Use when changing cmux.json actions, custom commands, workspace layouts, plus-button behavior, surface tab bar buttons, Command Palette entries, Dock controls, sidebar and app settings, shortcuts, notifications, browser routing, examples-library presets, or Ghostty-backed terminal preferences."
+description: "Customize cmux for an end user. Use when changing cmux.json actions, custom commands, workspace layouts, plus-button behavior, surface tab bar buttons, Command Palette entries, Dock controls, sidebar and app settings, shortcuts, notifications, examples-library presets, or Ghostty-backed terminal preferences."
 ---
 
 # cmux Customization
@@ -11,7 +11,7 @@ Keep the user's config intact, prefer schema-backed edits, and validate before r
 
 | Want to change | Edit |
 |---|---|
-| App preferences (appearance, sidebar, notifications, browser routing, automation, shortcuts, new-workspace placement) | `~/.config/cmux/cmux.json` via the `cmux-settings` helper |
+| App preferences (appearance, sidebar, notifications, automation, shortcuts, new-workspace placement) | `~/.config/cmux/cmux.json` via the `cmux-settings` helper |
 | Custom actions, workspace layouts/commands, tab bar buttons, plus-button behavior, Command Palette entries, notification hooks | `~/.config/cmux/cmux.json` globally or `.cmux/cmux.json` in the project |
 | Dock controls (right-sidebar terminals: logs, test watchers, git TUIs, dev servers, queues, `cmux feed tui --opentui`) | `.cmux/dock.json` or `~/.config/cmux/dock.json`; `cmux docs dock` when available |
 | Terminal rendering and terminal keybindings (fonts, themes, cursor style, copy-on-select, shell integration) | Ghostty config, usually `~/.config/ghostty/config` |
@@ -22,7 +22,7 @@ Project-local `.cmux/cmux.json` and `.cmux/dock.json` let worktree, SSH, review,
 
 If a request can be handled by Ghostty config, say so and use Ghostty config instead of inventing cmux UI settings.
 
-Key surfaces in `cmux.json`: `actions` (reusable, can appear in Cmd+Shift+P, surface tab bars, shortcuts, and the plus-button right-click menu), `ui.newWorkspace.action` (replaces the plus-button click) and `ui.newWorkspace.contextMenu` (right-click menu; `ui.newWorkspace.rightClick` is an accepted alias but new examples use `contextMenu`), `ui.surfaceTabBar.buttons` (replaces default tab bar buttons; include built-ins like `cmux.newTerminal`, `cmux.newBrowser`, `cmux.splitRight`, `cmux.splitDown` only when they should stay visible), and `commands` (workspace definitions with split layouts).
+Key surfaces in `cmux.json`: `actions` (reusable, can appear in Cmd+Shift+P, surface tab bars, shortcuts, and the plus-button right-click menu), `ui.newWorkspace.action` (replaces the plus-button click) and `ui.newWorkspace.contextMenu` (right-click menu; `ui.newWorkspace.rightClick` is an accepted alias but new examples use `contextMenu`), `ui.surfaceTabBar.buttons` (replaces default tab bar buttons; include built-ins like `cmux.newTerminal`, `cmux.splitRight`, `cmux.splitDown` only when they should stay visible), and `commands` (workspace definitions with split layouts).
 
 ## Workflow
 
@@ -46,7 +46,7 @@ Key surfaces in `cmux.json`: `actions` (reusable, can appear in Cmd+Shift+P, sur
 
    ```bash
    ~/.agents/skills/cmux-settings/scripts/cmux-settings list-supported
-   ~/.agents/skills/cmux-settings/scripts/cmux-settings set browser.openTerminalLinksInCmuxBrowser true
+   ~/.agents/skills/cmux-settings/scripts/cmux-settings set app.appearance dark
    ~/.agents/skills/cmux-settings/scripts/cmux-settings validate
    ```
 

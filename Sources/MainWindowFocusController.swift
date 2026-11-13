@@ -127,7 +127,7 @@ final class MainWindowFocusController {
             fileExplorerHost = host
         case .find:
             fileSearchHost = host
-        case .sessions, .feed, .dock, .machines, .customSidebar:
+        case .sessions, .feed, .dock, .customSidebar:
             break
         }
         focusRegisteredRightSidebarEndpointIfNeeded(mode: mode)
@@ -585,9 +585,6 @@ final class MainWindowFocusController {
             if terminalFocusRequest(for: responder) != nil {
                 return .mainPanelFind
             }
-            if selectedFocusedPanelIsBrowser() {
-                return .mainPanelFind
-            }
             if case .rightSidebar(let mode) = intent {
                 return findShortcutTarget(forRightSidebarMode: mode)
             }
@@ -623,10 +620,6 @@ final class MainWindowFocusController {
         mode == .files ? .rightSidebarFileSearch : .none
     }
 
-    private func selectedFocusedPanelIsBrowser() -> Bool {
-        selectedFocusedBrowserPanelRequest() != nil
-    }
-
     private struct FocusedPanelRequest {
         let workspaceId: UUID
         let panelId: UUID
@@ -651,19 +644,6 @@ final class MainWindowFocusController {
             return FocusedPanelRequest(workspaceId: workspace.id, panelId: panelId)
         }
         return nil
-    }
-
-    private func selectedFocusedBrowserPanelRequest() -> FocusedPanelRequest? {
-        guard let tabManager,
-              let workspace = tabManager.selectedWorkspace,
-              let panelId = workspace.focusedPanelId,
-              let panel = workspace.panels[panelId] else {
-            return nil
-        }
-        guard panel is BrowserPanel else {
-            return nil
-        }
-        return FocusedPanelRequest(workspaceId: workspace.id, panelId: panelId)
     }
 
     private func focusTerminalOrReleaseRightSidebarFocus(clearUnavailableIntent: Bool) -> Bool {
@@ -747,7 +727,7 @@ final class MainWindowFocusController {
             return .outline
         case .find:
             return .searchField
-        case .sessions, .machines, .customSidebar:
+        case .sessions, .customSidebar:
             return .host
         case .feed:
             return focusFirstItem ? .firstItem : .host
@@ -767,8 +747,6 @@ final class MainWindowFocusController {
             return fileSearchHost?.focusSearchField() == true
         case .sessions, .customSidebar:
             return mode == .customSidebar ? focusFallbackRightSidebarHost() : false
-        case .machines:
-            return focusFallbackRightSidebarHost()
         case .feed:
             if target == .firstItem {
                 feedHost?.focusFirstItemFromCoordinator()

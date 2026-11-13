@@ -380,11 +380,11 @@ jobs:
         run: |
           set -euo pipefail
           APP="build-universal/Build/Products/Release/cmux.app"
-          # The Release build's tunnel extension is com.cmuxterm.app.tunnel: the
+          # The Release build's tunnel extension is com.comux.app.tunnel: the
           # bundle identifier carries no team prefix (only NEMachServiceName and
           # the profile's App ID do), exactly as nightly ships <bundle id>.tunnel.
           # tests/test_ci_release_tunnel_identifiers.sh pins this to the project.
-          ./scripts/normalize-system-extension-bundle.sh "$APP" "com.cmuxterm.app.tunnel"
+          ./scripts/normalize-system-extension-bundle.sh "$APP" "com.comux.app.tunnel"
           APP_BINARY="build-universal/Build/Products/Release/cmux.app/Contents/MacOS/cmux"
           CLI_BINARY="build-universal/Build/Products/Release/cmux.app/Contents/Resources/bin/cmux"
           HELPER_BINARY="build-universal/Build/Products/Release/cmux.app/Contents/Resources/bin/ghostty"
@@ -400,7 +400,7 @@ jobs:
           [[ "$APP_ARCHS" == *arm64* && "$APP_ARCHS" == *x86_64* ]]
           [[ "$CLI_ARCHS" == *arm64* && "$CLI_ARCHS" == *x86_64* ]]
           [[ "$HELPER_ARCHS" == *arm64* && "$HELPER_ARCHS" == *x86_64* ]]
-          TUNNEL_BINARY="$APP/Contents/Library/SystemExtensions/com.cmuxterm.app.tunnel.systemextension/Contents/MacOS/cmuxTunnel"
+          TUNNEL_BINARY="$APP/Contents/Library/SystemExtensions/com.comux.app.tunnel.systemextension/Contents/MacOS/cmuxTunnel"
           [ -x "$TUNNEL_BINARY" ] || { echo "Cloud tunnel extension binary not found at $TUNNEL_BINARY" >&2; exit 1; }
           TUNNEL_ARCHS="$(lipo -archs "$TUNNEL_BINARY")"
           echo "Tunnel extension architectures: $TUNNEL_ARCHS"
@@ -455,7 +455,7 @@ jobs:
           echo "$APPLE_RELEASE_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$TMP_PROFILE"
           security cms -D -i "$TMP_PROFILE" > "$TMP_PLIST"
           APP_ID="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.application-identifier" "$TMP_PLIST")"
-          if [ "$APP_ID" != "7WLXT3NR37.com.cmuxterm.app" ]; then
+          if [ "$APP_ID" != "7WLXT3NR37.com.comux.app" ]; then
             echo "Release provisioning profile targets unexpected app ID: $APP_ID" >&2
             exit 1
           fi
@@ -479,7 +479,7 @@ jobs:
           set -euo pipefail
           ./scripts/ci/embed-tunnel-extension-profile.sh \
             "build-universal/Build/Products/Release/cmux.app" \
-            "7WLXT3NR37.com.cmuxterm.app.tunnel" \
+            "7WLXT3NR37.com.comux.app.tunnel" \
             "${APPLE_RELEASE_TUNNEL_PROVISIONING_PROFILE_BASE64:-}"
 
       - name: Strip release binaries

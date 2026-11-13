@@ -484,11 +484,9 @@ extension Workspace {
             scheduleRestoredStartupInputResend(panelId: detached.panelId)
         }
         if let deferredRestore = detached.deferredAgentResumeRestore {
-            let adoptedRemoteContext = surfaceResumeBindingsByPanelId[detached.panelId]?
-                .launchFlavor.remoteContext
             deferAgentResumeRestore(
                 panelId: detached.panelId,
-                restore: deferredRestore.retargetingRemoteOwner(adoptedRemoteContext)
+                restore: deferredRestore
             )
         }
         invalidatedRestoredAgentFingerprintsByPanelId.removeValue(forKey: detached.panelId)
@@ -638,19 +636,6 @@ extension Workspace {
             } else {
                 currentResumeBinding = nil
             }
-            if restore.remoteResumeCommandEmbedded {
-                // The attach command was embedded in the terminal's initial
-                // command before the ownership scan. Require the complete
-                // managed binding to remain unchanged (including its command,
-                // cwd, and launch flavor) so a changed resume payload can
-                // never execute from the stale terminal configuration.
-                guard let capturedBinding = restore.resumeBinding,
-                      let currentResumeBinding,
-                      capturedBinding == currentResumeBinding else {
-                    cancelDeferredAgentResumeRestore(panelId: panelId, restore: restore)
-                    continue
-                }
-            }
             let ownershipPanelID = restore.stablePanelID
             let expectedSessionId = restore.restorableAgent?.sessionId ?? restore.resumeBinding?.checkpointId
             let liveSessionOwner: LiveAgentSessionOwner? = if let expectedKind,
@@ -670,7 +655,7 @@ extension Workspace {
                     terminal: terminal,
                     noticeInput: AgentRestoreLiveOwnerNotice(
                         processID: liveSessionOwner.processID
-            ).startupInput(dialect: restore.noticeDialect)
+            ).startupInput(dialect: .loginShell)
                 )
                 AgentRestoreSuppressionJournal().record(
                     kind: liveSessionOwner.kind,
@@ -711,26 +696,11 @@ extension Workspace {
             }
 
             let startupInput: String?
-            let claim: (kind: String, sessionId: String)?
             if let restorableAgent = restore.restorableAgent {
-                startupInput = if restore.restoresRemoteWorkspaceTerminalSnapshot {
-                    restorableAgent.resumeStartupInput(
-                        useLocalRestoreVerb: false,
-                        restoringWorkingDirectory: restore.resumeWorkingDirectory
-                    )
-                } else {
-                    restorableAgent.resumeStartupInput(
-                        restoringWorkingDirectory: restore.resumeWorkingDirectory
-                    )
-                }
-                claim = (restorableAgent.kind.rawValue, restorableAgent.sessionId)
+                startupInput = restorableAgent.resumeStartupInput(
+                    restoringWorkingDirectory: restore.resumeWorkingDirectory
+                )
             } else if let binding = currentResumeBinding ?? restore.resumeBinding {
-                if restore.restoresRemoteWorkspaceTerminalSnapshot {
-                    guard binding.launchFlavor.remoteContext == restore.remoteResumeContext else {
-                        cancelDeferredAgentResumeRestore(panelId: panelId, restore: restore)
-                        continue
-                    }
-                }
                 let approvedBinding = policy.approvedSurfaceResumeBinding(
                     binding,
                     autoResumeAgentSessions: AgentSessionAutoResumeSettings.isEnabled(
@@ -740,35 +710,14 @@ extension Workspace {
                     approvalStoreURL: SurfaceResumeApprovalStore.defaultURL()
                 )
                 startupInput = approvedBinding.flatMap {
-                    if restore.restoresRemoteWorkspaceTerminalSnapshot {
-                        return $0.remoteStartupInput()
-                    }
-                    return policy.surfaceResumeStartupLaunch(forApprovedBinding: $0)?.initialInput
-                }
-                claim = binding.kind.flatMap { kind in
-                    binding.checkpointId.map { (kind, $0) }
+                    policy.surfaceResumeStartupLaunch(forApprovedBinding: $0)?.initialInput
                 }
             } else {
                 startupInput = nil
-                claim = nil
             }
             guard let startupInput, !startupInput.isEmpty else {
                 cancelDeferredAgentResumeRestore(panelId: panelId, restore: restore)
                 continue
-            }
-            let ownedClaim = restore.restoresRemoteWorkspaceTerminalSnapshot
-                ? claim
-                : nil
-            if let ownedClaim,
-               !AgentResumeLaunchGuard.shared.claimResumeLaunch(
-                   kind: ownedClaim.kind,
-                   sessionId: ownedClaim.sessionId
-               ) {
-                cancelDeferredAgentResumeRestore(panelId: panelId, restore: restore)
-                continue
-            }
-            if let ownedClaim {
-                deferredAgentResumeClaimsByPanelId[panelId] = ownedClaim
             }
             if let restoreWorkingDirectory = restore.resumeWorkingDirectory {
                 restoredResumeSessionWorkingDirectoriesByPanelId[panelId] = restoreWorkingDirectory
@@ -777,19 +726,12 @@ extension Workspace {
                 .awaitingAutoResumeCommand,
                 panelId: panelId
             )
-            let admittedInput = restore.remoteResumeCommandEmbedded ? nil : startupInput
-            restoredAgentLifecycle.registerStartupInput(admittedInput, panelId: panelId)
+            restoredAgentLifecycle.registerStartupInput(startupInput, panelId: panelId)
             let admitted = terminal.surface.admitStartupRestoreRuntime(
-                initialInput: admittedInput
+                initialInput: startupInput
             )
             if !admitted {
                 restoredAgentLifecycle.clearStartupInput(panelId: panelId)
-                if let ownedClaim {
-                    AgentResumeLaunchGuard.shared.releaseResumeLaunch(
-                        kind: ownedClaim.kind,
-                        sessionId: ownedClaim.sessionId
-                    )
-                }
                 deferredAgentResumeClaimsByPanelId.removeValue(forKey: panelId)
                 deferredAgentResumeRestoresByPanelId.removeValue(forKey: panelId)
                 restoredAgentLifecycle.setResumeState(
@@ -804,14 +746,6 @@ extension Workspace {
                     workingDirectory: restore.resumeWorkingDirectory ?? restore.workingDirectory
                 )
                 deferredAgentResumeRestoresByPanelId.removeValue(forKey: panelId)
-                if let ownedClaim,
-                   let pendingClaim = deferredAgentResumeClaimsByPanelId[panelId],
-                   pendingClaim.kind == ownedClaim.kind,
-                   pendingClaim.sessionId == ownedClaim.sessionId {
-                    // After admission the guard's bounded TTL owns this claim;
-                    // do not let later panel teardown release a newer claimant.
-                    deferredAgentResumeClaimsByPanelId.removeValue(forKey: panelId)
-                }
             }
         }
     }
@@ -927,27 +861,9 @@ extension Workspace {
             .manualResumeAvailable,
             panelId: panelId
         )
-        if restore.remoteResumeCommandEmbedded {
-            let fallbackCommand: String
-            if let remoteResumeContext = restore.remoteResumeContext,
-               let remoteNoticeCommand = persistentSSHLiveOwnerNoticeCommand(noticeInput) {
-                fallbackCommand = remotePTYAttachStartupCommand(
-                    sessionID: remoteResumeContext.persistentPTYSessionID,
-                    remoteCommand: remoteNoticeCommand
-                )
-            } else {
-                fallbackCommand = noticeInput
-            }
-            terminal.surface.setStartupRestoreAdmissionFallbackCommand(fallbackCommand)
-            // The original remote attach command contains the agent resume
-            // payload. Cancel admission so the attach-only/notice fallback
-            // replaces it and the payload can never execute.
-            terminal.surface.cancelStartupRestoreAdmission()
-        } else {
-            _ = terminal.surface.admitStartupRestoreRuntime(
-                initialInput: noticeInput
-            )
-        }
+        _ = terminal.surface.admitStartupRestoreRuntime(
+            initialInput: noticeInput
+        )
     }
 
     /// The live-agent scan did not finish inside the admission deadline, so
@@ -972,7 +888,7 @@ extension Workspace {
                 restore: restore,
                 terminal: terminal,
                 noticeInput: AgentRestoreUnverifiableNotice()
-                    .startupInput(dialect: restore.noticeDialect)
+                    .startupInput(dialect: .loginShell)
             )
         }
         deferredAgentResumeRestoresByPanelId.removeAll()

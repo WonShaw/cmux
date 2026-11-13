@@ -184,32 +184,6 @@ public protocol ControlSidebarContext: AnyObject {
     /// resolve.
     func controlSidebarClearGitBranch(tabArg: String?) -> Bool
 
-    // MARK: Pull requests (panel metadata mutations)
-
-    /// Whether a raw PR state token is valid (`SidebarPullRequestStatus` raw
-    /// values).
-    nonisolated func controlSidebarIsValidPullRequestState(_ raw: String) -> Bool
-
-    /// Enqueues the `report_pr` panel pull-request update.
-    nonisolated func controlSidebarSchedulePanelPullRequestUpdate(
-        target: ControlSidebarPanelMutationTarget,
-        number: Int,
-        label: String,
-        url: URL,
-        statusRawValue: String,
-        branch: String?
-    )
-
-    /// Enqueues the `clear_pr` panel pull-request clear.
-    nonisolated func controlSidebarSchedulePanelPullRequestClear(target: ControlSidebarPanelMutationTarget)
-
-    /// Enqueues the `report_pr_action` command hint.
-    nonisolated func controlSidebarSchedulePanelPullRequestAction(
-        target: ControlSidebarPanelMutationTarget,
-        action: String,
-        actionTarget: String?
-    )
-
     // MARK: Ports / pwd / shell state / tty / kick
 
     /// Applies the `report_ports` write (`panelArg` is the raw
@@ -304,15 +278,13 @@ public protocol ControlSidebarContext: AnyObject {
     /// the remote instead of created locally — the resolution distinguishes
     /// that from failure.
     func controlSidebarCreatePaneSplit(
-        isBrowser: Bool,
         orientationIsHorizontal: Bool,
-        insertFirst: Bool,
-        url: URL?
+        insertFirst: Bool
     ) -> ControlSidebarPaneSplitResolution
 
     /// Creates a `new_surface` in a pane (UUID-or-index argument, focused
     /// pane otherwise).
-    func controlSidebarNewSurface(isBrowser: Bool, paneArg: String?, url: URL?) -> ControlSidebarNewSurfaceResolution
+    func controlSidebarNewSurface(paneArg: String?) -> ControlSidebarNewSurfaceResolution
 
     /// Closes a surface (`close_surface`; empty argument = focused surface).
     func controlSidebarCloseSurface(surfaceArg: String?) -> ControlSidebarCloseSurfaceResolution

@@ -52,8 +52,6 @@ extension TabManager {
 #if DEBUG
             maybeMutateSelectionDuringWorkspaceCreationForDev(snapshot: snapshot)
 #endif
-            let nextTabCount = snapshot.tabs.count + 1
-            sentryBreadcrumb("workspace.create.fromDetachedSurface", data: ["tabCount": nextTabCount])
 
             let inheritedConfig = workspaceCreationConfigTemplate(
                 inheritedTerminalFontSizeLineage: snapshot.inheritedTerminalFontSizeLineage
@@ -86,7 +84,6 @@ extension TabManager {
                 explicitTitle: title,
                 explicitTitleSource: titleSource
             )
-            wireClosedBrowserTracking(for: newWorkspace)
 
             var updatedTabs = tabs
             let insertIndex = Self.clampedDetachedWorkspaceInsertIndex(plannedInsertIndex, workspaces: updatedTabs)

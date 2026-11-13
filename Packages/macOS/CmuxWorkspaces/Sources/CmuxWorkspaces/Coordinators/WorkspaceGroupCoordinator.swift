@@ -2,7 +2,7 @@ public import Foundation
 public import CmuxSettings
 internal import OSLog
 
-private let workspaceGroupLogger = Logger(subsystem: "com.cmuxterm.app", category: "WorkspaceGroupCoordinator")
+private let workspaceGroupLogger = Logger(subsystem: "com.comux.app", category: "WorkspaceGroupCoordinator")
 
 /// Sequences every workspace-group flow over the window's `WorkspacesModel`:
 /// group creation (fresh anchor + member adoption), member add/remove,
@@ -141,9 +141,6 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
         select: Bool = true,
         initialSurface: NewWorkspaceInitialSurface = .terminal,
         title: String? = nil,
-        initialBrowserURL: URL? = nil,
-        initialBrowserOmnibarVisible: Bool = true,
-        initialBrowserTransparentBackground: Bool = false,
         applyCreationTitleAsCustomTitle: Bool = true
     ) -> Tab? {
         guard let host else { return nil }
@@ -160,9 +157,6 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
             title: title,
             workingDirectory: cwd,
             initialSurface: initialSurface,
-            initialBrowserURL: initialBrowserURL,
-            initialBrowserOmnibarVisible: initialBrowserOmnibarVisible,
-            initialBrowserTransparentBackground: initialBrowserTransparentBackground,
             inheritWorkingDirectory: cwd == nil,
             select: select,
             applyCreationTitleAsCustomTitle: applyCreationTitleAsCustomTitle

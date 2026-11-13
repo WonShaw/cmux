@@ -1,6 +1,6 @@
 internal import Foundation
 
-/// The v1 sidebar telemetry/report commands (`report_git_branch` / `report_pr`
+/// The v1 sidebar telemetry/report commands (`report_git_branch`
 /// / `report_ports` / `report_pwd` / `report_shell_state` / `report_tty` /
 /// `ports_kick` / `sidebar_state` / `reset_sidebar` / `right_sidebar`), lifted
 /// byte-faithfully from the former `TerminalController` bodies.
@@ -70,108 +70,6 @@ extension ControlCommandCoordinator {
         guard cleared else {
             return "ERROR: Tab not found"
         }
-        return "OK"
-    }
-
-    // MARK: - Pull requests
-
-    /// `report_pr` / `report_review` — record a pull request on a panel
-    /// (parse + bus enqueue; zero main hops, replies are parse-only).
-    nonisolated func sidebarReportPullRequest(_ args: String, context: (any ControlCommandContext)?) -> String {
-        let parsed = sidebarParseOptions(args)
-        guard parsed.positional.count >= 2 else {
-            return "ERROR: Missing pull request number or URL — usage: report_pr <number> <url> [--label=PR] [--state=open|merged|closed] [--branch=<name>] [--tab=X] [--panel=Y]"
-        }
-
-        let rawNumber = parsed.positional[0].trimmingCharacters(in: .whitespacesAndNewlines)
-        let numberToken = rawNumber.hasPrefix("#") ? String(rawNumber.dropFirst()) : rawNumber
-        guard let number = Int(numberToken), number > 0 else {
-            return "ERROR: Invalid pull request number '\(rawNumber)'"
-        }
-
-        let rawURL = parsed.positional[1].trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: rawURL),
-              let scheme = url.scheme?.lowercased(),
-              scheme == "http" || scheme == "https" else {
-            return "ERROR: Invalid pull request URL '\(rawURL)'"
-        }
-
-        let statusRaw = (parsed.options["state"] ?? "open").lowercased()
-        guard context?.controlSidebarIsValidPullRequestState(statusRaw) ?? false else {
-            return "ERROR: Invalid pull request state '\(statusRaw)' — use: open, merged, closed"
-        }
-        let branch = sidebarNormalizedOptionValue(parsed.options["branch"])
-        if sidebarNormalizedOptionValue(parsed.options["checks"]) != nil {
-            return "ERROR: Unsupported option '--checks' — pull request checks are no longer tracked"
-        }
-
-        let labelRaw = sidebarNormalizedOptionValue(parsed.options["label"]) ?? "PR"
-        guard !labelRaw.isEmpty else {
-            return "ERROR: Invalid review label — usage: report_pr <number> <url> [--label=PR] [--state=open|merged|closed] [--branch=<name>] [--tab=X] [--panel=Y]"
-        }
-        let label = String(labelRaw.prefix(16))
-
-        // Shell integration provides explicit workspace/panel UUIDs for browser metadata.
-        // Keep this telemetry path off-main so SwiftUI render passes can't deadlock the socket handler.
-        let resolution = sidebarPanelMutationTarget(
-            options: parsed.options,
-            missingPanelUsage: "report_pr <number> <url> [--label=PR] [--state=open|merged|closed] [--branch=<name>] [--tab=X] [--panel=Y]"
-        )
-        guard let target = resolution.target else {
-            return resolution.error ?? "ERROR: Tab not found"
-        }
-        context?.controlSidebarSchedulePanelPullRequestUpdate(
-            target: target,
-            number: number,
-            label: label,
-            url: url,
-            statusRawValue: statusRaw,
-            branch: branch
-        )
-        return "OK"
-    }
-
-    /// `clear_pr` — clear a panel's pull request (parse + bus enqueue).
-    nonisolated func sidebarClearPullRequest(_ args: String, context: (any ControlCommandContext)?) -> String {
-        let parsed = sidebarParseOptions(args)
-        let resolution = sidebarPanelMutationTarget(
-            options: parsed.options,
-            missingPanelUsage: "clear_pr [--tab=X] [--panel=Y]"
-        )
-        guard let target = resolution.target else {
-            return resolution.error ?? "ERROR: Tab not found"
-        }
-        context?.controlSidebarSchedulePanelPullRequestClear(target: target)
-        return "OK"
-    }
-
-    /// `report_pr_action` — record a PR command hint on a panel (parse + bus
-    /// enqueue).
-    nonisolated func sidebarReportPullRequestAction(_ args: String, context: (any ControlCommandContext)?) -> String {
-        let parsed = sidebarParseOptions(args)
-        guard let rawAction = parsed.positional.first, !rawAction.isEmpty else {
-            return "ERROR: Missing PR action — usage: report_pr_action <merge|close|reopen|create|checkout|ready|edit|view> [--target=X] [--tab=X] [--panel=Y]"
-        }
-
-        let action = rawAction.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let validActions = Set(["merge", "close", "reopen", "create", "checkout", "ready", "edit", "view"])
-        guard validActions.contains(action) else {
-            return "ERROR: Invalid PR action '\(rawAction)'"
-        }
-
-        let actionTarget = sidebarNormalizedOptionValue(parsed.options["target"])
-        let resolution = sidebarPanelMutationTarget(
-            options: parsed.options,
-            missingPanelUsage: "report_pr_action <merge|close|reopen|create|checkout|ready|edit|view> [--target=X] [--tab=X] [--panel=Y]"
-        )
-        guard let target = resolution.target else {
-            return resolution.error ?? "ERROR: Tab not found"
-        }
-        context?.controlSidebarSchedulePanelPullRequestAction(
-            target: target,
-            action: action,
-            actionTarget: actionTarget
-        )
         return "OK"
     }
 
@@ -445,14 +343,6 @@ extension ControlCommandCoordinator {
             lines.append("git_branch=\(git.branch)\(git.isDirty ? " dirty" : " clean")")
         } else {
             lines.append("git_branch=none")
-        }
-
-        if let pr = snapshot.firstPullRequest {
-            lines.append("pr=#\(pr.number) \(pr.statusRawValue) \(pr.urlAbsoluteString)")
-            lines.append("pr_label=\(pr.label)")
-        } else {
-            lines.append("pr=none")
-            lines.append("pr_label=none")
         }
 
         if snapshot.listeningPorts.isEmpty {

@@ -4,7 +4,7 @@ import Bonsplit
 import OSLog
 
 private let closedItemHistoryLogger = Logger(
-    subsystem: "com.cmuxterm.app",
+    subsystem: "com.comux.app",
     category: "ClosedItemHistory"
 )
 
@@ -167,7 +167,6 @@ final class ClosedItemHistoryStore: ObservableObject {
         case remapPanelAnchorIds(oldPanelId: UUID, newPanelId: UUID)
         case remapWorkspaceWindowIds(oldWindowId: UUID, newWindowId: UUID)
         case removePanelRecords(workspaceIds: Set<UUID>)
-        case removeManagedCloudVMRecords
     }
 
     init(
@@ -372,45 +371,6 @@ final class ClosedItemHistoryStore: ObservableObject {
         persistRecords()
     }
 
-    /// Remove closed workspace/window snapshots that carry a Cloud VM identity.
-    ///
-    /// A sign-out must not leave a one-click "reopen" record containing a
-    /// remote machine's reconnect configuration. Local closed-panel history
-    /// remains intact.
-    func removeManagedCloudVMRecords() {
-        guard didFinishPersistedRecordsLoad else {
-            pendingPersistedRecordMutations.append(.removeManagedCloudVMRecords)
-            return
-        }
-        let filtered = records.filter { !Self.recordContainsManagedCloudVM($0) }
-        guard filtered.count != records.count else { return }
-        records = filtered
-        advanceRevision()
-        persistRecords()
-    }
-
-    static func recordContainsManagedCloudVM(_ record: ClosedItemHistoryRecord) -> Bool {
-        switch record.entry {
-        case .panel:
-            return false
-        case .workspace(let entry):
-            return workspaceSnapshotHostsCloudVM(entry.snapshot)
-        case .window(let entry):
-            return entry.snapshot.tabManager.workspaces.contains(where: workspaceSnapshotHostsCloudVM)
-        }
-    }
-
-    /// A Cloud workspace through either transport — the legacy managed remote
-    /// (`managedCloudVMID`) or the cmux-tui binding (`cloudVM`) — the same
-    /// definition session restore uses under `DisableCloud`, so a purge and a
-    /// blocked restore agree on what a Cloud record is.
-    static func workspaceSnapshotHostsCloudVM(_ snapshot: SessionWorkspaceSnapshot) -> Bool {
-        if snapshot.remote?.managedCloudVMID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
-            return true
-        }
-        return snapshot.cloudVM != nil
-    }
-
     @discardableResult private func trimToCapacityIfNeeded() -> Bool {
         let previousCount = records.count
         records = capacityPolicy.trimming(records)
@@ -544,9 +504,6 @@ final class ClosedItemHistoryStore: ObservableObject {
             return recordsByRemappingWorkspaceWindowIds(records, from: oldWindowId, to: newWindowId)
         case .removePanelRecords(let workspaceIds):
             return recordsByRemovingPanelRecords(records, forWorkspaceIds: workspaceIds)
-        case .removeManagedCloudVMRecords:
-            let filtered = records.filter { !recordContainsManagedCloudVM($0) }
-            return (filtered, filtered.count != records.count)
         }
     }
 
@@ -751,7 +708,7 @@ final class ClosedItemHistoryStore: ObservableObject {
         }
         let bundleId = (bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
             ? bundleIdentifier!
-            : "com.cmuxterm.app"
+            : "com.comux.app"
         let safeBundleId = bundleId.replacingOccurrences(
             of: "[^A-Za-z0-9._-]",
             with: "_",

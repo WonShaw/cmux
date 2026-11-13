@@ -221,46 +221,6 @@ extension TerminalController {
         }
     }
 
-    /// The enqueue halves of the deleted file-private
-    /// `schedulePanelMetadataMutation(args:options:missingPanelUsage:mutation:)`
-    /// (the parse-level head moved into the coordinator's
-    /// `sidebarPanelMutationTarget`): the explicit-scope fast path, then the
-    /// report-tab fallback, both deferred on the mutation bus. `nonisolated`
-    /// with a `@MainActor` mutation closure, for the same reasons as
-    /// `controlSidebarScheduleMutation`.
-    nonisolated func controlSidebarSchedulePanelMetadataMutation(
-        target: ControlSidebarPanelMutationTarget,
-        mutation: @escaping @MainActor (Workspace, UUID) -> Void
-    ) {
-        if let scope = target.scope {
-            TerminalMutationBus.shared.enqueueMainActorMutation { [weak self] in
-                guard let self,
-                      let tab = self.controlSidebarTabForMutation(id: scope.workspaceID) else {
-                    return
-                }
-                let validSurfaceIds = Set(tab.panels.keys)
-                tab.pruneSurfaceMetadata(validSurfaceIds: validSurfaceIds)
-                guard validSurfaceIds.contains(scope.panelID) else { return }
-                mutation(tab, scope.panelID)
-            }
-            return
-        }
-
-        let tabArg = target.tabArg
-        let surfaceIdFromOptions = target.panelID
-        TerminalMutationBus.shared.enqueueMainActorMutation { [weak self] in
-            guard let self,
-                  let tab = self.controlSidebarResolveTabForReport(tabArg: tabArg) else {
-                return
-            }
-            let validSurfaceIds = Set(tab.panels.keys)
-            tab.pruneSurfaceMetadata(validSurfaceIds: validSurfaceIds)
-            guard let surfaceId = surfaceIdFromOptions ?? tab.focusedPanelId else { return }
-            guard validSurfaceIds.contains(surfaceId) else { return }
-            mutation(tab, surfaceId)
-        }
-    }
-
     nonisolated func controlSidebarScheduleScopedDirectoryUpdate(scope: ControlSidebarPanelScope, directory: String, displayLabel: String?) {
         TerminalMutationBus.shared.enqueueReplacingMainActorMutation(
             replaceKey: TerminalMutationReplaceKey.scoped(
@@ -322,8 +282,6 @@ extension TerminalController {
                 directory: directory,
                 displayLabel: displayLabel
             )
-        } else if tab.isRemoteTerminalSurface(surfaceId) {
-            _ = tab.updateRemotePanelDirectoryWithMetadata(panelId: surfaceId, directory: directory, displayLabel: displayLabel)
         } else {
             _ = tab.updatePanelDirectory(panelId: surfaceId, directory: directory, displayLabel: displayLabel)
         }

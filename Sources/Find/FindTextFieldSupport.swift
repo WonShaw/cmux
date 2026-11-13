@@ -100,9 +100,8 @@ func cmuxRememberFindSelectionBeforePanelFocusMove(tabManager: TabManager?, wind
         return
     }
     guard let workspace = tabManager?.selectedWorkspace,
-          let focusedPanelId = workspace.focusedPanelId else { return }
-    let owner = (workspace.focusedTerminalInputTarget()?.panel.searchState as AnyObject?)
-        ?? (workspace.browserPanel(for: focusedPanelId)?.searchState as AnyObject?)
+          workspace.focusedPanelId != nil else { return }
+    let owner = workspace.focusedTerminalInputTarget()?.panel.searchState as AnyObject?
     guard let owner else { return }
     cmuxStoreFindSelection(selection, for: owner)
 }

@@ -87,17 +87,7 @@ extension KeyboardShortcutSettings {
             return .unbound
         }
 
-        let shortcut = shortcut(for: action)
-        switch action {
-        case .browserBack
-            where !shortcut.isUnbound && shortcut == KeyboardShortcutSettings.shortcut(for: .focusHistoryBack):
-            return .unbound
-        case .browserForward
-            where !shortcut.isUnbound && shortcut == KeyboardShortcutSettings.shortcut(for: .focusHistoryForward):
-            return .unbound
-        default:
-            return shortcut
-        }
+        return shortcut(for: action)
     }
 
     static func isManagedBySettingsFile(_ action: Action) -> Bool {

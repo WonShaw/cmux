@@ -129,8 +129,7 @@ struct SimulatorPanelVisibilityTests {
             onRequestPanelFocus: {},
             onResumeAgentHibernation: {},
             onAutoResumeAgentHibernation: {},
-            onTriggerFlash: {},
-            onRequestDeferredBrowserMaterialization: {}
+            onTriggerFlash: {}
         )
     }
 
@@ -201,8 +200,7 @@ struct SimulatorPanelThemeTests {
             onRequestPanelFocus: {},
             onResumeAgentHibernation: {},
             onAutoResumeAgentHibernation: {},
-            onTriggerFlash: {},
-            onRequestDeferredBrowserMaterialization: {}
+            onTriggerFlash: {}
         )
     }
 

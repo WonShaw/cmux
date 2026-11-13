@@ -57,11 +57,6 @@ final class FilePreviewQuickLookContainerView: NSView {
 
     private func retireLivePreview(reason: String) {
         guard let previewView else { return }
-        sentryBreadcrumb(
-            "quickLook.preview.retire",
-            category: "filePreview",
-            data: ["reason": reason]
-        )
         previewView.previewItem = nil
         // `shouldCloseWithWindow` transfers closure ownership to this host even
         // when the preview has never entered a window.

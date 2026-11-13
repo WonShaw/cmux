@@ -204,28 +204,6 @@ class BrokenPipeWritesTests(unittest.TestCase):
         self.assertIn(b"Failed to write to socket", result.stderr)
         self.assertRegex(result.stderr, rb"errno (32|54)")
 
-    def test_socket_disconnect_is_filtered_before_sentry_capture(self) -> None:
-        # The DEBUG capture probe is downstream of classification, before SDK
-        # startup. An actionable control proves an absent probe is meaningful.
-        self.env.pop("CMUX_CLI_SENTRY_DISABLED")
-        self.env.pop("CMUX_CLAUDE_HOOK_SENTRY_DISABLED")
-        self.env["CMUX_BUNDLE_ID"] = "com.cmuxterm.app.debug.cli-pipe-regressions"
-        probe = Path(self.root.name) / "capture.txt"
-        self.env["CMUX_CLI_SENTRY_CAPTURE_PROBE_PATH"] = str(probe)
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-            listener.bind(("127.0.0.1", 0))
-            port = listener.getsockname()[1]
-        control = self.run_cli("--socket", f"127.0.0.1:{port}", "ping")
-        self.assertEqual(control.returncode, 1, control.stderr)
-        self.assertIn(b"Missing relay auth metadata", control.stderr)
-        self.assertTrue(probe.exists(), "Actionable control did not reach the DEBUG capture probe")
-        probe.unlink()
-
-        result = self.run_socket_disconnect()
-        self.assertEqual(result.returncode, 1, result.stderr)
-        self.assertRegex(result.stderr, rb"errno (32|54)")
-        self.assertFalse(probe.exists(), "Expected disconnect reached Sentry capture")
-
     def test_child_processes_keep_default_sigpipe(self) -> None:
         for mode in ("spawn", "spawn-stderr", "exec"):
             with self.subTest(mode=mode):

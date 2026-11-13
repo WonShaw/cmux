@@ -5,13 +5,6 @@ import SwiftUI
 /// (https://github.com/manaflow-ai/cmux/issues/12134): the one the window
 /// opens on in the first layout pass, the rest one per run-loop turn.
 extension SettingsWindowRoot {
-    /// Sections a window opening now mounts progressively. Cloud stays
-    /// eager while unavailable: it renders nothing, so a placeholder would
-    /// only advertise a section the sidebar hides.
-    static func mountOrder(cloudAvailable: Bool) -> [SettingsSectionID] {
-        SettingsSectionMountModel.displayOrder.filter { $0 != .cloudMachines || cloudAvailable }
-    }
-
     func anchorID(for section: SettingsSectionID) -> String {
         "section:\(section.rawValue)"
     }
@@ -19,17 +12,9 @@ extension SettingsWindowRoot {
     @ViewBuilder
     func sectionStack(proxy: ScrollViewProxy) -> some View {
         // Order matches the legacy in-app SettingsView scroll order:
-        // Account, App, Terminal, TextBox, Mobile, Sidebar, Beta Features,
-        // Automation, Browser (with embedded Import), Global Hotkey,
+        // App, Terminal, TextBox, Mobile, Sidebar, Beta Features,
+        // Automation, Global Hotkey,
         // Keyboard Shortcuts, Workspace Colors, cmux.json, Reset.
-        slot(.account, proxy: proxy) {
-            AccountSection(
-                defaultsStore: defaultsStore,
-                catalog: catalog,
-                accountFlow: accountFlow
-            )
-        }
-
         slot(.app, proxy: proxy) {
             AppSection(
                 defaultsStore: defaultsStore,
@@ -53,22 +38,6 @@ extension SettingsWindowRoot {
 
         slot(.sleepyMode, proxy: proxy) {
             SleepyModeSection(hostActions: hostActions, store: hostActions.sleepyModeStore())
-        }
-
-        slot(.mobile, proxy: proxy) {
-            MobileSection(defaultsStore: defaultsStore, catalog: catalog, hostActions: hostActions)
-        }
-
-        slot(.cloudMachines, proxy: proxy) {
-            // `DisableCloud` (MDM) and the rollout gate: no Cloud pane at all
-            // while unavailable, not just no placeholder.
-            if isCloudSectionAvailable {
-                CloudMachinesSection(hostActions: hostActions)
-            }
-        }
-
-        slot(.networking, proxy: proxy) {
-            IrohNetworkingSection(hostActions: hostActions)
         }
 
         slot(.sidebarAppearance, proxy: proxy) {
@@ -96,24 +65,6 @@ extension SettingsWindowRoot {
                 catalog: catalog,
                 errorLog: runtime.errorLog,
                 hostActions: hostActions
-            )
-        }
-
-        slot(.computerUse, proxy: proxy) {
-            ComputerUseSection(
-                jsonStore: jsonStore,
-                catalog: catalog,
-                errorLog: runtime.errorLog,
-                hostActions: hostActions
-            )
-        }
-
-        slot(.browser, proxy: proxy) {
-            BrowserSection(
-                defaultsStore: defaultsStore,
-                catalog: catalog,
-                hostActions: hostActions,
-                importAnchorID: anchorID(for: .browserImport)
             )
         }
 
@@ -168,7 +119,7 @@ extension SettingsWindowRoot {
         SettingsSectionSlot(
             section: section,
             isMounted: mountModel.isMounted(section),
-            showsPlaceholder: section != .cloudMachines || isCloudSectionAvailable,
+            showsPlaceholder: true,
             onMountedAppear: { sectionContentDidAppear(section, proxy: proxy) },
             content: content
         )

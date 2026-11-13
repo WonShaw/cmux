@@ -1,6 +1,6 @@
 ---
 name: cmux-settings
-description: "View and edit cmux settings in ~/.config/cmux/cmux.json. Use when the user wants to change cmux preferences (appearance, sidebar, notifications, automation, browser, shortcuts), set a value by JSON path, validate the file, open it in an editor, or look up which keys cmux recognizes. Triggers on '/cmux-settings', 'change cmux setting', 'set <something> in cmux', 'cmux config', 'cmux.json', or 'rebind a cmux shortcut'."
+description: "View and edit cmux settings in ~/.config/cmux/cmux.json. Use when the user wants to change cmux preferences (appearance, sidebar, notifications, automation, shortcuts), set a value by JSON path, validate the file, open it in an editor, or look up which keys cmux recognizes. Triggers on '/cmux-settings', 'change cmux setting', 'set <something> in cmux', 'cmux config', 'cmux.json', or 'rebind a cmux shortcut'."
 ---
 
 # cmux-settings
@@ -45,7 +45,6 @@ The rest of this doc assumes it is on `$PATH` as `cmux-settings`; from a checkou
    cmux-settings set sidebarAppearance.matchTerminalBackground true
    cmux-settings set app.appearance dark
    cmux-settings set shortcuts.bindings.newTab '["ctrl+b","c"]'
-   cmux-settings set browser.hostsToOpenInEmbeddedBrowser '["localhost","*.internal.example"]'
    ```
 3. Read back and `cmux-settings validate`.
 4. Tell the user it auto-reloaded, and that `cmux-settings unset <key>` reverts it.
@@ -56,7 +55,6 @@ The rest of this doc assumes it is on `$PATH` as `cmux-settings`; from a checkou
 - Sidebar tint: `sidebarAppearance.matchTerminalBackground`, `.tintColor`, `.tintOpacity` (0..1).
 - Sidebar details: `sidebar.hideAllDetails`, `.showBranchDirectory`, `.showPullRequests`, `.showPorts`, `.showLog`.
 - Notifications: `notifications.dockBadge`, `.sound` (enum including `"none"`, `"custom_file"`), `.customSoundFilePath`, `.hooks` (array).
-- Browser: `browser.defaultSearchEngine`, `.theme`, `.defaultZoomLevel`, `.openTerminalLinksInCmuxBrowser`, `.hostsToOpenInEmbeddedBrowser`.
 - Automation: `automation.socketControlMode` (`off | cmuxOnly | automation | password | allowAll`), `.portBase`, `.portRange`.
 - Shortcuts: `shortcuts.bindings.<actionId>` = `"cmd+b"`, `["ctrl+b","c"]`, `null`, or `""` to unbind. Action ids in [references/shortcut-actions.md](references/shortcut-actions.md).
 

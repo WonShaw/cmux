@@ -31,7 +31,6 @@ extension View {
         task(id: ids) { @MainActor in
             await withTaskGroup(of: Void.self) { group in
                 for (id, workspace) in zip(ids, workspaces) {
-                    let cloudChanges = workspace.cloudBindingState.changes()
                     let immediateChanges = workspace.sidebarImmediateObservationPublisher
                         .values
                     let debouncedChanges = workspace.sidebarObservationPublisher
@@ -44,12 +43,6 @@ extension View {
                         .debounce(for: debouncedInterval, scheduler: DispatchQueue.main)
                         .values
                     group.addTask { @MainActor in
-                        for await _ in cloudChanges {
-                            if Task.isCancelled { break }
-                            onChange(id)
-                        }
-                    }
-                    group.addTask { @MainActor in
                         for await _ in immediateChanges {
                             if Task.isCancelled { break }
                             onChange(id)
@@ -59,27 +52,6 @@ extension View {
                         for await _ in debouncedChanges {
                             if Task.isCancelled { break }
                             onChange(id)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Keeps extension sidebar projections current using the same Cloud invalidation source.
-    func sidebarCloudBindingObservations(
-        ids: [UUID],
-        models: [WorkspaceCloudBindingState],
-        onChange: @MainActor @escaping () -> Void
-    ) -> some View {
-        task(id: ids) { @MainActor in
-            await withTaskGroup(of: Void.self) { group in
-                for model in models {
-                    let changes = model.changes()
-                    group.addTask { @MainActor in
-                        for await _ in changes {
-                            if Task.isCancelled { break }
-                            onChange()
                         }
                     }
                 }
@@ -215,14 +187,7 @@ private struct SidebarObservationState: Equatable {
     let progress: SidebarProgressState?
     let gitBranch: SidebarGitBranchState?
     let panelGitBranches: [UUID: SidebarGitBranchState]
-    let pullRequest: SidebarPullRequestState?
-    let panelPullRequests: [UUID: SidebarPullRequestState]
-    let remoteConfiguration: WorkspaceRemoteConfiguration?
-    let remoteConnectionState: WorkspaceRemoteConnectionState
-    let remoteConnectionDetail: String?
-    let activeRemoteTerminalSessionCount: Int
     let listeningPorts: [Int]
-    let browserMediaActivity: BrowserMediaActivity
 }
 
 extension Workspace {
@@ -317,24 +282,15 @@ extension Workspace {
             sidebarMetadata.logEntriesPublisher,
             sidebarMetadata.progressPublisher
         )
-        let gitFields = Publishers.CombineLatest4(
+        let gitFields = Publishers.CombineLatest(
             sidebarMetadata.gitBranchPublisher,
-            sidebarMetadata.panelGitBranchesPublisher,
-            sidebarMetadata.pullRequestPublisher,
-            sidebarMetadata.panelPullRequestsPublisher
-        )
-        let remoteFields = Publishers.CombineLatest4(
-            $remoteConfiguration,
-            $remoteConnectionState,
-            $remoteConnectionDetail,
-            $activeRemoteTerminalSessionCount
+            sidebarMetadata.panelGitBranchesPublisher
         )
         let directoryChangeRevision = currentDirectoryChangeRevisionPublisher()
-        return Publishers.CombineLatest4(
+        return Publishers.CombineLatest3(
             workspaceFields,
             metadataFields,
-            gitFields,
-            remoteFields
+            gitFields
         )
             .combineLatest($listeningPorts, sidebarMetadata.panelDirectoryDisplayLabelsPublisher)
             .combineLatest(directoryChangeRevision)
@@ -344,7 +300,6 @@ extension Workspace {
                 let workspaceFields = groupedFields.0
                 let metadataFields = groupedFields.1
                 let gitFields = groupedFields.2
-                let remoteFields = groupedFields.3
                 return SidebarObservationState(
                     currentDirectory: workspaceFields.0,
                     extensionSidebarProjectRootPath: workspaceFields.1,
@@ -358,14 +313,7 @@ extension Workspace {
                     progress: metadataFields.3,
                     gitBranch: gitFields.0,
                     panelGitBranches: gitFields.1,
-                    pullRequest: gitFields.2,
-                    panelPullRequests: gitFields.3,
-                    remoteConfiguration: remoteFields.0,
-                    remoteConnectionState: remoteFields.1,
-                    remoteConnectionDetail: remoteFields.2,
-                    activeRemoteTerminalSessionCount: remoteFields.3,
-                    listeningPorts: listeningPorts,
-                    browserMediaActivity: self.browserMediaActivity
+                    listeningPorts: listeningPorts
                 )
             }
             .removeDuplicates()

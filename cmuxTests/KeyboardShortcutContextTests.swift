@@ -34,122 +34,6 @@ final class KeyboardShortcutContextTests: XCTestCase {
         XCTAssertFalse(shortcutResponderAcceptsTextEditing(NSView()))
     }
 
-    func testRenameTabAndBrowserReloadCanShareDefaultChordAcrossContexts() {
-        let renameTabShortcut = KeyboardShortcutSettings.Action.renameTab.defaultShortcut
-
-        XCTAssertEqual(renameTabShortcut, KeyboardShortcutSettings.Action.browserReload.defaultShortcut)
-        XCTAssertEqual(KeyboardShortcutSettings.Action.renameTab.shortcutContext, .nonBrowserPanel)
-        XCTAssertEqual(KeyboardShortcutSettings.Action.browserReload.shortcutContext, .browserPanel)
-        XCTAssertFalse(
-            KeyboardShortcutSettings.Action.renameTab.conflicts(
-                with: KeyboardShortcutSettings.Action.browserReload.defaultShortcut,
-                proposedAction: .browserReload,
-                configuredShortcut: renameTabShortcut
-            )
-        )
-        XCTAssertFalse(
-            KeyboardShortcutSettings.Action.browserReload.conflicts(
-                with: renameTabShortcut,
-                proposedAction: .renameTab,
-                configuredShortcut: KeyboardShortcutSettings.Action.browserReload.defaultShortcut
-            )
-        )
-        XCTAssertTrue(
-            KeyboardShortcutSettings.Action.renameTab.conflicts(
-                with: renameTabShortcut,
-                proposedAction: .renameWorkspace,
-                configuredShortcut: renameTabShortcut
-            )
-        )
-    }
-
-    func testRenameTabCanReassignCommandRAfterUnbindingWithoutBrowserReloadConflict() throws {
-        let originalSettingsFileStore = KeyboardShortcutSettings.settingsFileStore
-        let directoryURL = try makeTemporaryDirectory()
-        defer {
-            KeyboardShortcutSettings.resetAll()
-            KeyboardShortcutSettings.settingsFileStore = originalSettingsFileStore
-            try? FileManager.default.removeItem(at: directoryURL)
-        }
-
-        let settingsFileURL = directoryURL.appendingPathComponent("cmux.json", isDirectory: false)
-        try writeSettingsFile("{}", to: settingsFileURL)
-        KeyboardShortcutSettings.settingsFileStore = KeyboardShortcutSettingsFileStore(
-            primaryPath: settingsFileURL.path,
-            fallbackPath: nil,
-            additionalFallbackPaths: [],
-            startWatching: false
-        )
-        KeyboardShortcutSettings.resetAll()
-
-        let commandR = StoredShortcut(key: "r", command: true, shift: false, option: false, control: false)
-        XCTAssertEqual(commandR, KeyboardShortcutSettings.Action.renameTab.defaultShortcut)
-        XCTAssertEqual(commandR, KeyboardShortcutSettings.Action.browserReload.defaultShortcut)
-
-        KeyboardShortcutSettings.setShortcut(commandR, for: .renameTab)
-        KeyboardShortcutSettings.clearShortcut(for: .renameTab)
-
-        XCTAssertEqual(KeyboardShortcutSettings.shortcut(for: .renameTab), .unbound)
-        XCTAssertEqual(KeyboardShortcutSettings.shortcut(for: .browserReload), commandR)
-        XCTAssertEqual(
-            KeyboardShortcutSettings.Action.renameTab.normalizedRecordedShortcutResult(commandR),
-            .accepted(commandR)
-        )
-
-        KeyboardShortcutSettings.setShortcut(commandR, for: .renameTab)
-
-        XCTAssertEqual(KeyboardShortcutSettings.shortcut(for: .renameTab), commandR)
-        XCTAssertEqual(KeyboardShortcutSettings.shortcut(for: .browserReload), commandR)
-    }
-
-    func testSwapPathIgnoresNonOverlappingShortcutContexts() throws {
-        let originalSettingsFileStore = KeyboardShortcutSettings.settingsFileStore
-        let directoryURL = try makeTemporaryDirectory()
-        defer {
-            KeyboardShortcutSettings.resetAll()
-            KeyboardShortcutSettings.settingsFileStore = originalSettingsFileStore
-            try? FileManager.default.removeItem(at: directoryURL)
-        }
-
-        let settingsFileURL = directoryURL.appendingPathComponent("cmux.json", isDirectory: false)
-        try writeSettingsFile("{}", to: settingsFileURL)
-        KeyboardShortcutSettings.settingsFileStore = KeyboardShortcutSettingsFileStore(
-            primaryPath: settingsFileURL.path,
-            fallbackPath: nil,
-            additionalFallbackPaths: [],
-            startWatching: false
-        )
-        KeyboardShortcutSettings.resetAll()
-
-        let commandR = KeyboardShortcutSettings.Action.renameTab.defaultShortcut
-        KeyboardShortcutSettings.clearShortcut(for: .renameTab)
-
-        KeyboardShortcutSettings.swapShortcutConflict(
-            proposedShortcut: commandR,
-            currentAction: .renameTab,
-            conflictingAction: .browserReload,
-            previousShortcut: .unbound
-        )
-
-        XCTAssertEqual(KeyboardShortcutSettings.shortcut(for: .renameTab), .unbound)
-        XCTAssertEqual(KeyboardShortcutSettings.shortcut(for: .browserReload), commandR)
-        XCTAssertNil(
-            ShortcutRecorderValidationPresentation(
-                attempt: ShortcutRecorderRejectedAttempt(
-                    reason: .conflictsWithAction(.browserReload),
-                    proposedShortcut: commandR
-                ),
-                action: .renameTab,
-                currentShortcut: .unbound,
-                shortcutForAction: { $0.defaultShortcut }
-            )
-        )
-    }
-
-    func testRenameWorkspaceIsScopedOutsideBrowserPanels() {
-        XCTAssertEqual(KeyboardShortcutSettings.Action.renameWorkspace.shortcutContext, .nonBrowserPanel)
-    }
-
     func testShowNotificationsStaysGenerallyAvailableForCustomBrowserBindings() {
         // The Cmd+I italics collision is special-cased in the browser routing path,
         // not by scoping the whole action out of browser panes. Show Notifications
@@ -162,74 +46,14 @@ final class KeyboardShortcutContextTests: XCTestCase {
         let context = KeyboardShortcutSettings.Action.switchRightSidebarToFiles.shortcutContext
 
         XCTAssertEqual(context, .rightSidebarFocus)
-        XCTAssertFalse(context.isAvailable(focusedBrowserPanel: false, focusedMarkdownPanel: false, rightSidebarFocused: false))
-        XCTAssertTrue(context.isAvailable(focusedBrowserPanel: false, focusedMarkdownPanel: false, rightSidebarFocused: true))
+        XCTAssertFalse(context.isAvailable(focusedMarkdownPanel: false, rightSidebarFocused: false))
+        XCTAssertTrue(context.isAvailable(focusedMarkdownPanel: false, rightSidebarFocused: true))
         XCTAssertFalse(
             KeyboardShortcutSettings.Action.renameTab.shortcutContext
-                .isAvailable(focusedBrowserPanel: false, focusedMarkdownPanel: false, rightSidebarFocused: true)
+                .isAvailable(focusedMarkdownPanel: false, rightSidebarFocused: true)
         )
         XCTAssertTrue(context.overlaps(KeyboardShortcutSettings.Action.commandPalette.shortcutContext))
         XCTAssertFalse(context.overlaps(KeyboardShortcutSettings.Action.renameTab.shortcutContext))
-    }
-
-    func testReactGrabStaysApplicationScopedForTerminalPastebackRouting() {
-        XCTAssertEqual(KeyboardShortcutSettings.Action.toggleReactGrab.shortcutContext, .application)
-    }
-
-    func testBrowserFocusModeToggleIsBrowserScopedAndDoesNotCollideWithSplitZoom() {
-        let focusMode = KeyboardShortcutSettings.Action.toggleBrowserFocusMode
-
-        // Scoped to browser panels so it only claims the key when a browser is focused.
-        XCTAssertEqual(focusMode.shortcutContext, .browserPanel)
-
-        // Default is Option+Cmd+Return: a modifier tier web pages rarely bind,
-        // distinct from the other Return-based shortcut (Cmd+Shift+Return = toggle
-        // split zoom), and clear of the Ctrl+Cmd+Return some screen recorders use.
-        let focusModeShortcut = focusMode.defaultShortcut
-        XCTAssertEqual(
-            focusModeShortcut,
-            StoredShortcut(key: "\r", command: true, shift: false, option: true, control: false)
-        )
-        XCTAssertNotEqual(
-            focusModeShortcut,
-            KeyboardShortcutSettings.Action.toggleSplitZoom.defaultShortcut
-        )
-        XCTAssertFalse(
-            focusMode.conflicts(
-                with: KeyboardShortcutSettings.Action.toggleSplitZoom.defaultShortcut,
-                proposedAction: .toggleSplitZoom,
-                configuredShortcut: focusModeShortcut
-            )
-        )
-    }
-
-    func testMarkdownZoomIsScopedToFocusedMarkdownPanelAndDoesNotCollideWithBrowserZoom() {
-        for action in [
-            KeyboardShortcutSettings.Action.markdownZoomIn,
-            .markdownZoomOut,
-            .markdownZoomReset,
-        ] {
-            XCTAssertEqual(action.shortcutContext, .markdownPanel)
-        }
-
-        let markdown = KeyboardShortcutSettings.Action.markdownZoomIn.shortcutContext
-        XCTAssertTrue(markdown.isAvailable(focusedBrowserPanel: false, focusedMarkdownPanel: true, rightSidebarFocused: false))
-        XCTAssertFalse(markdown.isAvailable(focusedBrowserPanel: false, focusedMarkdownPanel: false, rightSidebarFocused: false))
-        XCTAssertFalse(markdown.isAvailable(focusedBrowserPanel: true, focusedMarkdownPanel: false, rightSidebarFocused: false))
-
-        // Markdown zoom and browser zoom share Cmd-=/-/0 but are mutually
-        // exclusive (a panel can't be both), so they must NOT be treated as
-        // conflicting bindings.
-        let browser = KeyboardShortcutSettings.Action.browserZoomIn.shortcutContext
-        XCTAssertFalse(markdown.overlaps(browser))
-        XCTAssertTrue(markdown.overlaps(markdown))
-
-        // A focused markdown viewer is also a non-browser panel, so those two
-        // contexts CAN be active together and must be treated as overlapping.
-        let nonBrowser = KeyboardShortcutSettings.Action.renameTab.shortcutContext
-        XCTAssertEqual(nonBrowser, .nonBrowserPanel)
-        XCTAssertTrue(markdown.overlaps(nonBrowser))
-        XCTAssertTrue(nonBrowser.overlaps(markdown))
     }
 
     func testSurfaceDigitFamilyCoexistsWithPrioritizedSidebarModeShortcuts() {
@@ -267,17 +91,6 @@ final class KeyboardShortcutContextTests: XCTestCase {
                 configuredShortcut: sidebarFiles
             )
         )
-    }
-
-    func testNewBrowserWorkspaceSettingsPackageActionStaysAligned() {
-        guard let settingsAction = ShortcutAction(
-            rawValue: KeyboardShortcutSettings.Action.newBrowserWorkspace.rawValue
-        ) else {
-            XCTFail("Expected CmuxSettings.ShortcutAction for newBrowserWorkspace")
-            return
-        }
-        XCTAssertEqual(settingsAction.defaultStroke, ShortcutStroke(key: "n", command: true, option: true))
-        XCTAssertEqual(settingsAction.displayName, KeyboardShortcutSettings.Action.newBrowserWorkspace.label)
     }
 
     func testSettingsPackageDefaultWhenClausesMatchRuntimeShortcutContexts() {
@@ -394,42 +207,6 @@ final class KeyboardShortcutContextTests: XCTestCase {
                 layoutCharacterProvider: { _, _ in "n" }
             )
         )
-    }
-
-    func testFocusHistoryMenuShortcutsSuppressDuplicateBrowserHistoryKeys() throws {
-        let originalSettingsFileStore = KeyboardShortcutSettings.settingsFileStore
-        let directoryURL = try makeTemporaryDirectory()
-        defer {
-            KeyboardShortcutSettings.resetAll()
-            KeyboardShortcutSettings.settingsFileStore = originalSettingsFileStore
-            try? FileManager.default.removeItem(at: directoryURL)
-        }
-
-        let settingsFileURL = directoryURL.appendingPathComponent("cmux.json", isDirectory: false)
-        try writeSettingsFile("{}", to: settingsFileURL)
-        KeyboardShortcutSettings.settingsFileStore = KeyboardShortcutSettingsFileStore(
-            primaryPath: settingsFileURL.path,
-            fallbackPath: nil,
-            additionalFallbackPaths: [],
-            startWatching: false
-        )
-        KeyboardShortcutSettings.resetAll()
-
-        let focusBack = KeyboardShortcutSettings.shortcut(for: .focusHistoryBack)
-        let focusForward = KeyboardShortcutSettings.shortcut(for: .focusHistoryForward)
-
-        XCTAssertEqual(focusBack, KeyboardShortcutSettings.shortcut(for: .browserBack))
-        XCTAssertEqual(focusForward, KeyboardShortcutSettings.shortcut(for: .browserForward))
-        XCTAssertEqual(KeyboardShortcutSettings.menuShortcut(for: .focusHistoryBack), focusBack)
-        XCTAssertEqual(KeyboardShortcutSettings.menuShortcut(for: .focusHistoryForward), focusForward)
-        XCTAssertEqual(KeyboardShortcutSettings.menuShortcut(for: .browserBack), .unbound)
-        XCTAssertEqual(KeyboardShortcutSettings.menuShortcut(for: .browserForward), .unbound)
-
-        KeyboardShortcutSettings.clearShortcut(for: .focusHistoryBack)
-        KeyboardShortcutSettings.clearShortcut(for: .focusHistoryForward)
-
-        XCTAssertEqual(KeyboardShortcutSettings.menuShortcut(for: .browserBack), KeyboardShortcutSettings.shortcut(for: .browserBack))
-        XCTAssertEqual(KeyboardShortcutSettings.menuShortcut(for: .browserForward), KeyboardShortcutSettings.shortcut(for: .browserForward))
     }
 
     func testEmptyWhenClauseDoesNotSuppressMenuShortcut() throws {
@@ -619,8 +396,8 @@ final class KeyboardShortcutContextTests: XCTestCase {
         XCTAssertEqual(KeyboardShortcutSettings.shortcut(for: .selectWorkspaceByNumber), ctrl1)
 
         let workspaceWhen = KeyboardShortcutSettings.effectiveWhenClause(for: .selectWorkspaceByNumber)
-        XCTAssertTrue(workspaceWhen.evaluate(ShortcutFocusState(browser: false, markdown: false, sidebar: false)))
-        XCTAssertFalse(workspaceWhen.evaluate(ShortcutFocusState(browser: false, markdown: false, sidebar: true)))
+        XCTAssertTrue(workspaceWhen.evaluate(ShortcutFocusState(markdown: false, sidebar: false)))
+        XCTAssertFalse(workspaceWhen.evaluate(ShortcutFocusState(markdown: false, sidebar: true)))
         XCTAssertFalse(
             KeyboardShortcutSettings.Action.selectWorkspaceByNumber.conflicts(
                 with: ctrl1,

@@ -30,12 +30,6 @@ public struct ControlSystemTreeSurfaceNode: Sendable, Equatable {
     public let indexInPane: Int?
     /// The terminal's tty name, if known.
     public let tty: String?
-    /// Whether this is a browser surface (drives the `url` emission: browsers
-    /// emit a string — empty when no URL — and non-browsers emit JSON `null`).
-    public let isBrowser: Bool
-    /// For browser surfaces, the current URL string (`nil` encodes as the
-    /// legacy empty string).
-    public let url: String?
     /// Renderer health for terminal surfaces, or `nil` for other panel types.
     public let renderHealthRawValue: String?
     /// The Dock container scope for Dock-hosted surfaces, else `nil`.
@@ -54,8 +48,6 @@ public struct ControlSystemTreeSurfaceNode: Sendable, Equatable {
     ///   - paneID: The enclosing pane's identifier, if resolved.
     ///   - indexInPane: The tab index within the pane, if resolved.
     ///   - tty: The terminal's tty name, if known.
-    ///   - isBrowser: Whether this is a browser surface.
-    ///   - url: For browsers, the current URL string.
     ///   - dockScopeRawValue: The Dock scope for a Dock-hosted surface.
     public init(
         surfaceID: UUID,
@@ -68,8 +60,6 @@ public struct ControlSystemTreeSurfaceNode: Sendable, Equatable {
         paneID: UUID?,
         indexInPane: Int?,
         tty: String?,
-        isBrowser: Bool,
-        url: String?,
         renderHealthRawValue: String? = nil,
         dockScopeRawValue: String? = nil
     ) {
@@ -83,8 +73,6 @@ public struct ControlSystemTreeSurfaceNode: Sendable, Equatable {
         self.paneID = paneID
         self.indexInPane = indexInPane
         self.tty = tty
-        self.isBrowser = isBrowser
-        self.url = url
         self.renderHealthRawValue = renderHealthRawValue
         self.dockScopeRawValue = dockScopeRawValue
     }

@@ -7,7 +7,6 @@ struct WorkspaceSwitchActiveTransaction {
     let targetWorkspaceID: UUID
     var targetSurfaceID: UUID?
     var targetTerminalViewID: ObjectIdentifier?
-    var targetWebViewID: ObjectIdentifier?
     var readiness: WorkspaceSwitchReadiness?
     var sourceRetired = false
     var rendererProtectionActive = false

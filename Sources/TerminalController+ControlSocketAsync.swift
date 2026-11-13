@@ -1,5 +1,4 @@
 import CmuxControlSocket
-import CmuxBrowser
 import Foundation
 
 /// Async socket-dispatch helpers kept separate from the legacy synchronous
@@ -53,11 +52,7 @@ extension TerminalController {
                 request = parsed
             }
 
-            let relayAuthorization = await authorizeRemoteRelayRequestAsync(request)
-            if let errorResponse = relayAuthorization.errorResponse {
-                return errorResponse
-            }
-            let authorizedRequest = relayAuthorization.request
+            let authorizedRequest = request
             let automationOrigin = CmuxAutomationInvocationContext.eventOrigin
             if let focusError = Self.focusSuppressionResponse(
                 method: authorizedRequest.method,
@@ -83,21 +78,6 @@ extension TerminalController {
                     isV2: true,
                     params: authorizedRequest.params
                 ) {
-                    // Native browser keys stay on the asynchronous MainActor
-                    // path: WebKit/AppKit require main-actor delivery, while
-                    // the socket worker remains suspendable during readiness.
-                    // Opaque keys intentionally continue through the legacy
-                    // compatibility worker handler.
-                    if let action = self.browserKeyboardAction(for: authorizedRequest.method),
-                       let rawKey = authorizedRequest.params["key"]?.foundationObject as? String,
-                       let event = BrowserKeyboardEvent(rawKey: rawKey),
-                       event.nativeKey != nil {
-                        return await self.v2BrowserKeyboardNativeResponse(
-                            request: authorizedRequest,
-                            event: event,
-                            action: action
-                        )
-                    }
                     if authorizedRequest.method == "surface.sync_codex_native_title" {
                         return await self.v2MainAsync {
                             self.v2Result(
@@ -109,23 +89,6 @@ extension TerminalController {
                         }
                     }
                     if policy.runsOnSocketWorker {
-                        // Terminal rename performs an awaited cloud-link mutation. Keep the
-                        // actual socket connection task asynchronous instead of parking a
-                        // worker thread behind the legacy semaphore bridge.
-                        if authorizedRequest.method == "vm.terminal_rename" {
-                            return await self.socketCloudRenameResponseWithDeadline(
-                                id: authorizedRequest.id
-                            ) {
-                                await self.socketWorkerVMTerminalRenameResponseAsync(authorizedRequest)
-                            }
-                        }
-                        if authorizedRequest.method == "vm.tab_rename" {
-                            return await self.socketCloudRenameResponseWithDeadline(
-                                id: authorizedRequest.id
-                            ) {
-                                await self.socketWorkerVMTabRenameResponseAsync(authorizedRequest)
-                            }
-                        }
                         return await self.socketWorkerV2ResponseAsync(authorizedRequest)
                     }
                     return await self.processParsedV2CommandAsync(authorizedRequest)
@@ -198,8 +161,7 @@ extension TerminalController {
         if request.method == "agent.restore.release" {
             return await agentRestoreAdmissionReleaseResponse(request)
         }
-        if request.params[WorkspaceRemoteRelayCommandRewriter.remoteWorkspaceIDKey] == nil,
-           ControlCommandExecutionPolicy.servesFromPublishedReadSnapshot(method: request.method),
+        if ControlCommandExecutionPolicy.servesFromPublishedReadSnapshot(method: request.method),
            let snapshotResult = socketReadSnapshotStore.response(
                 method: request.method,
                 params: request.params,
@@ -334,68 +296,6 @@ extension TerminalController {
         )
     }
 
-    /// Applies one deadline to the complete cloud rename transaction. The
-    /// provider can perform several refreshes, compare-and-set writes, retries,
-    /// and compensation writes, so a per-command timeout alone does not bound
-    /// the socket request. The operation task is cancelled when the deadline
-    /// wins; the provider's next cancellation check or command boundary then
-    /// stops further writes, while the canonical graph remains the authority
-    /// for any command that was already in flight.
-    private nonisolated func socketCloudRenameResponseWithDeadline(
-        id: JSONValue?,
-        operation: @escaping @Sendable () async -> String
-    ) async -> String {
-        let (responses, continuation) = AsyncStream<String>.makeStream(
-            bufferingPolicy: .bufferingOldest(1)
-        )
-        let operationTask = Task {
-            let response = await operation()
-            continuation.yield(response)
-            continuation.finish()
-        }
-        let timeoutTask = Task {
-            do {
-                try await ContinuousClock().sleep(for: .seconds(120))
-            } catch {
-                return
-            }
-            guard !Task.isCancelled else { return }
-            continuation.yield(Self.v2Encoder.error(
-                id: id,
-                code: "timeout",
-                message: String(
-                    localized: "socket.vm.renameTimedOut",
-                    defaultValue: "The remote rename timed out after 120 seconds. Refresh and try again."
-                )
-            ))
-            continuation.finish()
-        }
-        continuation.onTermination = { @Sendable _ in
-            operationTask.cancel()
-            timeoutTask.cancel()
-        }
-
-        let response = await withTaskCancellationHandler(
-            operation: {
-                var iterator = responses.makeAsyncIterator()
-                return await iterator.next()
-            },
-            onCancel: {
-                operationTask.cancel()
-                timeoutTask.cancel()
-                continuation.finish()
-            }
-        )
-        operationTask.cancel()
-        timeoutTask.cancel()
-        continuation.finish()
-        return response ?? Self.v2Encoder.error(
-            id: id,
-            code: "request_error",
-            message: "Request failed before returning a result"
-        )
-    }
-
     private nonisolated func v2SystemTopAsync(_ request: ControlRequest) async -> String {
         let base = await v2MainAsync {
             let foundationParams = request.params.mapValues(\.foundationObject)
@@ -421,11 +321,9 @@ extension TerminalController {
             includeProcessDetails: includeProcesses
         )
         var windows = windowsObject
-        let browserPIDOccurrences = v2TopBrowserPIDOccurrences(in: windows)
         let totalPIDs = v2AnnotateTopWindows(
             &windows,
             processSnapshot: processSnapshot,
-            browserPIDOccurrences: browserPIDOccurrences,
             includeProcesses: includeProcesses
         )
         let aggregates = processAggregates(
@@ -482,9 +380,6 @@ extension TerminalController {
             return v2Result(id: id, workspaceParamError)
         }
 
-        let diffViewerRegistration: DiffViewerSessionPreparation = method == "browser.open_split"
-            ? v2PrepareDiffViewerRegistration(params: bridgedParams)
-            : .notNeeded
         let outcome = await v2MainAsync {
             let mainParams = request.params.mapValues(\.foundationObject)
             let mainID = request.id?.foundationObject
@@ -492,8 +387,7 @@ extension TerminalController {
                 request: request,
                 id: mainID,
                 method: method,
-                params: mainParams,
-                diffViewerRegistration: diffViewerRegistration
+                params: mainParams
             )
         }
         Task { @MainActor [weak self] in

@@ -2,6 +2,10 @@
 <html lang="en" data-color-mode="auto" data-light-theme="light" data-dark-theme="dark">
 <head>
 <meta charset="utf-8">
+<!-- Offline viewer: no network subresources of any kind. Images come only from
+     the host-mediated local-image scheme or inline data/blob URLs; scripts and
+     styles are the inlined bundled assets. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src cmux-local-image: data: blob:; font-src data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 {{githubMarkdownCSS}}
@@ -112,19 +116,6 @@ body {
   overflow-wrap: anywhere;
   font: 12px/1.4 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   color: var(--fgColor-muted);
-}
-.cmux-remote-image-placeholder button {
-  padding: 3px 7px;
-  border: 1px solid var(--borderColor-default);
-  border-radius: 6px;
-  background: var(--bgColor-default);
-  color: var(--fgColor-accent);
-  font: inherit;
-  cursor: pointer;
-}
-.cmux-remote-image-placeholder button:hover,
-.cmux-remote-image-placeholder button:focus-visible {
-  background: var(--bgColor-neutral-muted);
 }
 /* Mermaid + Vega-Lite blocks. Both libs render into these containers
    lazily; the .cmux-source <pre> holds the raw block source for the
@@ -462,121 +453,10 @@ html { scroll-behavior: smooth; }
       var parsed = new URL(raw, document.baseURI || window.location.href);
       var protocol = (parsed.protocol || '').toLowerCase();
       if (protocol !== 'http:' && protocol !== 'https:') { return null; }
-      return {
-        href: parsed.href,
-        host: parsed.host || parsed.hostname || '',
-        hostname: parsed.hostname || '',
-        port: parsed.port || '',
-        username: parsed.username || '',
-        password: parsed.password || '',
-        https: protocol === 'https:'
-      };
+      return { href: parsed.href };
     } catch (e) {
       return null;
     }
-  }
-
-  function normalizedRemoteHostname(info) {
-    return String((info && info.hostname) || '')
-      .replace(/^\[/, '')
-      .replace(/\]$/, '')
-      .replace(/\.+$/, '')
-      .toLowerCase();
-  }
-
-  function isBlockedRemoteIPv4(host) {
-    var match = String(host || '').match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-    if (!match) { return false; }
-    var parts = match.slice(1).map(function(part) { return Number(part); });
-    if (parts.some(function(part) { return !Number.isFinite(part) || part < 0 || part > 255; })) {
-      return true;
-    }
-    var first = parts[0];
-    var second = parts[1];
-    return first === 0 ||
-      first === 10 ||
-      (first === 100 && second >= 64 && second <= 127) ||
-      first === 127 ||
-      (first === 169 && second === 254) ||
-      (first === 172 && second >= 16 && second <= 31) ||
-      (first === 192 && (second === 0 || second === 168)) ||
-      (first === 198 && (second === 18 || second === 19)) ||
-      first >= 224;
-  }
-
-  function isBlockedRemoteIPv6(host) {
-    var value = String(host || '').toLowerCase();
-    value = value.replace(/^\[/, '').replace(/\]$/, '');
-    if (value.indexOf(':') === -1) { return false; }
-    if (value === '::' || value === '::1') { return true; }
-    var embeddedIPv4 = embeddedIPv4FromIPv6(value);
-    if (embeddedIPv4) {
-      return isBlockedRemoteIPv4(embeddedIPv4);
-    }
-    var first = value.split(':')[0] || '0';
-    var firstValue = parseInt(first, 16);
-    if (Number.isFinite(firstValue)) {
-      if ((firstValue & 0xfe00) === 0xfc00) { return true; }
-      if ((firstValue & 0xffc0) === 0xfe80) { return true; }
-      if ((firstValue & 0xffc0) === 0xfec0) { return true; }
-      if ((firstValue & 0xff00) === 0xff00) { return true; }
-    }
-    return false;
-  }
-
-  function embeddedIPv4FromIPv6(value) {
-    var raw = String(value || '').toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
-    var hextets = null;
-    if (raw.indexOf('::') === 0) {
-      hextets = raw.split(':').filter(Boolean);
-      if (hextets.length === 3 && hextets[0] === 'ffff') {
-        hextets = hextets.slice(1);
-      }
-    } else {
-      var expanded = raw.split(':');
-      var numbers = expanded.map(function(part) {
-        return /^[0-9a-f]{1,4}$/.test(part) ? parseInt(part, 16) : NaN;
-      });
-      var isIPv4Compatible = numbers.length === 8 &&
-        numbers.slice(0, 6).every(function(part) { return part === 0; });
-      var isIPv4Mapped = numbers.length === 8 &&
-        numbers.slice(0, 5).every(function(part) { return part === 0; }) &&
-        numbers[5] === 0xffff;
-      if (isIPv4Compatible || isIPv4Mapped) {
-        hextets = [expanded[6], expanded[7]];
-      }
-    }
-    if (!hextets || hextets.length !== 2) { return null; }
-    var high = parseInt(hextets[0], 16);
-    var low = parseInt(hextets[1], 16);
-    if (
-      !Number.isFinite(high) ||
-      !Number.isFinite(low) ||
-      high < 0 ||
-      high > 0xffff ||
-      low < 0 ||
-      low > 0xffff
-    ) {
-      return null;
-    }
-    return [
-      (high >> 8) & 0xff,
-      high & 0xff,
-      (low >> 8) & 0xff,
-      low & 0xff
-    ].join('.');
-  }
-
-  function remoteImageCanOfferLoad(info) {
-    if (!info || !info.https) { return false; }
-    if (info.username || info.password) { return false; }
-    if (info.port && info.port !== '443') { return false; }
-    var host = normalizedRemoteHostname(info);
-    if (!host) { return false; }
-    if (host === 'localhost' || host.slice(-10) === '.localhost') { return false; }
-    if (host === 'local' || host.slice(-6) === '.local') { return false; }
-    if (isBlockedRemoteIPv4(host) || isBlockedRemoteIPv6(host)) { return false; }
-    return true;
   }
 
   function isRelativeLocalImagePath(value) {
@@ -620,157 +500,8 @@ html { scroll-behavior: smooth; }
     });
   }
 
-  var remoteImageAllowedURLs = Object.create(null);
-
-  function cmuxRemoteImageURL(value) {
-    var info = remoteImageInfo(value);
-    if (!info || !info.https) { return null; }
-    return 'cmux-remote-image://image?url=' + encodeURIComponent(info.href);
-  }
-
-  function removeRemoteImagePlaceholder(img) {
-    var id = img && img.getAttribute('data-cmux-remote-placeholder-id');
-    if (!id) { return; }
-    var placeholder = contentEl.querySelector('[data-cmux-remote-placeholder-for="' + id + '"]');
-    if (placeholder) { placeholder.remove(); }
-  }
-
-  function remoteImagePlaceholderForImage(img) {
-    var id = img && img.getAttribute('data-cmux-remote-placeholder-id');
-    if (!id) { return null; }
-    return contentEl.querySelector('[data-cmux-remote-placeholder-for="' + id + '"]');
-  }
-
-  function setRemoteImageLoadingState(img, loading) {
-    var placeholder = remoteImagePlaceholderForImage(img);
-    if (!placeholder) { return; }
-    var buttons = placeholder.querySelectorAll('button[data-cmux-remote-action="load"]');
-    Array.prototype.slice.call(buttons).forEach(function(button) {
-      if (loading) {
-        button.textContent = cmuxString('remoteImageLoading', 'Loading');
-        button.disabled = true;
-        button.setAttribute('data-loading', '1');
-      } else {
-        button.textContent = cmuxString('remoteImageLoadImage', 'Load this image');
-        button.disabled = false;
-        button.removeAttribute('data-loading');
-      }
-    });
-  }
-
-  function loadRemoteImage(img) {
-    var raw = unescapeDataAttribute(img.getAttribute('data-cmux-remote-src'));
-    var rewritten = cmuxRemoteImageURL(raw);
-    if (!rewritten) { return false; }
-    if (img.getAttribute('data-cmux-remote-loading') === '1') { return true; }
-    img.setAttribute('data-cmux-remote-loading', '1');
-    setRemoteImageLoadingState(img, true);
-    function cleanup() {
-      img.removeEventListener('load', onLoad);
-      img.removeEventListener('error', onError);
-      img.removeAttribute('data-cmux-remote-loading');
-    }
-    function onLoad() {
-      cleanup();
-      removeRemoteImagePlaceholder(img);
-      img.hidden = false;
-    }
-    function onError() {
-      cleanup();
-      setRemoteImageLoadingState(img, false);
-      img.hidden = true;
-      img.removeAttribute('src');
-    }
-    img.addEventListener('load', onLoad);
-    img.addEventListener('error', onError);
-    img.setAttribute('src', rewritten);
-    if (img.complete && img.naturalWidth > 0) {
-      onLoad();
-    }
-    return true;
-  }
-
-  function loadApprovedRemoteImage(href) {
-    remoteImageAllowedURLs[href] = true;
-    contentEl.querySelectorAll('img[data-cmux-remote-src]').forEach(function(img) {
-      var raw = unescapeDataAttribute(img.getAttribute('data-cmux-remote-src'));
-      var info = remoteImageInfo(raw);
-      if (info && remoteImageCanOfferLoad(info) && info.href === href) {
-        loadRemoteImage(img);
-      }
-    });
-    return true;
-  }
-
-  function appendRemoteImageText(placeholder, key, fallback, replacements) {
-    var detail = document.createElement('span');
-    detail.textContent = cmuxString(key, fallback, replacements || {});
-    placeholder.appendChild(detail);
-    return detail;
-  }
-
-  function appendRemoteImageURL(placeholder, href) {
-    var url = document.createElement('span');
-    url.className = 'cmux-remote-image-url';
-    url.textContent = cmuxString(
-      'remoteImageURL',
-      'Image URL: {url}',
-      { url: href }
-    );
-    placeholder.appendChild(url);
-    return url;
-  }
-
-  function appendRemoteImageButton(placeholder, label, handler) {
-    var button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = label;
-    button.addEventListener('click', function(ev) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      handler(button);
-    });
-    placeholder.appendChild(button);
-    return button;
-  }
-
-  function openRemoteImageURL(href) {
-    window.open(href, '_blank', 'noopener');
-  }
-
-  function temporarilySetButtonLabel(button, label, restoreLabel) {
-    if (!button) { return; }
-    if (button._cmuxResetLabelTimer) {
-      window.clearTimeout(button._cmuxResetLabelTimer);
-    }
-    button.textContent = label;
-    button.setAttribute('data-copied', '1');
-    button._cmuxResetLabelTimer = window.setTimeout(function() {
-      button.textContent = restoreLabel;
-      button.removeAttribute('data-copied');
-      button._cmuxResetLabelTimer = null;
-    }, 1200);
-  }
-
-  function copyRemoteImageURL(href, button, restoreLabel) {
-    copyTextToClipboard(href).then(function() {
-      temporarilySetButtonLabel(
-        button,
-        cmuxString('remoteImageCopied', 'Copied'),
-        restoreLabel
-      );
-    }).catch(function() {});
-  }
-
-  function insertRemoteImagePlaceholder(img, placeholder) {
-    var anchor = img.closest ? img.closest('a') : null;
-    if (anchor && contentEl.contains(anchor) && anchor.parentNode) {
-      anchor.parentNode.insertBefore(placeholder, anchor.nextSibling);
-      return;
-    }
-    img.parentNode.insertBefore(placeholder, img.nextSibling);
-  }
-
+  // Remote images are never fetched. Each one is replaced by an inert,
+  // non-interactive placeholder showing its alt text and URL.
   function ensureRemoteImagePlaceholder(img) {
     if (!img || img.getAttribute('data-cmux-remote-processed') === '1') { return; }
     var raw = unescapeDataAttribute(img.getAttribute('data-cmux-remote-src'));
@@ -779,72 +510,32 @@ html { scroll-behavior: smooth; }
 
     img.setAttribute('data-cmux-remote-processed', '1');
     img.hidden = true;
-    var canOfferLoad = remoteImageCanOfferLoad(info);
-
-    var placeholderId = 'remote-image-' + Math.floor(Math.random() * 1e9).toString(36) + '-' + Date.now().toString(36);
-    img.setAttribute('data-cmux-remote-placeholder-id', placeholderId);
 
     var placeholder = document.createElement('span');
     placeholder.className = 'cmux-remote-image-placeholder';
-    placeholder.setAttribute('data-cmux-remote-placeholder-for', placeholderId);
-    placeholder.setAttribute('role', 'group');
+    placeholder.setAttribute('role', 'note');
 
     var title = document.createElement('strong');
     title.textContent = cmuxString('remoteImageBlocked', 'Remote image blocked');
     placeholder.appendChild(title);
 
-    if (canOfferLoad) {
-      appendRemoteImageText(
-        placeholder,
-        'remoteImageConsentMessage',
-        'cmux will not contact this image URL until you load this image.'
-      );
-      appendRemoteImageURL(placeholder, info.href);
-      var loadButton = appendRemoteImageButton(
-        placeholder,
-        cmuxString(
-          'remoteImageLoadImage',
-          'Load this image'
-        ),
-        function() {
-          loadApprovedRemoteImage(info.href);
-        }
-      );
-      loadButton.setAttribute('data-cmux-remote-action', 'load');
-    } else if (!info.https) {
-      appendRemoteImageText(
-        placeholder,
-        'remoteImageHTTPSOnly',
-        'Only HTTPS remote images can be loaded in the viewer.'
-      );
-      appendRemoteImageURL(placeholder, info.href);
-    } else {
-      appendRemoteImageText(
-        placeholder,
-        'remoteImageNotAllowed',
-        'This remote image URL cannot be loaded in the viewer.'
-      );
-      appendRemoteImageURL(placeholder, info.href);
+    var alt = String(img.getAttribute('alt') || '').trim();
+    if (alt) {
+      var altEl = document.createElement('span');
+      altEl.textContent = alt;
+      placeholder.appendChild(altEl);
     }
-    var copyURLLabel = cmuxString('remoteImageCopyURL', 'Copy image URL');
-    appendRemoteImageButton(
-      placeholder,
-      copyURLLabel,
-      function(button) {
-        copyRemoteImageURL(info.href, button, copyURLLabel);
-      }
-    );
-    appendRemoteImageButton(
-      placeholder,
-      cmuxString('remoteImageOpenURL', 'Open image URL'),
-      function() {
-        openRemoteImageURL(info.href);
-      }
-    );
 
-    insertRemoteImagePlaceholder(img, placeholder);
-    if (canOfferLoad && remoteImageAllowedURLs[info.href]) {
-      loadRemoteImage(img);
+    var url = document.createElement('span');
+    url.className = 'cmux-remote-image-url';
+    url.textContent = cmuxString('remoteImageURL', 'Image URL: {url}', { url: info.href });
+    placeholder.appendChild(url);
+
+    var anchor = img.closest ? img.closest('a') : null;
+    if (anchor && contentEl.contains(anchor) && anchor.parentNode) {
+      anchor.parentNode.insertBefore(placeholder, anchor.nextSibling);
+    } else {
+      img.parentNode.insertBefore(placeholder, img.nextSibling);
     }
   }
 
@@ -964,10 +655,6 @@ html { scroll-behavior: smooth; }
           var remoteInfo = remoteImageInfo(attr.value);
           if (remoteInfo) {
             el.setAttribute('data-cmux-remote-src', escapeDataAttribute(remoteInfo.href));
-            el.setAttribute('data-cmux-remote-host', escapeDataAttribute(remoteInfo.host));
-            if (!remoteInfo.https) {
-              el.setAttribute('data-cmux-remote-blocked-reason', 'https-only');
-            }
             el.removeAttribute(attr.name);
             return;
           }
@@ -1756,7 +1443,6 @@ html { scroll-behavior: smooth; }
   });
   contentEl.addEventListener('click', function(ev) {
     if (ev.target && ev.target.closest && ev.target.closest('.cmux-remote-image-placeholder')) {
-      if (ev.target.closest('button')) { return; }
       ev.preventDefault();
       ev.stopPropagation();
       return;
@@ -1804,7 +1490,11 @@ html { scroll-behavior: smooth; }
     if (!contentEl) { return null; }
     options = options || {};
     var restoreImageSources = options.restoreImageSources !== false;
-    var clone = contentEl.cloneNode(true);
+    // When original image URLs are restored for export, build the clone in an
+    // inert document so assigning `src` can never start a resource load.
+    var clone = restoreImageSources
+      ? document.implementation.createHTMLDocument('').importNode(contentEl, true)
+      : contentEl.cloneNode(true);
     clone.querySelectorAll('.cmux-code-copy-button').forEach(function(el) {
       el.remove();
     });

@@ -1,6 +1,5 @@
 import AppKit
 import Bonsplit
-import CmuxBrowser
 import CmuxControlSocket
 import Foundation
 
@@ -35,11 +34,6 @@ extension TerminalController: ControlPaneContext {
             if let workspace = tabManager.tabs.first(where: { $0.panels[surfaceId] != nil }) {
                 return workspace
             }
-            if let workspace = tabManager.tabs.first(where: {
-                $0.remoteTmuxControlPane(surfaceID: surfaceId) != nil
-            }) {
-                return workspace
-            }
             guard windowDockContainingPanel(surfaceId) == nil else { return nil }
             return tabManager.tabs.first(where: { $0.containsDockPanel(surfaceId) })
         }
@@ -47,11 +41,6 @@ extension TerminalController: ControlPaneContext {
             if let located = v2LocatePane(paneId) {
                 guard located.tabManager === tabManager else { return nil }
                 return located.workspace
-            }
-            if let workspace = tabManager.tabs.first(where: {
-                $0.remoteTmuxControlPane(paneID: paneId) != nil
-            }) {
-                return workspace
             }
             guard windowDockContainingPane(paneId) == nil else { return nil }
             if let located = locateDockPane(paneId), located.tabManager === tabManager {
@@ -165,65 +154,9 @@ extension TerminalController: ControlPaneContext {
         if case .dock = placement, !RightSidebarMode.dock.isAvailable() {
             return .dockUnavailable(message: dockUnavailableMessage())
         }
-        let url = inputs.urlRaw.flatMap { URL(string: $0) }
         if case .dock = placement, let invalid = validateDockPaneCreateRouting(routing: routing, tabManager: tabManager, panelType: panelType) {
             return invalid
         }
-        let hasProfileParam = inputs.profileRaw != nil
-            || inputs.hasInvalidProfileParam
-            || inputs.hasMultipleProfileParams
-        let preferredBrowserProfileID: UUID?
-        if panelType != .browser, hasProfileParam {
-            return .invalidBrowserProfile(
-                selector: inputs.profileRaw ?? "",
-                message: BrowserProfileAutomationError.profileRequiresBrowserPane.description,
-                candidates: []
-            )
-        } else if inputs.hasMultipleProfileParams {
-            return .invalidBrowserProfile(
-                selector: inputs.profileRaw ?? "",
-                message: BrowserProfileAutomationError.multipleProfileSelectors.description,
-                candidates: []
-            )
-        } else if panelType == .browser, inputs.hasInvalidProfileParam {
-            return .invalidBrowserProfile(
-                selector: inputs.profileRaw ?? "",
-                message: BrowserProfileAutomationError.invalidProfileSelector.description,
-                candidates: []
-            )
-        } else if panelType == .browser, let selector = inputs.profileRaw {
-            switch BrowserProfileStore.shared.resolveProfileSelection(selector) {
-            case .matched(let profile):
-                preferredBrowserProfileID = profile.id
-            case .notFound:
-                return .invalidBrowserProfile(
-                    selector: selector,
-                    message: BrowserProfileAutomationError.profileNotFound(selector).description,
-                    candidates: []
-                )
-            case .ambiguous(let profiles):
-                return .invalidBrowserProfile(
-                    selector: selector,
-                    message: BrowserProfileAutomationError.ambiguousProfile(selector, profiles).description,
-                    candidates: profiles.map {
-                        ControlPaneBrowserProfileCandidate(id: $0.id, displayName: $0.displayName)
-                    }
-                )
-            }
-        } else {
-            preferredBrowserProfileID = nil
-        }
-        if panelType == .browser, BrowserAvailabilitySettings.isDisabled() {
-            if let selector = inputs.profileRaw {
-                return .invalidBrowserProfile(
-                    selector: selector,
-                    message: BrowserProfileAutomationError.browserDisabled.description,
-                    candidates: []
-                )
-            }
-            return browserDisabledCreateResolution(rawURL: inputs.urlRaw, url: url, tabManager: tabManager)
-        }
-
         let orientation = direction.orientation
         let insertFirst = direction.insertFirst
 
@@ -240,62 +173,15 @@ extension TerminalController: ControlPaneContext {
                 routing: routing,
                 tabManager: tabManager,
                 panelType: panelType,
-                url: url,
                 orientation: orientation,
                 insertFirst: insertFirst,
                 initialDividerPosition: initialDividerPosition.map { CGFloat($0) },
-                preferredProfileID: preferredBrowserProfileID,
                 inputs: inputs
             )
         }
 
         guard let ws = resolveWorkspace(routing: routing, tabManager: tabManager) else {
             return .workspaceNotFound
-        }
-        if panelType == .browser, preferredBrowserProfileID != nil, ws.isRemoteWorkspace {
-            return .invalidBrowserProfile(
-                selector: inputs.profileRaw ?? "",
-                message: BrowserProfileAutomationError.profileUnavailableInRemoteWorkspace.description,
-                candidates: []
-            )
-        }
-        if panelType == .terminal {
-            let remoteTarget: RemoteTmuxControlPaneLocation?
-            if let requestedSurfaceID = inputs.requestedSourceSurfaceID {
-                switch ws.remoteTmuxControlSurfaceTarget(surfaceID: requestedSurfaceID) {
-                case .pane(let location):
-                    remoteTarget = location
-                case .unresolvedMirror:
-                    return .noSourceSurface
-                case .notRemote:
-                    remoteTarget = nil
-                }
-            } else {
-                remoteTarget = routing.paneID.flatMap { ws.remoteTmuxControlPane(paneID: $0) }
-            }
-            if let remoteTarget {
-                let unsupported = mirrorRoutedUnsupportedOptions(
-                    insertFirst: insertFirst,
-                    workingDirectory: inputs.workingDirectory,
-                    initialCommand: inputs.initialCommand,
-                    initialInput: inputs.initialInput,
-                    tmuxStartCommand: inputs.tmuxStartCommand,
-                    startupEnvironment: inputs.startupEnvironment,
-                    initialDividerPosition: initialDividerPosition
-                )
-                guard unsupported.isEmpty else { return .mirrorUnsupportedOptions(unsupported) }
-                let focusIntent = remoteTmuxSplitFocusIntent(requested: inputs.requestedFocus)
-                guard remoteTarget.requestSplit(vertical: orientation == .vertical, focusIntent: focusIntent) else {
-                    return .createFailed
-                }
-                v2MaybeFocusWindow(for: tabManager)
-                v2MaybeSelectWorkspace(tabManager, workspace: ws)
-                return .routedToRemote(
-                    windowID: v2ResolveWindowId(tabManager: tabManager),
-                    workspaceID: ws.id,
-                    typeRawValue: panelType.rawValue
-                )
-            }
         }
         v2MaybeFocusWindow(for: tabManager)
         v2MaybeSelectWorkspace(tabManager, workspace: ws)
@@ -305,35 +191,9 @@ extension TerminalController: ControlPaneContext {
             return .noSourceSurface
         }
 
-        if ws.isRemoteTmuxMirror, panelType == .terminal {
-            let unsupported = mirrorRoutedUnsupportedOptions(
-                insertFirst: insertFirst,
-                workingDirectory: inputs.workingDirectory,
-                initialCommand: inputs.initialCommand,
-                initialInput: inputs.initialInput,
-                tmuxStartCommand: inputs.tmuxStartCommand,
-                startupEnvironment: inputs.startupEnvironment,
-                initialDividerPosition: initialDividerPosition
-            )
-            if !unsupported.isEmpty {
-                return .mirrorUnsupportedOptions(unsupported)
-            }
-        }
-
         let newPanelId: UUID?
         let focus = v2FocusAllowed(requested: inputs.requestedFocus)
-        if panelType == .browser {
-            newPanelId = ws.newBrowserSplit(
-                from: sourcePanelId,
-                orientation: orientation,
-                insertFirst: insertFirst,
-                url: url,
-                preferredProfileID: preferredBrowserProfileID,
-                focus: focus,
-                creationPolicy: .automationPreload,
-                initialDividerPosition: initialDividerPosition.map { CGFloat($0) }
-            )?.id
-        } else if panelType == .simulator {
+        if panelType == .simulator {
             newPanelId = ws.newSimulatorSplit(
                 from: sourcePanelId,
                 orientation: orientation,
@@ -383,25 +243,6 @@ extension TerminalController: ControlPaneContext {
     }
 
     private func panelType(forRawToken raw: String) -> PanelType? { v2PanelType(rawToken: raw) }
-    /// The byte-faithful twin of `v2BrowserDisabledExternalOpenResult`, mapped
-    /// onto ``ControlPaneCreateResolution``.
-    private func browserDisabledCreateResolution(
-        rawURL: String?,
-        url: URL?,
-        tabManager: TabManager?
-    ) -> ControlPaneCreateResolution {
-        if let rawURL, url == nil {
-            return .browserDisabledInvalidURL(rawURL: rawURL)
-        }
-        guard let url else {
-            return .browserDisabledNoURL
-        }
-        guard NSWorkspace.shared.open(url) else {
-            return .browserDisabledExternalOpenFailed(url: url.absoluteString)
-        }
-        let windowId = v2ResolveWindowId(tabManager: tabManager)
-        return .browserDisabledOpenedExternally(windowID: windowId, url: url.absoluteString)
-    }
 
     // MARK: - resize
 
@@ -419,9 +260,6 @@ extension TerminalController: ControlPaneContext {
         let paneUUID = inputs.paneID ?? ws.bonsplitController.focusedPaneId?.id
         guard let paneUUID else {
             return .noFocusedPane
-        }
-        if let remote = controlRemoteTmuxPaneResize(workspace: ws, tabManager: tabManager, inputs: inputs) {
-            return remote
         }
         guard ws.bonsplitController.allPaneIds.contains(where: { $0.id == paneUUID }) else {
             return .paneNotFound(paneUUID)
@@ -522,14 +360,8 @@ extension TerminalController: ControlPaneContext {
         requestedFocus: Bool
     ) -> ControlPaneSwapResolution {
         let focus = v2FocusAllowed(requested: requestedFocus)
-        guard locateRemoteTmuxControlPane(sourcePaneID) == nil else {
-            return .sourcePaneNotFound(sourcePaneID)
-        }
         guard let located = v2LocatePane(sourcePaneID) else {
             return .sourcePaneNotFound(sourcePaneID)
-        }
-        guard located.workspace.remoteTmuxControlPane(paneID: targetPaneID) == nil else {
-            return .targetPaneNotFound(targetPaneID)
         }
         guard let targetPane = located.workspace.bonsplitController.allPaneIds.first(where: {
             $0.id == targetPaneID
@@ -613,17 +445,6 @@ extension TerminalController: ControlPaneContext {
             return .workspaceNotFound
         }
 
-        if let paneID, let remote = sourceWorkspace.remoteTmuxControlPane(paneID: paneID) {
-            return .surfaceNotFound(remote.pane.panel.id)
-        }
-        if let surfaceID {
-            switch sourceWorkspace.remoteTmuxControlSurfaceTarget(surfaceID: surfaceID) {
-            case .pane, .unresolvedMirror:
-                return .surfaceNotFound(surfaceID)
-            case .notRemote:
-                break
-            }
-        }
         let sourcePane: PaneID? = {
             if let paneID {
                 return sourceWorkspace.bonsplitController.allPaneIds.first(where: { $0.id == paneID })
@@ -687,23 +508,6 @@ extension TerminalController: ControlPaneContext {
         hasFocusParam: Bool,
         focus: Bool
     ) -> ControlPaneJoinResolution {
-        if let surfaceID, locateRemoteTmuxMirrorContainer(surfaceID) != nil {
-            return .moved(.err(
-                code: "not_found",
-                message: "Surface not found",
-                data: .object(["surface_id": .string(surfaceID.uuidString)])
-            ))
-        }
-        if let sourcePaneID, locateRemoteTmuxControlPane(sourcePaneID) != nil {
-            return .sourceSurfaceUnresolved(sourcePaneID: sourcePaneID)
-        }
-        if locateRemoteTmuxControlPane(targetPaneID) != nil {
-            return .moved(.err(
-                code: "not_found",
-                message: "Pane not found",
-                data: .object(["pane_id": .string(targetPaneID.uuidString)])
-            ))
-        }
         var resolvedSurfaceId = surfaceID
         if resolvedSurfaceId == nil, let sourcePaneID {
             guard let sourceLocated = v2LocatePane(sourcePaneID),
@@ -755,9 +559,6 @@ extension TerminalController: ControlPaneContext {
         }
         guard let ws = resolveWorkspace(routing: routing, tabManager: tabManager) else {
             return .workspaceNotFound
-        }
-        if let paneID = routing.paneID, ws.remoteTmuxControlPane(paneID: paneID) != nil {
-            return .noAlternatePane
         }
         guard let focused = ws.bonsplitController.focusedPaneId else {
             return .noFocusedPane

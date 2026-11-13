@@ -78,40 +78,10 @@ public struct SidebarCatalogSection: SettingCatalogSection {
         userDefaultsKey: "sidebarShowBranchDirectory"
     )
 
-    public let showPullRequests = DefaultsKey<Bool>(
-        id: "sidebar.showPullRequests",
-        defaultValue: true,
-        userDefaultsKey: "sidebarShowPullRequest"
-    )
-
     public let watchGitStatus = DefaultsKey<Bool>(
         id: "sidebar.watchGitStatus",
         defaultValue: true,
         userDefaultsKey: "sidebarWatchGitStatus"
-    )
-
-    public let makePullRequestsClickable = DefaultsKey<Bool>(
-        id: "sidebar.makePullRequestsClickable",
-        defaultValue: true,
-        userDefaultsKey: "sidebarMakePullRequestClickable"
-    )
-
-    public let openPullRequestLinksInCmuxBrowser = DefaultsKey<Bool>(
-        id: "sidebar.openPullRequestLinksInCmuxBrowser",
-        defaultValue: true,
-        userDefaultsKey: "browserOpenSidebarPullRequestLinksInCmuxBrowser"
-    )
-
-    public let openPortLinksInCmuxBrowser = DefaultsKey<Bool>(
-        id: "sidebar.openPortLinksInCmuxBrowser",
-        defaultValue: true,
-        userDefaultsKey: "browserOpenSidebarPortLinksInCmuxBrowser"
-    )
-
-    public let showSSH = DefaultsKey<Bool>(
-        id: "sidebar.showSSH",
-        defaultValue: true,
-        userDefaultsKey: "sidebarShowSSH"
     )
 
     public let showPorts = DefaultsKey<Bool>(

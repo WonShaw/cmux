@@ -15,10 +15,6 @@ extension ContentView {
         switch commandId {
         case "palette.newWorkspace":
             return .newTab
-        case "palette.newBrowserWorkspace":
-            return .newBrowserWorkspace
-        case ContentView.commandPaletteCloudNewMachineCommandId:
-            return .newCloudMachine
         case "palette.newWindow":
             return .newWindow
         case "palette.openFolder":
@@ -31,8 +27,6 @@ extension ContentView {
             return .reopenClosedBrowserPanel
         case "palette.newTerminalTab":
             return .newSurface
-        case "palette.newBrowserTab":
-            return .openBrowser
         case "palette.closeWindow":
             return .closeWindow
         case "palette.toggleSidebar":
@@ -65,16 +59,6 @@ extension ContentView {
             return .nextSurface
         case "palette.previousTabInPane":
             return .prevSurface
-        case "palette.browserToggleDevTools":
-            return .toggleBrowserDeveloperTools
-        case "palette.browserConsole":
-            return .showBrowserJavaScriptConsole
-        case "palette.browserReactGrab":
-            return .toggleReactGrab
-        case "palette.browserSplitRight", "palette.terminalSplitBrowserRight":
-            return .splitBrowserRight
-        case "palette.browserSplitDown", "palette.terminalSplitBrowserDown":
-            return .splitBrowserDown
         case "palette.terminalSplitRight":
             return .splitRight
         case "palette.terminalSplitDown":
@@ -165,8 +149,6 @@ extension ContentView {
             return "palette.showRightSidebarFeed"
         case .dock:
             return "palette.showRightSidebarDock"
-        case .machines:
-            return "palette.showRightSidebarMachines"
         case .customSidebar:
             return "palette.showRightSidebarCustomSidebar"
         }
@@ -191,8 +173,6 @@ extension ContentView {
             return "palette.openFindPane"
         case .sessions:
             return "palette.openVaultPane"
-        case .machines:
-            return "palette.openCloudPane"
         case .feed, .dock, .customSidebar:
             return nil
         }
@@ -206,8 +186,6 @@ extension ContentView {
             return String(localized: "command.openFindPane.title", defaultValue: "Open Find as Pane")
         case .sessions:
             return String(localized: "command.openVaultPane.title", defaultValue: "Open Vault as Pane")
-        case .machines:
-            return String(localized: "command.openCloudPane.title", defaultValue: "Open Cloud as Pane")
         case .feed, .dock, .customSidebar:
             return nil
         }

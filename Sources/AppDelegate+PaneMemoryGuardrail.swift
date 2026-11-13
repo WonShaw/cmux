@@ -32,11 +32,6 @@ extension AppDelegate {
             )
         )
         monitor.registry.register(
-            BrowserHiddenWebViewMemoryPressureResponder { [weak self] in
-                self?.paneMemoryGuardrailTabManagers() ?? []
-            }
-        )
-        monitor.registry.register(
             AggregateMemoryPressureResponder(
                 controller: AgentHibernationController.shared,
                 isAggregatePressureActive: { [weak monitor] in

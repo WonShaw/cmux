@@ -109,7 +109,6 @@ extension TerminalController: ControlSimulatorContext {
             guard workspace != nil else { return .failure(.workspaceNotFound) }
         }
         guard let workspace else { return .failure(.workspaceNotFound) }
-        guard !workspace.isRemoteTmuxMirror else { return .failure(.remoteWorkspace) }
 
         if let surfaceID = routing.surfaceID {
             guard let panel = workspace.panels[surfaceID] else {

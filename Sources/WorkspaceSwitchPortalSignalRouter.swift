@@ -2,7 +2,6 @@ import AppKit
 import Combine
 import CmuxTerminal
 import Foundation
-import WebKit
 
 /// Relays portal readiness notifications only to the owning main window.
 @MainActor
@@ -30,16 +29,13 @@ final class WorkspaceSwitchPortalSignalRouter {
     /// Observes only the surfaces participating in the current handoff.
     func observe(
         terminalHostedView: GhosttySurfaceScrollView?,
-        terminalSurface: TerminalSurface?,
-        browserWebView: WKWebView?
+        terminalSurface: TerminalSurface?
     ) {
         clearSources()
         let registrations: [(Notification.Name, AnyObject?)] = [
             (.terminalPortalVisibilityDidChange, terminalHostedView),
             (.terminalPortalDidBecomePresentable, terminalHostedView),
             (.terminalSurfaceHostedViewDidMoveToWindow, terminalSurface),
-            (.browserPortalRegistryDidChange, browserWebView),
-            (.browserPortalDidBecomePresentable, browserWebView),
         ]
         for (name, object) in registrations {
             guard let object else { continue }

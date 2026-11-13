@@ -130,9 +130,6 @@ struct ControlCommandCoordinatorWorkspaceTodoTests {
             signals: ControlWorkspaceTodoStatusSnapshot.Signals(
                 anyAgentNeedsInput: false,
                 anyAgentRunning: true,
-                anyOpenPullRequest: false,
-                hasPullRequests: false,
-                allPullRequestsMergedOrClosed: false,
                 isGitDirty: true
             )
         )

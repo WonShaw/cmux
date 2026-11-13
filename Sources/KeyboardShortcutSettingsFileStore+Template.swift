@@ -76,7 +76,6 @@ extension CmuxSettingsFileStore {
                     "openMarkdownInCmuxViewer": AppCatalogSection().openMarkdownInCmuxViewer.defaultValue,
                     "reorderOnNotification": SettingCatalog().app.reorderOnNotification.defaultValue,
                     "iMessageMode": IMessageModeSettings.defaultValue,
-                    "sendAnonymousTelemetry": AppCatalogSection().sendAnonymousTelemetry.defaultValue,
                     "confirmQuit": AppCatalogSection().confirmQuitMode.defaultValue.rawValue,
                     "warnBeforeClosingTab": AppCatalogSection().warnBeforeClosingTab.defaultValue,
                     "warnBeforeClosingTabXButton": AppCatalogSection().warnBeforeClosingTabXButton.defaultValue,
@@ -151,12 +150,7 @@ extension CmuxSettingsFileStore {
                     "showNotificationMessage": SettingCatalog().sidebar.showNotificationMessage.defaultValue,
                     "notificationMessageLineLimit": SettingCatalog().sidebar.notificationMessageLineLimit.defaultValue,
                     "showBranchDirectory": SidebarWorkspaceDetailDefaults.showBranchDirectory,
-                    "showPullRequests": SidebarWorkspaceDetailDefaults.showPullRequests,
                     "watchGitStatus": SidebarWorkspaceDetailDefaults.watchGitStatus,
-                    "makePullRequestsClickable": SettingCatalog().sidebar.makePullRequestsClickable.defaultValue,
-                    "openPullRequestLinksInCmuxBrowser": BrowserLinkOpenSettings.defaultOpenSidebarPullRequestLinksInCmuxBrowser,
-                    "openPortLinksInCmuxBrowser": BrowserLinkOpenSettings.defaultOpenSidebarPortLinksInCmuxBrowser,
-                    "showSSH": SidebarWorkspaceDetailDefaults.showSSH,
                     "showPorts": SidebarWorkspaceDetailDefaults.showPorts,
                     "showLog": SidebarWorkspaceDetailDefaults.showLog,
                     "showProgress": SidebarWorkspaceDetailDefaults.showProgress,
@@ -201,32 +195,6 @@ extension CmuxSettingsFileStore {
                 ],
             ],
             [
-                "browser": [
-                    "defaultSearchEngine": BrowserSearchSettingsStore.defaultSearchEngine.rawValue,
-                    "defaultZoomLevel": BrowserZoomSettings.defaultLevel,
-                    "customSearchEngineName": BrowserSearchSettingsStore.defaultCustomSearchEngineName,
-                    "customSearchEngineURLTemplate": BrowserSearchSettingsStore.defaultCustomSearchEngineURLTemplate,
-                    "showSearchSuggestions": BrowserSearchSettingsStore.defaultSearchSuggestionsEnabled,
-                    "theme": BrowserThemeSettings.defaultMode.rawValue,
-                    "discardHiddenWebViews": BrowserHiddenWebViewDiscardPolicy.defaultEnabled,
-                    "hiddenWebViewDiscardDelaySeconds": BrowserHiddenWebViewDiscardPolicy.defaultHiddenDelay,
-                    "askWhereToSaveDownloads": SettingCatalog().browser.askWhereToSaveDownloads.defaultValue,
-                    "openTerminalLinksInCmuxBrowser": BrowserLinkOpenSettings.defaultOpenTerminalLinksInCmuxBrowser,
-                    "interceptTerminalOpenCommandInCmuxBrowser": BrowserLinkOpenSettings.defaultInterceptTerminalOpenCommandInCmuxBrowser,
-                    "hostsToOpenInEmbeddedBrowser": [String](),
-                    "urlsToAlwaysOpenExternally": [String](),
-                    "insecureHttpHostsAllowedInEmbeddedBrowser": BrowserInsecureHTTPSettings.defaultAllowlistPatterns,
-                    "urlAllowlist": BrowserURLAllowlistPolicy.defaultPatterns,
-                    "showImportHintOnBlankTabs": BrowserImportHintSettings.defaultShowOnBlankTabs,
-                    "reactGrabVersion": ReactGrabSettings.defaultVersion,
-                ],
-            ],
-            [
-                "mobile": [
-                    "artifactFolderAccess": SettingCatalog().mobile.artifactFolderAccess.defaultValue.rawValue,
-                ],
-            ],
-            [
                 "markdown": [
                     "fontSize": Int(MarkdownFontSizeSettings.defaultPointSize),
                     "fontFamily": "",
@@ -246,11 +214,6 @@ extension CmuxSettingsFileStore {
             [
                 "fileExplorer": [
                     "doubleClickAction": FileExplorerDoubleClickActionSettings.defaultValue.rawValue,
-                ],
-            ],
-            [
-                "diffViewer": [
-                    "defaultLayout": "unified",
                 ],
             ],
             [

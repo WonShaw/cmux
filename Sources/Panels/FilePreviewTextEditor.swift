@@ -671,7 +671,6 @@ final class SavingTextView: NSTextView {
 
     private static var filePreviewTextEditorShortcutContext: ShortcutContext {
         ShortcutFocusState(
-            browser: false,
             markdown: false,
             sidebar: false,
             filePreviewTextEditor: true

@@ -2,17 +2,14 @@ import Foundation
 
 /// A single Dock control loaded from `dock.json`.
 ///
-/// Back-compat: existing terminal-only configs omit `type`/`url` and require
-/// `command`; those decode unchanged as `.terminal` entries. New configs may add
-/// `"type": "browser"` with a `url` to seed a browser pane. Browser controls
-/// may set `"chrome": false` to keep the pane's browser toolbar hidden.
+/// Terminal-only configs omit `type` and require `command`. Legacy
+/// `"type": "browser"` controls are no longer supported; `DockConfigFile`
+/// skips them while decoding so the rest of the Dock still loads.
 struct DockControlDefinition: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let title: String
     let kind: DockSurfaceKind
     let command: String?
-    let url: String?
-    let showsBrowserChrome: Bool
     let cwd: String?
     let height: Double?
     let env: [String: String]
@@ -22,8 +19,6 @@ struct DockControlDefinition: Codable, Equatable, Identifiable, Sendable {
         title: String,
         kind: DockSurfaceKind = .terminal,
         command: String? = nil,
-        url: String? = nil,
-        showsBrowserChrome: Bool = true,
         cwd: String? = nil,
         height: Double? = nil,
         env: [String: String] = [:]
@@ -32,8 +27,6 @@ struct DockControlDefinition: Codable, Equatable, Identifiable, Sendable {
         self.title = title
         self.kind = kind
         self.command = command
-        self.url = url
-        self.showsBrowserChrome = showsBrowserChrome
         self.cwd = cwd
         self.height = height
         self.env = env
@@ -44,8 +37,6 @@ struct DockControlDefinition: Codable, Equatable, Identifiable, Sendable {
         case title
         case type
         case command
-        case url
-        case chrome
         case cwd
         case height
         case env
@@ -70,7 +61,7 @@ struct DockControlDefinition: Codable, Equatable, Identifiable, Sendable {
             guard let parsed = DockSurfaceKind(rawValue: rawType) else {
                 throw Self.validationError(
                     code: 3,
-                    message: String(localized: "dock.error.unknownControlType", defaultValue: "Dock control type must be terminal or browser.")
+                    message: String(localized: "dock.error.unknownControlType", defaultValue: "Dock control type must be terminal.")
                 )
             }
             resolvedKind = parsed
@@ -83,8 +74,6 @@ struct DockControlDefinition: Codable, Equatable, Identifiable, Sendable {
 
         let normalizedCommand = try container.decodeIfPresent(String.self, forKey: .command)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedURL = try container.decodeIfPresent(String.self, forKey: .url)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
 
         switch resolvedKind {
         case .terminal:
@@ -95,29 +84,11 @@ struct DockControlDefinition: Codable, Equatable, Identifiable, Sendable {
                 )
             }
             command = normalizedCommand
-            url = nil
-        case .browser:
-            guard let normalizedURL, !normalizedURL.isEmpty else {
-                throw Self.validationError(
-                    code: 5,
-                    message: String(localized: "dock.error.blankControlURL", defaultValue: "Dock browser control url must not be blank.")
-                )
-            }
-            url = normalizedURL
-            command = nil
         }
 
         id = normalizedID
         title = normalizedTitle.isEmpty ? normalizedID : normalizedTitle
         kind = resolvedKind
-        if resolvedKind == .browser {
-            showsBrowserChrome = try container.decodeIfPresent(
-                Bool.self,
-                forKey: .chrome
-            ) ?? true
-        } else {
-            showsBrowserChrome = true
-        }
         cwd = try container.decodeIfPresent(String.self, forKey: .cwd)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         height = try container.decodeIfPresent(Double.self, forKey: .height)
@@ -142,20 +113,6 @@ struct DockControlDefinition: Codable, Equatable, Identifiable, Sendable {
                 throw EncodingError.invalidValue(command as Any, context)
             }
             try container.encode(command, forKey: .command)
-        case .browser:
-            try container.encode(DockSurfaceKind.browser.rawValue, forKey: .type)
-            guard let url = url?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !url.isEmpty else {
-                let context = EncodingError.Context(
-                    codingPath: container.codingPath + [CodingKeys.url],
-                    debugDescription: String(localized: "dock.error.blankControlURL", defaultValue: "Dock browser control url must not be blank.")
-                )
-                throw EncodingError.invalidValue(url as Any, context)
-            }
-            try container.encode(url, forKey: .url)
-            if !showsBrowserChrome {
-                try container.encode(false, forKey: .chrome)
-            }
         }
         try container.encodeIfPresent(cwd, forKey: .cwd)
         try container.encodeIfPresent(height, forKey: .height)

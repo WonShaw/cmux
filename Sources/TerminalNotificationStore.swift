@@ -10,19 +10,10 @@ import CmuxSettings
 import CmuxNotifications
 
 nonisolated private let terminalNotificationLogger = Logger(
-    subsystem: "com.cmuxterm.app",
+    subsystem: "com.comux.app",
     category: "notification"
 )
 
-extension TerminalNotificationStore {
-    nonisolated static func shouldAttemptPhoneForward(
-        effects _: TerminalNotificationPolicyEffects,
-        phoneForwardingEnabled: Bool,
-        categoryAllowsDelivery: Bool
-    ) -> Bool {
-        phoneForwardingEnabled && categoryAllowsDelivery
-    }
-}
 enum NotificationBadgeSettings {
     static let dockBadgeEnabledKey = "notificationDockBadgeEnabled"
     static let defaultDockBadgeEnabled = true
@@ -154,31 +145,11 @@ final class TerminalNotificationStore: ObservableObject {
     let notificationHookCache = CmuxNotificationHookCache()
 
     static let authorizationStatusDidChangeNotification = Notification.Name("cmux.terminalNotificationAuthorizationStatusDidChange")
-    static let categoryIdentifier = "com.cmuxterm.app.userNotification"
-    static let textReplyCategoryIdentifier = "com.cmuxterm.app.userNotification.textReply"
-    static let actionShowIdentifier = "com.cmuxterm.app.userNotification.show"
+    static let categoryIdentifier = "com.comux.app.userNotification"
+    static let textReplyCategoryIdentifier = "com.comux.app.userNotification.textReply"
+    static let actionShowIdentifier = "com.comux.app.userNotification.show"
     static let actionReplyIdentifier = "terminal.reply"
     nonisolated static let retargetsToLiveSurfaceOwnerUserInfoKey = "retargetsToLiveSurfaceOwner"
-    /// Mobile-host event topic the Mac emits when one or more delivered
-    /// notifications are dismissed/cleared on this Mac, so an attached phone can
-    /// clear the matching banners it is mirroring. Payload carries the stable
-    /// notification ids plus the authoritative unread count
-    /// (`["ids": [String], "unread_count": Int]`) — never any terminal content —
-    /// so dismiss-sync is safe even with phone-forward hideContent on.
-    static let dismissedEventTopic = "notification.dismissed"
-
-    /// Mobile-host event topic carrying the authoritative unread-notification
-    /// count (`["unread_count": Int]`) whenever it changes. The phone SETS its
-    /// app-icon badge to this absolute total (never local ±1 arithmetic), so any
-    /// drift self-heals on the next event. Emitted from the same chokepoint that
-    /// refreshes the Mac Dock badge, so every mutation lane is covered.
-    static let badgeEventTopic = "notification.badge"
-
-    /// Invalidates the paired phone's notification feed without sending any
-    /// notification content in the event frame. The phone fetches the
-    /// authoritative snapshot through `notification.feed.list`.
-    static let feedChangedEventTopic = "notification.feed.changed"
-
     /// Durable chronological history for the paired-phone notification feed.
     private(set) var notificationFeedHistory: NotificationFeedHistoryStore
 
@@ -299,16 +270,6 @@ final class TerminalNotificationStore: ObservableObject {
     private func emitNotificationsDismissed(ids: [String]) {
         guard !ids.isEmpty else { return }
         recordDismissTombstones(ids: ids.compactMap { UUID(uuidString: $0) })
-        let unreadCount = indexes.unreadCount
-        // Live lane: nonisolated static fan-out; short-circuits when no phone is
-        // subscribed.
-        MobileHostService.emitEvent(
-            topic: Self.dismissedEventTopic,
-            payload: ["ids": ids, "unread_count": unreadCount]
-        )
-        // Cold lane: mirror the dismiss through APNs for every registered
-        // device, attached or not (no-op unless phone forwarding is on).
-        PhonePushClient.shared.forwardDismissed(ids: ids, badgeCount: unreadCount)
     }
 
     /// A user-driven dismiss emit that also carries any stale superseded-banner
@@ -340,10 +301,6 @@ final class TerminalNotificationStore: ObservableObject {
         let count = indexes.unreadCount
         guard count != lastEmittedPhoneBadgeCount else { return }
         lastEmittedPhoneBadgeCount = count
-        MobileHostService.emitEvent(
-            topic: Self.badgeEventTopic,
-            payload: ["unread_count": count]
-        )
     }
 
     private enum AuthorizationRequestOrigin: String {
@@ -464,12 +421,7 @@ final class TerminalNotificationStore: ObservableObject {
         )
         notificationFeedHistory = NotificationFeedHistoryStore(
             fileURL: NotificationFeedHistoryStore.defaultFileURL()
-        ) { revision in
-            MobileHostService.emitEvent(
-                topic: Self.feedChangedEventTopic,
-                payload: ["revision": revision]
-            )
-        }
+        ) { _ in }
         indexes = Self.buildIndexes(for: notifications)
         userDefaultsObserver = NotificationCenter.default.addUserDefaultsObserver(object: nil) { [weak self] in
             Task { @MainActor [weak self] in
@@ -1223,7 +1175,7 @@ final class TerminalNotificationStore: ObservableObject {
             "notification.store.add workspace=\(tabId.uuidString.prefix(8)) surface=\(surfaceId?.uuidString.prefix(8) ?? "nil") titleLen=\(title.count) subtitleLen=\(subtitle.count) bodyLen=\(body.count) cooldown=\(cooldownKey == nil ? 0 : 1) origin=\(origin.kind)"
         )
 #endif
-        // SECURITY: a remote origin (ssh relay, cloud machine) is untrusted text. It gets
+        // SECURITY: a remote origin (a cloud machine) is untrusted text. It gets
         // display, sound, badge, hooks, and phone forwarding — never a reply affordance
         // that types into a pane, a click action that opens a local path, agent context
         // that hooks treat as trusted identity, or a sound override. Clamped here so no
@@ -1521,7 +1473,7 @@ final class TerminalNotificationStore: ObservableObject {
             ),
             scrollPosition: scrollPosition,
             hooks: resolvedHooks ?? (origin.isRemote ? [] : cmuxConfigStore?.notificationHooks(
-                startingFrom: workspace?.isRemoteWorkspace == true ? nil : cwd
+                startingFrom: cwd
             )) ?? [],
             globalConfigPath: cmuxConfigStore?.globalConfigPath
         )
@@ -1642,8 +1594,8 @@ final class TerminalNotificationStore: ObservableObject {
             "notification.store.effectsOnly workspace=\(notification.tabId.uuidString.prefix(8)) surface=\(notification.surfaceId?.uuidString.prefix(8) ?? "nil") desktop=\(effects.desktop ? 1 : 0) sound=\(effects.sound ? 1 : 0) command=\(effects.command ? 1 : 0) suppressExternal=\(shouldSuppressExternalDelivery ? 1 : 0)"
         )
 #endif
-        effects.applySidebarOrdering(defaults: .standard) {
-            reorderSidebars(for: notification)
+        if effects.reorderWorkspace, UserDefaultsSettingsClient(defaults: .standard).value(for: SettingCatalog().app.reorderOnNotification) {
+            AppDelegate.shared?.tabManagerFor(tabId: notification.tabId)?.moveTabToTopForNotification(notification.tabId)
         }
         if hasAnyNotificationEffect(effects) {
             commitCooldownReservation(cooldownReservation, at: now)
@@ -1688,8 +1640,8 @@ final class TerminalNotificationStore: ObservableObject {
             setFocusedReadIndicator(forTabId: notification.tabId, surfaceId: notification.surfaceId)
         }
 
-        effects.applySidebarOrdering(defaults: .standard) {
-            reorderSidebars(for: notification)
+        if effects.reorderWorkspace, UserDefaultsSettingsClient(defaults: .standard).value(for: SettingCatalog().app.reorderOnNotification) {
+            AppDelegate.shared?.tabManagerFor(tabId: notification.tabId)?.moveTabToTopForNotification(notification.tabId)
         }
 
         updated.insert(notification, at: 0)
@@ -1765,19 +1717,6 @@ final class TerminalNotificationStore: ObservableObject {
             tabId: notification.tabId,
             surfaceId: notification.surfaceId
         )
-        let shouldAttemptPhone = !shouldSuppressExternalDelivery
-            && Self.shouldAttemptPhoneForward(
-                effects: effects,
-                phoneForwardingEnabled: PhonePushClient.shared
-                    .configuration().forwardingEnabled,
-                categoryAllowsDelivery: true
-            )
-        if shouldAttemptPhone {
-            PhonePushClient.shared.forward(
-                notification,
-                badgeCount: indexes.unreadCount
-            )
-        }
         let superseded = supersededPhoneDismissBuffer.flush(forKey: key)
         if !superseded.isEmpty {
             // The replacement enqueue above and this dismissal enter the same
@@ -2983,12 +2922,7 @@ final class TerminalNotificationStore: ObservableObject {
     func replaceNotificationsForTesting(_ notifications: [TerminalNotification]) {
         TerminalMutationBus.shared.discardPendingNotifications()
         self.notifications = notifications
-        notificationFeedHistory = NotificationFeedHistoryStore(fileURL: nil) { revision in
-            MobileHostService.emitEvent(
-                topic: Self.feedChangedEventTopic,
-                payload: ["revision": revision]
-            )
-        }
+        notificationFeedHistory = NotificationFeedHistoryStore(fileURL: nil) { _ in }
         clearWorkspaceManualUnread()
         clearSurfaceManualUnread()
         clearPanelDerivedWorkspaceUnread()

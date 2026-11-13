@@ -3,7 +3,6 @@ import Bonsplit
 import Combine
 import CmuxAgentChat
 import CmuxAppKitSupportUI
-import CmuxBrowser
 import CmuxCore
 import CmuxFoundation
 import CmuxNotifications
@@ -13,7 +12,6 @@ import CmuxTerminalCore
 import CmuxWorkspaces
 import Observation
 import SwiftUI
-import WebKit
 
 @MainActor
 @Observable
@@ -50,12 +48,8 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
     /// and new host, so visibility is the union rather than a single flag.
     private var visibleUIHostIds: Set<UUID> = []
     @ObservationIgnored let dockPortalReconcileState = DockPortalReconcileState()
-    @ObservationIgnored let appLinkHandoffCoordinator = BrowserAppLinkHandoffCoordinator()
-    @ObservationIgnored let appLinkPlacementPolicy = BrowserAppLinkPlacementPolicy()
 
     private let baseDirectoryProvider: () -> String?
-    private let remoteBrowserSettingsProvider: () -> DockRemoteBrowserSettings
-    private let browserAvailabilityProvider: () -> Bool
     let fileContentChangeCoordinator: FileContentChangeCoordinator
     @ObservationIgnored weak var notificationStore: TerminalNotificationStore?
     var panels: [UUID: any Panel] = [:]
@@ -137,16 +131,8 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
     @ObservationIgnored var pendingClosedPaneHistoryEntries:
         [UUID: [ClosedPanelHistoryEntry]] = [:]
     @ObservationIgnored let closedItemHistoryStore: ClosedItemHistoryStore
-    @ObservationIgnored var reactGrabTask: Task<Void, Never>?
-    @ObservationIgnored var reactGrabTaskID: UUID?
-    @ObservationIgnored var reactGrabTaskPanelId: UUID?
     @ObservationIgnored var terminalViewReattachCoalescingDepth = 0
     @ObservationIgnored var pendingTerminalViewReattachPanelIds: Set<UUID> = []
-    /// Prevents synchronous Bonsplit selection callbacks from materializing
-    /// deferred browser panels while a restore tree is still being assembled.
-    @ObservationIgnored var sessionRestoreDepth = 0
-    /// Browser panel IDs requested by a host while the restore transaction was active.
-    @ObservationIgnored var pendingDeferredBrowserMaterializationPanelIds: Set<UUID> = []
     @ObservationIgnored let focusHistoryNavigation: any FocusHistoryNavigating
     @ObservationIgnored let terminalWorkingDirectoryResolver: TerminalWorkingDirectoryResolver
     private let settings: any SettingsReading
@@ -160,153 +146,31 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
     /// of walking every window × workspace tab on each resolution. Entries drop
     /// automatically when a store deallocates; accessed on the main actor only.
     @MainActor private static let liveStoresTable = NSHashTable<DockSplitStore>.weakObjects()
-    /// Weak, presentation-workspace-scoped ownership avoids app-wide Dock
-    /// traversal for every remote terminal lifecycle callback.
-    @MainActor private static var remoteTerminalStoresByPresentationWorkspaceID:
-        [UUID: NSHashTable<DockSplitStore>] = [:]
 
     @MainActor static var liveStores: [DockSplitStore] { liveStoresTable.allObjects }
-
-    @MainActor
-    static func liveRemoteTerminalStores(
-        presentationWorkspaceID: UUID
-    ) -> [DockSplitStore] {
-        guard let stores = remoteTerminalStoresByPresentationWorkspaceID[
-            presentationWorkspaceID
-        ] else {
-            return []
-        }
-        let liveStores = stores.allObjects
-        if liveStores.isEmpty {
-            remoteTerminalStoresByPresentationWorkspaceID.removeValue(
-                forKey: presentationWorkspaceID
-            )
-        }
-        return liveStores
-    }
 
     func setDetachedSurfaceTransfer(
         _ transfer: Workspace.DetachedSurfaceTransfer,
         forPanelID panelID: UUID
     ) {
-        let previous = detachedSurfaceTransfersByPanelId.updateValue(
-            transfer,
-            forKey: panelID
-        )
-        let previousWorkspaceID = previous.flatMap(
-            Self.remoteTerminalPresentationWorkspaceID
-        )
-        let currentWorkspaceID = Self.remoteTerminalPresentationWorkspaceID(
-            transfer
-        )
-        guard previousWorkspaceID != currentWorkspaceID else { return }
-        if let previousWorkspaceID,
-           !hasRemoteTerminalTransfer(
-               presentationWorkspaceID: previousWorkspaceID
-           ) {
-            Self.unregisterRemoteTerminalStore(
-                self,
-                presentationWorkspaceID: previousWorkspaceID
-            )
-        }
-        if let currentWorkspaceID {
-            Self.registerRemoteTerminalStore(
-                self,
-                presentationWorkspaceID: currentWorkspaceID
-            )
-        }
+        detachedSurfaceTransfersByPanelId[panelID] = transfer
     }
 
     @discardableResult
     func removeDetachedSurfaceTransfer(
         forPanelID panelID: UUID
     ) -> Workspace.DetachedSurfaceTransfer? {
-        guard let removed = detachedSurfaceTransfersByPanelId.removeValue(
-            forKey: panelID
-        ) else {
-            return nil
-        }
-        if let workspaceID = Self.remoteTerminalPresentationWorkspaceID(removed),
-           !hasRemoteTerminalTransfer(presentationWorkspaceID: workspaceID) {
-            Self.unregisterRemoteTerminalStore(
-                self,
-                presentationWorkspaceID: workspaceID
-            )
-        }
-        return removed
+        detachedSurfaceTransfersByPanelId.removeValue(forKey: panelID)
     }
 
     func removeAllDetachedSurfaceTransfers() {
-        let workspaceIDs = Set(
-            detachedSurfaceTransfersByPanelId.values.compactMap(
-                Self.remoteTerminalPresentationWorkspaceID
-            )
-        )
         detachedSurfaceTransfersByPanelId.removeAll()
-        for workspaceID in workspaceIDs {
-            Self.unregisterRemoteTerminalStore(
-                self,
-                presentationWorkspaceID: workspaceID
-            )
-        }
-    }
-
-    private func hasRemoteTerminalTransfer(
-        presentationWorkspaceID: UUID
-    ) -> Bool {
-        detachedSurfaceTransfersByPanelId.values.contains {
-            Self.remoteTerminalPresentationWorkspaceID($0) ==
-                presentationWorkspaceID
-        }
-    }
-
-    private static func remoteTerminalPresentationWorkspaceID(
-        _ transfer: Workspace.DetachedSurfaceTransfer
-    ) -> UUID? {
-        transfer.isRemoteTerminal ? transfer.sessionRestoreWorkspaceId : nil
-    }
-
-    private static func registerRemoteTerminalStore(
-        _ store: DockSplitStore,
-        presentationWorkspaceID: UUID
-    ) {
-        let stores: NSHashTable<DockSplitStore>
-        if let existing = remoteTerminalStoresByPresentationWorkspaceID[
-            presentationWorkspaceID
-        ] {
-            stores = existing
-        } else {
-            stores = .weakObjects()
-            remoteTerminalStoresByPresentationWorkspaceID[
-                presentationWorkspaceID
-            ] = stores
-        }
-        stores.add(store)
-    }
-
-    private static func unregisterRemoteTerminalStore(
-        _ store: DockSplitStore,
-        presentationWorkspaceID: UUID
-    ) {
-        guard let stores = remoteTerminalStoresByPresentationWorkspaceID[
-            presentationWorkspaceID
-        ] else {
-            return
-        }
-        stores.remove(store)
-        if stores.allObjects.isEmpty {
-            remoteTerminalStoresByPresentationWorkspaceID.removeValue(
-                forKey: presentationWorkspaceID
-            )
-        }
     }
 
     init(
         workspaceId: UUID,
         scope: DockScope = .workspace,
         baseDirectoryProvider: @escaping () -> String?,
-        remoteBrowserSettingsProvider: @escaping () -> DockRemoteBrowserSettings = { .local },
-        browserAvailabilityProvider: @escaping () -> Bool = { BrowserAvailabilitySettings.isEnabled() },
         terminalTitleUpdateCoalescer: NotificationBurstCoalescer? = nil,
         tabDragTransferRegistry: TabDragTransferRegistry? = nil,
         settings: any SettingsReading = UserDefaultsSettingsClient(defaults: .standard),
@@ -321,8 +185,6 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         self.workspaceId = workspaceId
         self.scope = scope
         self.baseDirectoryProvider = baseDirectoryProvider
-        self.remoteBrowserSettingsProvider = remoteBrowserSettingsProvider
-        self.browserAvailabilityProvider = browserAvailabilityProvider
         self.fileContentChangeCoordinator =
             fileContentChangeCoordinator ?? FileContentChangeCoordinator()
         self.terminalTitleUpdateCoalescer =
@@ -399,9 +261,6 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
 
     // MARK: - Lookups
 
-    func currentRemoteBrowserSettings() -> DockRemoteBrowserSettings { remoteBrowserSettingsProvider() }
-    func isBrowserAvailable() -> Bool { browserAvailabilityProvider() }
-
     func panel(for tabId: TabID) -> (any Panel)? {
         guard let panelId = surfaceIdToPanelId[tabId] else { return nil }
         return panels[panelId]
@@ -409,41 +268,6 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
 
     func forEachPanel(_ body: (UUID, any Panel) -> Void) {
         for (panelId, panel) in panels { body(panelId, panel) }
-    }
-
-    func browserPanel(for panelId: UUID) -> BrowserPanel? {
-        panels[panelId] as? BrowserPanel
-    }
-
-    /// Resolves the mute state for a live or deferred browser tab.
-    func resolvedAudioMuted(for panel: any Panel) -> Bool {
-        (panel as? BrowserPanel)?.isMuted
-            ?? (panel as? DeferredBrowserPanel)?.sessionPanelSnapshot.browser?.isMuted
-            ?? false
-    }
-
-    /// Requests a deferred browser transition from the Dock owner.
-    @discardableResult
-    func requestDeferredBrowserMaterialization(
-        panelId: UUID,
-        isVisibleInUI: Bool,
-        reason: String = "browser.deferred.request"
-    ) -> Bool {
-        guard let deferredPanel = panels[panelId] as? DeferredBrowserPanel else {
-            return panels[panelId] is BrowserPanel
-        }
-        guard isVisibleInUI else { return false }
-        guard sessionRestoreDepth == 0 else {
-            pendingDeferredBrowserMaterializationPanelIds.insert(panelId)
-            return false
-        }
-#if DEBUG
-        cmuxDebugLog(
-            "session.restore.dockBrowser.materialize.request dock=\(workspaceId.uuidString.prefix(8)) " +
-                "panel=\(panelId.uuidString.prefix(8)) reason=\(reason)"
-        )
-#endif
-        return materializeDeferredBrowserPanel(deferredPanel) != nil
     }
 
     /// Binds a Dock tab to its panel and makes that tab the authoritative reverse lookup.
@@ -570,7 +394,7 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         applyFocusedDockSelection()
     }
 
-    /// Tears down every Dock panel (closing terminals/browsers and their
+    /// Tears down every Dock panel (closing terminals and their
     /// portals). Called from `Workspace.teardownAllPanels()` on workspace close.
     func closeAllPanels() {
         cancelConfigurationTasks()
@@ -604,8 +428,6 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
     func newSurface(
         kind: DockSurfaceKind,
         inPane paneId: PaneID,
-        url: URL? = nil,
-        initialRequest: URLRequest? = nil,
         command: String? = nil,
         workingDirectory: String? = nil,
         sourcePanelId: UUID? = nil,
@@ -613,30 +435,14 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         tmuxStartCommand: String? = nil,
         initialInput: String? = nil,
         startupRestoreAgent: SessionRestorableAgentSnapshot? = nil,
-        focus: Bool = true,
-        preferredProfileID: UUID? = nil,
-        bypassInsecureHTTPHostOnce: String? = nil,
-        chromeVisibility: BrowserChromeVisibility = .visible,
-        preloadInitialNavigationInBackground: Bool = false,
-        transparentBackground: Bool = false,
-        bypassRemoteProxy: Bool? = nil,
-        allowsExternalBrowserFallback: Bool = true,
-        websiteDataStore: WKWebsiteDataStore? = nil
+        focus: Bool = true
     ) -> UUID? {
         guard !isRetired else { return nil }
         ensureLoaded()
         let source = resolveSourcePanelId(sourcePanelId, preferredPaneId: paneId)
-        let resolvedBrowserProfileID = kind == .browser
-            ? resolvedNewBrowserProfileID(
-                preferredProfileID: preferredProfileID,
-                sourcePanelId: source
-            )
-            : nil
         guard let panel = makePanel(
             kind: kind,
             command: command,
-            url: url,
-            initialRequest: initialRequest,
             configTemplate: kind == .terminal
                 ? inheritedTerminalFontSizeConfig(sourcePanelId: source)
                 : nil,
@@ -648,16 +454,7 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
             ),
             tmuxStartCommand: tmuxStartCommand,
             initialInput: initialInput,
-            startupRestoreAgent: startupRestoreAgent,
-            preferredProfileID: resolvedBrowserProfileID,
-            bypassInsecureHTTPHostOnce: bypassInsecureHTTPHostOnce,
-            chromeVisibility: chromeVisibility,
-            preloadInitialNavigationInBackground:
-                preloadInitialNavigationInBackground,
-            transparentBackground: transparentBackground,
-            bypassRemoteProxy: bypassRemoteProxy,
-            allowsExternalBrowserFallback: allowsExternalBrowserFallback,
-            websiteDataStore: websiteDataStore
+            startupRestoreAgent: startupRestoreAgent
         ) else { return nil }
         let previousFocus = focus ? nil : focusedDockPaneSelection()
         guard let tabId = attachPanelAsTab(panel, kind: kind, title: panel.displayTitle, inPane: paneId) else {
@@ -688,8 +485,6 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         orientation: SplitOrientation,
         insertFirst: Bool,
         sourcePanelId: UUID?,
-        url: URL? = nil,
-        initialRequest: URLRequest? = nil,
         command: String? = nil,
         workingDirectory: String? = nil,
         environment: [String: String] = [:],
@@ -697,29 +492,14 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         initialInput: String? = nil,
         startupRestoreAgent: SessionRestorableAgentSnapshot? = nil,
         initialDividerPosition: CGFloat? = nil,
-        preferredProfileID: UUID? = nil,
-        chromeVisibility: BrowserChromeVisibility = .visible,
-        preloadInitialNavigationInBackground: Bool = false,
-        transparentBackground: Bool = false,
-        bypassRemoteProxy: Bool? = nil,
-        allowsExternalBrowserFallback: Bool = true,
-        websiteDataStore: WKWebsiteDataStore? = nil,
         focus: Bool = true
     ) -> UUID? {
         guard !isRetired else { return nil }
         ensureLoaded()
         let source = resolveSourcePanelId(sourcePanelId)
-        let resolvedBrowserProfileID = kind == .browser
-            ? resolvedNewBrowserProfileID(
-                preferredProfileID: preferredProfileID,
-                sourcePanelId: source
-            )
-            : nil
         guard let panel = makePanel(
             kind: kind,
             command: command,
-            url: url,
-            initialRequest: initialRequest,
             configTemplate: kind == .terminal
                 ? inheritedTerminalFontSizeConfig(sourcePanelId: source)
                 : nil,
@@ -731,15 +511,7 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
             ),
             tmuxStartCommand: tmuxStartCommand,
             initialInput: initialInput,
-            startupRestoreAgent: startupRestoreAgent,
-            preferredProfileID: resolvedBrowserProfileID,
-            chromeVisibility: chromeVisibility,
-            preloadInitialNavigationInBackground:
-                preloadInitialNavigationInBackground,
-            transparentBackground: transparentBackground,
-            bypassRemoteProxy: bypassRemoteProxy,
-            allowsExternalBrowserFallback: allowsExternalBrowserFallback,
-            websiteDataStore: websiteDataStore
+            startupRestoreAgent: startupRestoreAgent
         ) else { return nil }
 
         guard let source, let sourcePaneId = paneId(forPanelId: source) else {
@@ -992,22 +764,12 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
     private func makePanel(
         kind: DockSurfaceKind,
         command: String?,
-        url: URL?,
-        initialRequest: URLRequest? = nil,
         configTemplate: CmuxSurfaceConfigTemplate? = nil,
         environment: [String: String],
         workingDirectory: String,
         tmuxStartCommand: String? = nil,
         initialInput: String? = nil,
-        startupRestoreAgent: SessionRestorableAgentSnapshot? = nil,
-        preferredProfileID: UUID? = nil,
-        bypassInsecureHTTPHostOnce: String? = nil,
-        chromeVisibility: BrowserChromeVisibility = .visible,
-        preloadInitialNavigationInBackground: Bool = false,
-        transparentBackground: Bool = false,
-        bypassRemoteProxy: Bool? = nil,
-        allowsExternalBrowserFallback: Bool = true,
-        websiteDataStore: WKWebsiteDataStore? = nil
+        startupRestoreAgent: SessionRestorableAgentSnapshot? = nil
     ) -> (any Panel)? {
         guard !isRetired else { return nil }
         switch kind {
@@ -1023,26 +785,6 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
                 startupRestoreAgent: startupRestoreAgent,
                 controlId: nil,
                 controlTitle: nil
-            )
-        case .browser:
-            guard browserAvailabilityProvider() else {
-                if allowsExternalBrowserFallback,
-                   let externalURL = url ?? initialRequest?.url {
-                    _ = NSWorkspace.shared.open(externalURL)
-                }
-                return nil
-            }
-            return makeBrowserPanel(
-                url: url,
-                initialRequest: initialRequest,
-                preferredProfileID: preferredProfileID,
-                bypassInsecureHTTPHostOnce: bypassInsecureHTTPHostOnce,
-                chromeVisibility: chromeVisibility,
-                preloadInitialNavigationInBackground:
-                    preloadInitialNavigationInBackground,
-                transparentBackground: transparentBackground,
-                bypassRemoteProxy: bypassRemoteProxy,
-                websiteDataStore: websiteDataStore
             )
         }
     }
@@ -1060,12 +802,6 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
                 configTemplate: inheritedTerminalFontSizeConfig(sourcePanelId: nil),
                 controlId: def.id,
                 controlTitle: def.title
-            )
-        case .browser:
-            guard browserAvailabilityProvider() else { return nil }
-            return makeBrowserPanel(
-                url: def.url.flatMap { URL(string: $0) },
-                chromeVisibility: def.showsBrowserChrome ? .visible : .chromeless
             )
         }
     }
@@ -1133,7 +869,6 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
     private func tabKindRaw(_ kind: DockSurfaceKind) -> String {
         switch kind {
         case .terminal: return "terminal"
-        case .browser: return "browser"
         }
     }
 
@@ -1173,48 +908,7 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
             configureAgentHibernationResume(for: terminal)
         }
         installAttentionRouting(for: panel)
-        if let browser = panel as? BrowserPanel {
-            let browserTabState = Publishers.CombineLatest4(
-                browser.$pageTitle.removeDuplicates(),
-                browser.$currentURL.removeDuplicates(),
-                browser.$isLoading.removeDuplicates(),
-                browser.$faviconPNGData.removeDuplicates(by: { $0 == $1 })
-            )
-            let cancellable = browserTabState
-                .combineLatest(browser.$isMuted.removeDuplicates())
-                .receive(on: DispatchQueue.main)
-                .sink { [weak self, weak browser] _ in
-                    guard let self, let browser else { return }
-                    self.publishBrowserOpenTabSuggestion(for: browser)
-                    guard let tabId = self.surfaceId(forPanelId: browser.id),
-                          let existing = self.bonsplitController.tab(tabId) else { return }
-                    // Only push fields that actually changed. The combined stream
-                    // fires for any observed field, so an `isLoading` flicker during a
-                    // page load would otherwise re-publish the (unchanged) title and
-                    // favicon, mutating the @Observable BonsplitController and
-                    // re-rendering the Dock tree for nothing. Mirrors the main area's
-                    // guarded path in Workspace.installBrowserPanelSubscription.
-                    let resolvedTitle = browser.displayTitle
-                    let favicon = browser.faviconPNGData
-                    let titleUpdate: String? =
-                        existing.hasCustomTitle || existing.title == resolvedTitle
-                        ? nil
-                        : resolvedTitle
-                    let faviconUpdate: Data?? = existing.iconImageData == favicon ? nil : .some(favicon)
-                    let loadingUpdate: Bool? = existing.isLoading == browser.isLoading ? nil : browser.isLoading
-                    let mutedUpdate: Bool? = existing.isAudioMuted == browser.isMuted ? nil : browser.isMuted
-                    guard titleUpdate != nil || faviconUpdate != nil || loadingUpdate != nil || mutedUpdate != nil else { return }
-                    self.bonsplitController.updateTab(
-                        tabId,
-                        title: titleUpdate,
-                        iconImageData: faviconUpdate,
-                        isLoading: loadingUpdate,
-                        isAudioMuted: mutedUpdate
-                    )
-                }
-            panelCancellables[panel.id] = cancellable
-            publishBrowserOpenTabSuggestion(for: browser)
-        } else if let filePreview = panel as? FilePreviewPanel {
+        if let filePreview = panel as? FilePreviewPanel {
             panelCancellables.removeValue(forKey: panel.id)
             filePreview.bindTabMetadata(to: self)
         } else {
@@ -1507,7 +1201,7 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
     private func seed(definitions: [DockControlDefinition], baseDirectory: String) {
         guard !isRetired else { return }
         // Build panels first so divider math runs over the entries actually
-        // created (e.g. browser entries are skipped when the browser is disabled).
+        // created.
         let created: [(definition: DockControlDefinition, panel: any Panel)] = definitions.compactMap { definition in
             guard let panel = makePanel(for: definition, baseDirectory: baseDirectory) else { return nil }
             return (definition: definition, panel: panel)

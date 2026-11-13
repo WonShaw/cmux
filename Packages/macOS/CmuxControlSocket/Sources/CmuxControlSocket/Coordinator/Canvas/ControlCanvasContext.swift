@@ -80,7 +80,7 @@ public protocol ControlCanvasContext: AnyObject {
     ) -> ControlCanvasActionResolution
 
     /// Creates a new free-floating canvas pane for `canvas.new_pane`. `type`
-    /// is `"terminal"`, `"browser"`, or `"simulator"`. Returns `.created` carrying the new
+    /// is `"terminal"` or `"simulator"`. Returns `.created` carrying the new
     /// surface id.
     func controlCanvasNewPane(
         routing: ControlRoutingSelectors,

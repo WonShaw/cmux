@@ -31,7 +31,7 @@ private final class DurableDeepLinkDockTestPanel: Panel, ObservableObject {
 @MainActor
 @Suite("Durable deep link restore")
 struct CmuxDurableDeepLinkRestoreTests {
-    private let scheme = AuthEnvironment.callbackScheme
+    private let scheme = CmuxAppURLScheme.current
 
     private func parsedRequest(_ link: String) throws -> CmuxNavigationURLRequest {
         let url = try #require(URL(string: link))

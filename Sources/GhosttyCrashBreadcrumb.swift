@@ -12,7 +12,7 @@ enum GhosttyCrashBreadcrumb {
 
     private static let sessionLifecycleDirectoryName = "lifecycle"
     private static let sessionLaunchSentinelFileName = "running.sentinel"
-    private static let fallbackBundleIdentifier = "com.cmuxterm.app"
+    private static let fallbackBundleIdentifier = "com.comux.app"
 
     nonisolated static var defaultCrashDirectoryURL: URL {
         SessionPersistencePolicy.defaultCmuxCrashDirectoryURL()

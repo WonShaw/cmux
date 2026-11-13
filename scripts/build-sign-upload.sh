@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build, sign, notarize, create DMG, generate appcast, and upload to GitHub release.
+# Build, sign, notarize, create DMG, and upload to GitHub release.
 # Usage: ./scripts/build-sign-upload.sh <tag> [--allow-overwrite]
-# Requires: source ~/.secrets/cmuxterm.env && export SPARKLE_PRIVATE_KEY
+# Requires: source ~/.secrets/cmuxterm.env
 
 usage() {
   cat <<'EOF'
@@ -53,7 +53,6 @@ GHOSTTYKIT_CRASH_REPORT_SUBDIR="cmux/crash"
 
 # --- Pre-flight ---
 source ~/.secrets/cmuxterm.env
-export SPARKLE_PRIVATE_KEY
 for tool in zig xcodebuild create-dmg xcrun codesign ditto gh; do
   command -v "$tool" >/dev/null || { echo "MISSING: $tool" >&2; exit 1; }
 done
@@ -80,42 +79,14 @@ if [ ! -x "$HELPER_PATH" ]; then
   exit 1
 fi
 
-# Submit the independently signed Computer Use helper now. Apple can process
-# its first ticket while this script finishes bundle metadata and signing.
-COMPUTER_USE_NOTARY_STATE="build/computer-use-notarization.state"
-./scripts/ci/notarize-computer-use-helper.sh \
-  --start "$COMPUTER_USE_NOTARY_STATE" \
-  "$APP_PATH" \
-  "$ENTITLEMENTS" \
-  "$SIGN_HASH"
-
-# --- Inject Sparkle keys ---
-echo "Injecting Sparkle keys..."
-SPARKLE_PUBLIC_KEY_DERIVED=$(swift scripts/derive_sparkle_public_key.swift "$SPARKLE_PRIVATE_KEY")
-APP_PLIST="$APP_PATH/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Delete :SUPublicEDKey" "$APP_PLIST" 2>/dev/null || true
-/usr/libexec/PlistBuddy -c "Delete :SUFeedURL" "$APP_PLIST" 2>/dev/null || true
-/usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY_DERIVED" "$APP_PLIST"
-/usr/libexec/PlistBuddy -c "Add :SUFeedURL string https://github.com/manaflow-ai/cmux/releases/latest/download/appcast.xml" "$APP_PLIST"
-echo "Sparkle keys injected"
-
-# cmux is a non-sandboxed app. Sparkle's sandbox-only XPC services make the
-# installer handoff wait for an agent connection that never arrives.
-./scripts/remove-sparkle-sandbox-xpc-services.sh "$APP_PATH"
 
 # --- Codesign ---
 echo "Codesigning..."
-CMUX_SIGN_MODE=all-except-computer-use \
-  ./scripts/sign-cmux-bundle.sh "$APP_PATH" "$ENTITLEMENTS" "$SIGN_HASH"
+./scripts/sign-cmux-bundle.sh "$APP_PATH" "$ENTITLEMENTS" "$SIGN_HASH"
 echo "Codesign verified"
 
 # --- Notarize app ---
 echo "Notarizing app..."
-./scripts/ci/notarize-computer-use-helper.sh \
-  --finish "$COMPUTER_USE_NOTARY_STATE" \
-  "$APP_PATH" \
-  "$ENTITLEMENTS" \
-  "$SIGN_HASH"
 ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" cmux-notary.zip
 xcrun notarytool submit cmux-notary.zip \
   --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --wait
@@ -136,16 +107,12 @@ xcrun stapler staple cmux-macos.dmg
 xcrun stapler validate cmux-macos.dmg
 echo "DMG notarized"
 
-# --- Generate Sparkle appcast ---
-echo "Generating appcast..."
-./scripts/sparkle_generate_appcast.sh cmux-macos.dmg "$TAG" appcast.xml
-
 # --- Create GitHub release (if needed) and upload ---
 if gh release view "$TAG" >/dev/null 2>&1; then
   echo "Release $TAG already exists"
   EXISTING_ASSETS="$(gh release view "$TAG" --json assets --jq '.assets[].name' || true)"
   HAS_CONFLICTING_ASSET="false"
-  for asset in cmux-macos.dmg appcast.xml; do
+  for asset in cmux-macos.dmg; do
     if printf '%s\n' "$EXISTING_ASSETS" | grep -Fxq "$asset"; then
       HAS_CONFLICTING_ASSET="true"
       break
@@ -160,14 +127,14 @@ if gh release view "$TAG" >/dev/null 2>&1; then
 
   if [[ "$ALLOW_OVERWRITE" == "true" ]]; then
     echo "Uploading with overwrite enabled for existing release $TAG..."
-    gh release upload "$TAG" cmux-macos.dmg appcast.xml --clobber
+    gh release upload "$TAG" cmux-macos.dmg --clobber
   else
     echo "Uploading to existing release $TAG..."
-    gh release upload "$TAG" cmux-macos.dmg appcast.xml
+    gh release upload "$TAG" cmux-macos.dmg
   fi
 else
   echo "Creating release $TAG and uploading..."
-  gh release create "$TAG" cmux-macos.dmg appcast.xml --title "$TAG" --notes "See CHANGELOG.md for details"
+  gh release create "$TAG" cmux-macos.dmg --title "$TAG" --notes "See CHANGELOG.md for details"
 fi
 
 # --- Verify ---
@@ -223,7 +190,7 @@ CASKEOF
 fi
 
 # --- Cleanup ---
-rm -rf build/ cmux-macos.dmg appcast.xml
+rm -rf build/ cmux-macos.dmg
 echo ""
 echo "=== Release $TAG complete ==="
 say "cmux release complete"

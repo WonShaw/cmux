@@ -369,7 +369,7 @@ def run_wrapper_terminal_env_probe(
         args_log = tmp / "real-args.log"
         socket_path = str(tmp / "cmux.sock")
         fingerprint_env = {
-            "CMUX_BUNDLE_ID": "com.cmuxterm.app.debug.envprobe",
+            "CMUX_BUNDLE_ID": "com.comux.app.debug.envprobe",
             "CMUX_BUNDLED_CLI_PATH": str(wrapper_dir / "cmux"),
             "CMUX_LOAD_GHOSTTY_ZSH_INTEGRATION": "1",
             "CMUX_PANEL_ID": "panel:test",
@@ -1717,7 +1717,7 @@ def test_hooks_disabled_preserves_cmux_terminal_env_for_custom_hooks(failures: l
         )
 
         for key, expected_value in {
-            "CMUX_BUNDLE_ID": "com.cmuxterm.app.debug.envprobe",
+            "CMUX_BUNDLE_ID": "com.comux.app.debug.envprobe",
             "CMUX_CLAUDE_HOOKS_DISABLED": "1",
             "CMUX_PANEL_ID": "panel:test",
             "CMUX_SURFACE_ID": "surface:test",
@@ -2739,21 +2739,6 @@ def main() -> int:
     test_command_like_invocations_bypass_hook_injection(failures)
     test_hidden_attach_subcommand_bypasses_hook_injection(failures)
     test_passthrough_flags_bypass_hook_injection(failures)
-    test_live_socket_attaches_cmux_cua_when_available(failures)
-    test_computer_use_wrapper_is_a_pure_proxy(failures)
-    test_computer_use_skips_without_daemon_credential(failures)
-    test_computer_use_reads_private_daemon_credential_file(failures)
-    test_computer_use_probe_uses_absolute_system_helpers(failures)
-    test_computer_use_driver_does_not_require_external_runtime_auth(failures)
-    test_computer_use_rejects_external_client_override(failures)
-    test_computer_use_driver_skipped_for_strict_mcp_config(failures)
-    test_computer_use_driver_skipped_when_disabled(failures)
-    test_computer_use_driver_skipped_when_no_driver_available(failures)
-    test_hooks_disabled_is_fully_inert_for_computer_use(failures)
-    test_stale_socket_fails_closed_for_computer_use(failures)
-    test_computer_use_skipped_under_managed_sideload_policy(failures)
-    test_computer_use_rejects_group_writable_ancestor(failures)
-    test_computer_use_rejects_group_writable_override(failures)
     test_agents_subcommand_removes_cmux_terminal_fingerprint(failures)
     test_hooks_disabled_preserves_cmux_terminal_env_for_custom_hooks(failures)
     test_live_socket_preserves_third_party_claude_auth_for_fresh_launch(failures)

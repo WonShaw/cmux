@@ -80,10 +80,6 @@ extension TerminalController: ControlDebugContext {
         return workspace.id
     }
 
-    func controlDebugShowProWelcomeChecklist() {
-        ProWelcomeChecklistPresenter.present()
-    }
-
     func controlDebugIsTerminalFocused(surfaceArgument: String) -> String {
         isTerminalFocused(surfaceArgument)
     }
@@ -315,42 +311,6 @@ extension TerminalController: ControlDebugContext {
         return CommandPaletteSettingsStore(defaults: .standard).renameSelectsAllOnFocus
     }
 
-    // MARK: - debug.browser.*
-
-    func controlDebugFocusedBrowserAddressBarSurfaceID() -> UUID? {
-        AppDelegate.shared?.focusedBrowserAddressBarPanelId()
-    }
-
-    func controlDebugBrowserFavicon(params: [String: JSONValue]) -> ControlCallResult {
-        // Documented passthrough: panel resolution lives in the still-shared
-        // `v2BrowserWithPanel` (the whole `browser.*` domain's resolver), so
-        // the legacy `[String: Any]` params are reconstructed exactly
-        // (`foundationObject` is the inverse of the dispatcher's bridging) and
-        // the favicon body runs verbatim.
-        let result = v2BrowserWithPanel(params: params.mapValues(\.foundationObject)) { workspaceId, surfaceId, browserPanel in
-            let pngData = browserPanel.faviconPNGData
-            return .ok([
-                "workspace_id": workspaceId.uuidString,
-                "workspace_ref": v2Ref(kind: .workspace, uuid: workspaceId),
-                "surface_id": surfaceId.uuidString,
-                "surface_ref": v2Ref(kind: .surface, uuid: surfaceId),
-                "has_favicon": pngData != nil,
-                "png_base64": pngData?.base64EncodedString() ?? "",
-                "current_url": v2OrNull(browserPanel.currentURL?.absoluteString)
-            ])
-        }
-        switch result {
-        case let .ok(payload):
-            return .ok(JSONValue(foundationObject: payload) ?? .object([:]))
-        case let .err(code, message, data):
-            return .err(
-                code: code,
-                message: message,
-                data: data.flatMap { JSONValue(foundationObject: $0) }
-            )
-        }
-    }
-
     // MARK: - debug.right_sidebar.focus / debug.sidebar.visible
 
     func controlDebugRightSidebarFocus(
@@ -434,10 +394,6 @@ extension TerminalController: ControlDebugContext {
 
     func controlDebugPortalStats() -> JSONValue? {
         JSONValue(foundationObject: TerminalWindowPortalRegistry.debugPortalStats())
-    }
-
-    func controlDebugRemoteTmuxSizingSettled() -> JSONValue? {
-        JSONValue(foundationObject: remoteTmuxSizingSettlementPayload())
     }
 #endif
 }

@@ -78,26 +78,6 @@ struct DockControlDefinitionDecodingTests {
         }
     }
 
-    @Test("Browser config decodes with url and no command")
-    func browserDecodes() throws {
-        let control = try decode(#"{"id":"docs","title":"Docs","type":"browser","url":"https://example.com"}"#)
-        #expect(control.id == "docs")
-        #expect(control.kind == .browser)
-        #expect(control.url == "https://example.com")
-        #expect(control.command == nil)
-        #expect(control.showsBrowserChrome)
-    }
-
-    @Test("Browser config decodes chromeless toolbar policy")
-    func chromelessBrowserDecodes() throws {
-        let control = try decode(
-            #"{"id":"dashboard","type":"browser","url":"http://127.0.0.1:8877/sidebar","chrome":false}"#
-        )
-
-        #expect(control.kind == .browser)
-        #expect(!control.showsBrowserChrome)
-    }
-
     @Test("Browser config missing url throws")
     func browserMissingURLThrows() {
         #expect(throws: (any Error).self) {
@@ -136,133 +116,6 @@ struct DockControlDefinitionDecodingTests {
         #expect(throws: (any Error).self) {
             _ = try JSONEncoder().encode(control)
         }
-    }
-
-    @Test("Browser entries re-encode with type and url")
-    func browserReencodeIncludesTypeAndURL() throws {
-        let control = DockControlDefinition(
-            id: "docs",
-            title: "Docs",
-            kind: .browser,
-            url: "https://example.com"
-        )
-        let encoded = String(data: try JSONEncoder().encode(control), encoding: .utf8) ?? ""
-        #expect(encoded.contains("\"type\""))
-        #expect(encoded.contains("\"url\""))
-        #expect(!encoded.contains("\"chrome\""))
-    }
-
-    @Test("Chromeless browser entries re-encode the opt-in field")
-    func chromelessBrowserReencodeIncludesChrome() throws {
-        let control = DockControlDefinition(
-            id: "dashboard",
-            title: "Dashboard",
-            kind: .browser,
-            url: "http://127.0.0.1:8877/sidebar",
-            showsBrowserChrome: false
-        )
-        let encoded = String(data: try JSONEncoder().encode(control), encoding: .utf8) ?? ""
-
-        #expect(encoded.contains("\"chrome\":false"))
-    }
-
-    @Test("Browser entries without url fail to encode")
-    func browserReencodeMissingURLThrows() {
-        let control = DockControlDefinition(id: "docs", title: "Docs", kind: .browser)
-        #expect(throws: (any Error).self) {
-            _ = try JSONEncoder().encode(control)
-        }
-    }
-
-    @Test("Mixed terminal + browser config file decodes")
-    func mixedConfigFileDecodes() throws {
-        let json = #"""
-        {
-          "controls": [
-            {"id": "git", "title": "Git", "command": "lazygit"},
-            {"id": "docs", "title": "Docs", "type": "browser", "url": "https://example.com"}
-          ]
-        }
-        """#
-        let file = try JSONDecoder().decode(DockConfigFile.self, from: Data(json.utf8))
-        #expect(file.controls.count == 2)
-        #expect(file.controls[0].kind == .terminal)
-        #expect(file.controls[1].kind == .browser)
-        #expect(file.controls[1].url == "https://example.com")
-    }
-
-    @Test("Chromeless Dock browser stays hidden across focus requests and session restore")
-    @MainActor
-    func chromelessBrowserBehaviorPersists() throws {
-        let root = try makeTemporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: root) }
-
-        let store = DockSplitStore(
-            workspaceId: UUID(),
-            baseDirectoryProvider: { root.path },
-            browserAvailabilityProvider: { true }
-        )
-        defer { store.closeAllPanels() }
-
-        let generation = store.markConfigurationLoadInFlightForTesting(
-            rootDirectory: root.path
-        )
-        let resolution = DockConfigResolution(
-            controls: [
-                DockControlDefinition(
-                    id: "dashboard",
-                    title: "Dashboard",
-                    kind: .browser,
-                    url: "http://127.0.0.1:8877/sidebar",
-                    showsBrowserChrome: false
-                )
-            ],
-            sourceURL: nil,
-            baseDirectory: root.path,
-            isProjectSource: false
-        )
-        store.applyConfigurationLoadResult(
-            .resolved(resolution),
-            generation: generation,
-            replacingPanels: false
-        )
-
-        let panel = try #require(
-            store.panels.values.compactMap { $0 as? BrowserPanel }.first
-        )
-        #expect(panel.chromeVisibility == .chromeless)
-        #expect(!panel.isOmnibarVisible)
-        #expect(panel.requestAddressBarFocus(selectionIntent: .selectAll) == nil)
-        #expect(!panel.isOmnibarVisible)
-        #expect(!panel.setOmnibarVisible(true))
-        #expect(!panel.toggleOmnibarVisibility())
-        #expect(panel.chromeVisibility == .chromeless)
-
-        let snapshot = store.sessionSnapshot(includeScrollback: false)
-        let encodedSnapshot = try JSONEncoder().encode(snapshot)
-        let persistedSnapshot = try JSONDecoder().decode(
-            SessionSplitContainerSnapshot.self,
-            from: encodedSnapshot
-        )
-        #expect(
-            persistedSnapshot.panels.first?.browser?.chromeVisibility ==
-                .chromeless
-        )
-
-        let restoredStore = DockSplitStore(
-            workspaceId: UUID(),
-            baseDirectoryProvider: { root.path },
-            browserAvailabilityProvider: { true }
-        )
-        defer { restoredStore.closeAllPanels() }
-        restoredStore.restoreSessionSnapshot(persistedSnapshot)
-
-        let restoredPanel = try #require(
-            restoredStore.panels.values.compactMap { $0 as? BrowserPanel }.first
-        )
-        #expect(restoredPanel.chromeVisibility == .chromeless)
-        #expect(restoredPanel.requestAddressBarFocus() == nil)
-        #expect(!restoredPanel.isOmnibarVisible)
     }
 
     @Test(
@@ -983,29 +836,6 @@ struct DockControlDefinitionDecodingTests {
                     resumeBinding
             )
         }
-    }
-
-    @Test("Dock browser closes when WebKit requests close")
-    @MainActor
-    func dockBrowserClosesWhenWebViewRequestsClose() throws {
-        let root = try makeTemporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: root) }
-
-        let store = DockSplitStore(
-            workspaceId: UUID(),
-            baseDirectoryProvider: { root.path },
-            browserAvailabilityProvider: { true }
-        )
-        defer { store.closeAllPanels() }
-
-        let rootPane = try #require(store.bonsplitController.allPaneIds.first)
-        let panelId = try #require(store.newSurface(kind: .browser, inPane: rootPane, url: URL(string: "https://example.com"), focus: true))
-        let panel = try #require(store.browserPanel(for: panelId))
-
-        panel.webViewDidRequestClose?()
-
-        #expect(store.bonsplitController.allTabIds.isEmpty)
-        #expect(!store.containsPanel(panelId))
     }
 
     private final class ManualTitleCoalescerScheduler {

@@ -165,10 +165,7 @@ extension Workspace {
         // preserved current-generation report under the destination key so
         // strict caller-TTY resolution keeps its freshness check after a
         // local surface move.
-        guard !transfer.isRemoteTerminal,
-              !isRemoteWorkspace,
-              !isRemoteTmuxMirror,
-              let terminal = panels[transfer.panelId] as? TerminalPanel,
+        guard let terminal = panels[transfer.panelId] as? TerminalPanel,
               hasCurrentRuntimeReportedTTY(panelId: transfer.panelId, terminal: terminal),
               let ttyName = surfaceTTYNames[transfer.panelId] else {
             return
@@ -185,13 +182,10 @@ extension Workspace {
     }
 
     /// Host-local TTY bindings eligible to identify a process running on this
-    /// Mac. Remote workspaces and remote terminal surfaces use a different
-    /// `/dev` namespace and must never participate in local device matching.
+    /// Mac.
     var localAgentDeliveryTTYDevices: [(surfaceId: UUID, ttyDevice: Int64)] {
-        guard !isRemoteWorkspace, !isRemoteTmuxMirror else { return [] }
-        return panels.flatMap { panelId, panel -> [(surfaceId: UUID, ttyDevice: Int64)] in
-            guard let terminal = panel as? TerminalPanel,
-                  !isRemoteTerminalSurface(panelId) else {
+        panels.flatMap { panelId, panel -> [(surfaceId: UUID, ttyDevice: Int64)] in
+            guard let terminal = panel as? TerminalPanel else {
                 return []
             }
             var devices: [Int64] = []
@@ -218,8 +212,7 @@ extension DockSplitStore {
     /// nested-PTY fallback.
     var localAgentDeliveryTTYDevices: [(surfaceId: UUID, ttyDevice: Int64)] {
         panels.flatMap { panelId, panel -> [(surfaceId: UUID, ttyDevice: Int64)] in
-            guard let terminal = panel as? TerminalPanel,
-                  detachedSurfaceTransfersByPanelId[panelId]?.isRemoteTerminal != true else {
+            guard let terminal = panel as? TerminalPanel else {
                 return []
             }
             var devices: [Int64] = []
@@ -364,8 +357,6 @@ extension TerminalController {
     /// - `{surface_id, workspace_id?}`: the workspace that currently hosts a
     ///   known surface (`source: "surface"`), re-homing moved panes.
     /// - `{workspace_id}`: existence check only (`source: "workspace"`).
-    /// - `{tty_name, tty_resolution: "reported_tty"}`: a relay-authenticated
-    ///   remote workspace's unique fresh TTY report (`source: "tty"`).
     func v2AgentResolveDeliveryTarget(params: [String: Any]) -> V2CallResult {
         let claimedWorkspaceId = v2UUID(params, "workspace_id")
         let claimedSurfaceId = v2UUID(params, "surface_id")
@@ -397,32 +388,16 @@ extension TerminalController {
             )
         }
         if params.keys.contains("tty_name") {
-            let ttyResolution = AgentTTYBindingResolution.reportedTTY.rawValue
-            guard params["tty_resolution"] as? String == ttyResolution,
-                  let ttyName = params["tty_name"] as? String,
-                  TerminalCallerTTYResolver.normalizedName(ttyName) != nil,
-                  let remoteWorkspaceId = v2UUID(params, "_cmux_remote_workspace_id"),
-                  let authenticatedWorkspace = controlTabForSidebarMutation(id: remoteWorkspaceId),
-                  authenticatedWorkspace.isRemoteWorkspace,
-                  let target = appDelegate.liveRelayAgentDeliveryTarget(
-                      authenticatedWorkspaceID: remoteWorkspaceId,
-                      ttyName: ttyName
-                  ) else {
-                return .err(
-                    code: "not_found",
-                    message: String(
-                        localized: "agent.deliveryTarget.error.notFound",
-                        defaultValue: "No live delivery target"
-                    ),
-                    data: nil
-                )
-            }
-            return .ok([
-                "workspace_id": target.workspaceId.uuidString,
-                "surface_id": target.surfaceId.uuidString,
-                "source": "tty",
-                "tty_resolution": ttyResolution,
-            ])
+            // TTY-name probes were only ever answerable for relay-backed
+            // remote workspaces, which this build does not have.
+            return .err(
+                code: "not_found",
+                message: String(
+                    localized: "agent.deliveryTarget.error.notFound",
+                    defaultValue: "No live delivery target"
+                ),
+                data: nil
+            )
         }
         if params.keys.contains("pid") {
             // A socket caller controls both the value and its JSON type. Do

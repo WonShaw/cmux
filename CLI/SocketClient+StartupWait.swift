@@ -28,9 +28,6 @@ extension SocketClient {
                     try client.connectWithoutRetry(
                         responseTimeout: max(remainingTime, 0.001)
                     )
-                    if client.isRelayBacked {
-                        client.close()
-                    }
                     return client
                 } catch {
                     client.close()

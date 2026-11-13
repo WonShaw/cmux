@@ -139,17 +139,15 @@ extension ControlCommandCoordinator {
         }
     }
 
-    /// `new_pane` — split a new terminal/browser pane off the focused panel.
+    /// `new_pane` — split a new terminal pane off the focused panel.
     func sidebarNewPane(_ args: String) -> String {
         guard sidebarContext?.controlSidebarTabManagerAvailable() ?? false else {
             return "ERROR: TabManager not available"
         }
 
-        // Parse arguments: --type=terminal|browser --direction=left|right|up|down --url=...
-        var isBrowser = false
+        // Parse arguments: --type=terminal --direction=left|right|up|down
         var direction: ControlSidebarSplitDirectionV1 = .right
-        var urlRaw: String? = nil
-        var url: URL? = nil
+        var unsupportedType: String? = nil
         var invalidDirection = false
 
         let parts = args.split(separator: " ")
@@ -157,7 +155,7 @@ extension ControlCommandCoordinator {
             let partStr = String(part)
             if partStr.hasPrefix("--type=") {
                 let typeStr = String(partStr.dropFirst(7))
-                isBrowser = typeStr == "browser"
+                if typeStr == "browser" { unsupportedType = typeStr }
             } else if partStr.hasPrefix("--direction=") {
                 let dirStr = String(partStr.dropFirst(12))
                 if let parsed = ControlSidebarSplitDirectionV1.parse(dirStr) {
@@ -165,32 +163,24 @@ extension ControlCommandCoordinator {
                 } else {
                     invalidDirection = true
                 }
-            } else if partStr.hasPrefix("--url=") {
-                let urlStr = String(partStr.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
-                urlRaw = urlStr.isEmpty ? nil : urlStr
-                url = urlRaw.flatMap { URL(string: $0) }
             }
         }
 
         if invalidDirection {
             return "ERROR: Invalid direction. Use left, right, up, or down."
         }
-        if isBrowser, !(browserPanelContext?.controlBrowserPanelAvailabilityEnabled() ?? true) {
-            return browserPanelOpenExternallyWhenDisabled(rawURL: urlRaw, url: url)
+        if let unsupportedType {
+            return "ERROR: Unsupported pane type: \(unsupportedType)"
         }
 
         switch sidebarContext?.controlSidebarCreatePaneSplit(
-            isBrowser: isBrowser,
             orientationIsHorizontal: direction.isHorizontal,
-            insertFirst: direction.insertFirst,
-            url: url
+            insertFirst: direction.insertFirst
         ) ?? .failed {
         case .created(let newPanelID):
             return "OK \(newPanelID.uuidString)"
         case .routedToRemote:
             return "OK routed-to-remote-tmux"
-        case .mirrorInsertFirstRejected:
-            return "ERROR: direction left/up is not supported in a remote tmux mirror workspace"
         case .failed:
             return "ERROR: Failed to create pane"
         }
@@ -198,37 +188,31 @@ extension ControlCommandCoordinator {
 
     // MARK: - New / close surface
 
-    /// `new_surface` — create a terminal/browser surface in a pane.
+    /// `new_surface` — create a terminal surface in a pane.
     func sidebarNewSurface(_ args: String) -> String {
         guard sidebarContext?.controlSidebarTabManagerAvailable() ?? false else {
             return "ERROR: TabManager not available"
         }
 
-        // Parse arguments: --type=terminal|browser --pane=<pane_id> --url=...
-        var isBrowser = false
+        // Parse arguments: --type=terminal --pane=<pane_id>
         var paneArg: String? = nil
-        var urlRaw: String? = nil
-        var url: URL? = nil
+        var unsupportedType: String? = nil
 
         let parts = args.split(separator: " ")
         for part in parts {
             let partStr = String(part)
             if partStr.hasPrefix("--type=") {
                 let typeStr = String(partStr.dropFirst(7))
-                isBrowser = typeStr == "browser"
+                if typeStr == "browser" { unsupportedType = typeStr }
             } else if partStr.hasPrefix("--pane=") {
                 paneArg = String(partStr.dropFirst(7))
-            } else if partStr.hasPrefix("--url=") {
-                let urlStr = String(partStr.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
-                urlRaw = urlStr.isEmpty ? nil : urlStr
-                url = urlRaw.flatMap { URL(string: $0) }
             }
         }
-        if isBrowser, !(browserPanelContext?.controlBrowserPanelAvailabilityEnabled() ?? true) {
-            return browserPanelOpenExternallyWhenDisabled(rawURL: urlRaw, url: url)
+        if let unsupportedType {
+            return "ERROR: Unsupported surface type: \(unsupportedType)"
         }
 
-        switch sidebarContext?.controlSidebarNewSurface(isBrowser: isBrowser, paneArg: paneArg, url: url) ?? .noTabSelected {
+        switch sidebarContext?.controlSidebarNewSurface(paneArg: paneArg) ?? .noTabSelected {
         case .noTabSelected, .failed:
             return "ERROR: Failed to create tab"
         case .paneNotFound:
@@ -294,8 +278,6 @@ extension ControlCommandCoordinator {
             switch row.kind {
             case .terminal(let inWindow, let portalHosted, let viewDepth):
                 return "\(index): \(panelId) type=\(type) in_window=\(inWindow) portal=\(portalHosted) view_depth=\(viewDepth)"
-            case .browser(let inWindow):
-                return "\(index): \(panelId) type=\(type) in_window=\(inWindow)"
             case .other:
                 return "\(index): \(panelId) type=\(type) in_window=unknown"
             }

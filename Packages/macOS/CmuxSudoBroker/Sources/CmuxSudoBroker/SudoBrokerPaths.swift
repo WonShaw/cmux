@@ -27,7 +27,7 @@ public struct SudoBrokerPaths: Sendable, Equatable {
             }
             .joined()
         let scope = sanitizedScope.isEmpty || sanitizedScope == "." || sanitizedScope == ".."
-            ? "com.cmuxterm.app"
+            ? "com.comux.app"
             : sanitizedScope
         base = applicationSupportDirectory
             .appendingPathComponent("cmux", isDirectory: true)

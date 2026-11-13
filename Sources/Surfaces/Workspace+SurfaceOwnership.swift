@@ -4,19 +4,14 @@ import Foundation
 
 extension Workspace {
     var surfaceOwnershipPolicy: SurfaceOwnershipPolicy {
-        SurfaceOwnershipPolicy(cloudMachine: cloudVMID.map(SurfaceMachineID.cloud))
+        SurfaceOwnershipPolicy(cloudMachine: nil)
     }
 
-    /// A pane's projection or remote transport owns its machine, never its title
+    /// A pane's projection owns its machine, never its title
     /// or merely the workspace it happens to be displayed in.
     func machineOwningSurface(_ panelID: UUID, catalog: SurfaceCatalog = .shared) -> SurfaceMachineID? {
         guard panels[panelID] != nil else { return nil }
         if let machine = catalog.machineOwningPanel(panelID), !machine.isLocal { return machine }
-        if let reservation = cloudPendingCreations[panelID] { return reservation.machine }
-        if activeRemoteTerminalSurfaceIds.contains(panelID),
-           let machine = remoteConfiguration?.managedCloudVMID {
-            return .cloud(machine)
-        }
         return panels[panelID]?.transferredSurfaceMachine ?? .local
     }
 
@@ -26,8 +21,6 @@ extension Workspace {
     ) -> SurfaceTransferRejection? {
         guard surfaceOwnershipPolicy.cloudMachine != nil else { return nil }
         switch source {
-        case .surfaceResources(let group):
-            return SurfaceCatalog.shared.ownershipRejection(for: group.resources, policy: surfaceOwnershipPolicy)
         case .surface:
             let machine: SurfaceMachineID?
             if transfer.isFromCurrentProcess {
@@ -64,8 +57,6 @@ extension Workspace {
         if transfer.origin == .workspace(id) { return true }
         let machine = transfer.surfaceMachine
             ?? SurfaceCatalog.shared.machineOwningPanel(transfer.panelId)
-            ?? transfer.remoteRelayNamespaceConfiguration?.managedCloudVMID.map(SurfaceMachineID.cloud)
-            ?? transfer.remoteCleanupConfiguration?.managedCloudVMID.map(SurfaceMachineID.cloud)
             ?? .local
         return surfaceOwnershipPolicy.rejection(for: machine) == nil
     }

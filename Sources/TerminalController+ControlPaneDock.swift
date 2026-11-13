@@ -5,17 +5,14 @@ import Foundation
 
 extension TerminalController {
     /// Creates a pane in the routed window's right-sidebar Dock instead of the
-    /// main area, splitting the Dock's own Bonsplit tree. Browser-disabled is
-    /// handled by `controlPaneCreate` before this is reached.
+    /// main area, splitting the Dock's own Bonsplit tree.
     func dockPaneCreate(
         routing: ControlRoutingSelectors,
         tabManager: TabManager,
         panelType: PanelType,
-        url: URL?,
         orientation: SplitOrientation,
         insertFirst: Bool,
         initialDividerPosition: CGFloat?,
-        preferredProfileID: UUID?,
         inputs: ControlPaneCreateInputs
     ) -> ControlPaneCreateResolution {
         if let invalid = validateDockPaneCreateRouting(routing: routing, tabManager: tabManager, panelType: panelType) {
@@ -33,7 +30,7 @@ extension TerminalController {
             return .noSourceSurface
         }
         let focus = v2FocusAllowed(requested: inputs.requestedFocus)
-        let kind: DockSurfaceKind = (panelType == .browser) ? .browser : .terminal
+        let kind: DockSurfaceKind = .terminal
         if focus {
             // Creation is authoritative; revealing its secondary focus request
             // is best-effort when the Dock host is still mounting.
@@ -44,15 +41,12 @@ extension TerminalController {
             orientation: orientation,
             insertFirst: insertFirst,
             sourcePanelId: inputs.requestedSourceSurfaceID,
-            url: kind == .browser ? url : nil,
-            command: kind == .terminal ? inputs.initialCommand : nil,
-            workingDirectory: kind == .terminal ? inputs.workingDirectory : nil,
+            command: inputs.initialCommand,
+            workingDirectory: inputs.workingDirectory,
             environment: inputs.startupEnvironment,
-            tmuxStartCommand: kind == .terminal ? inputs.tmuxStartCommand : nil,
-            initialInput: kind == .terminal ? inputs.initialInput : nil,
+            tmuxStartCommand: inputs.tmuxStartCommand,
+            initialInput: inputs.initialInput,
             initialDividerPosition: initialDividerPosition,
-            preferredProfileID: preferredProfileID,
-            preloadInitialNavigationInBackground: kind == .browser,
             focus: false
         )
         guard let newPanelId else {

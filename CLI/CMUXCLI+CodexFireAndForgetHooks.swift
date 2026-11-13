@@ -13,12 +13,10 @@ extension CMUXCLI {
     func spawnDetachedCodexSettledStop(
         payload: String,
         environment: [String: String],
-        telemetry: CLISocketSentryTelemetry,
         turnID: String? = nil
     ) {
         let retryCount = max(0, Int(environment["CMUX_CODEX_SETTLED_STOP_RETRY_COUNT"] ?? "0") ?? 0)
         guard retryCount < Self.codexSettledStopMaximumRetries else {
-            telemetry.breadcrumb("codex-hook.settled-stop.retry-limit-reached")
             return
         }
         let retryDelay = [0.0, 0.5, 1.0][min(retryCount, 2)]
@@ -44,7 +42,6 @@ extension CMUXCLI {
             contents: payloadData,
             attributes: [.posixPermissions: NSNumber(value: Int16(0o600))]
         ) else {
-            telemetry.breadcrumb("codex-hook.settled-stop.payload-write-failed")
             return
         }
 
@@ -73,7 +70,6 @@ extension CMUXCLI {
             try process.run()
         } catch {
             try? FileManager.default.removeItem(at: payloadURL)
-            telemetry.breadcrumb("codex-hook.settled-stop.spawn-failed")
         }
     }
 
@@ -83,14 +79,12 @@ extension CMUXCLI {
     func runCodexNativeTitleSyncHook(
         commandArgs: [String],
         environment: [String: String],
-        client: SocketClient,
-        telemetry: CLISocketSentryTelemetry
+        client: SocketClient
     ) {
         guard let sessionId = optionValue(commandArgs, name: "--session"),
               let workspaceId = optionValue(commandArgs, name: "--workspace"),
               let surfaceId = optionValue(commandArgs, name: "--surface"),
               !sessionId.isEmpty, !workspaceId.isEmpty, !surfaceId.isEmpty else {
-            telemetry.breadcrumb("codex-hook.native-title-sync.invalid-target")
             return
         }
         // Capture the Cloud name revision before reading Codex's database.
@@ -101,12 +95,10 @@ extension CMUXCLI {
             codexHome: normalizedHookValue(environment["CODEX_HOME"])
         )
         guard let title = titleStore.title(forSessionId: sessionId) else {
-            telemetry.breadcrumb("codex-hook.native-title-sync.no-title")
             return
         }
         let turnLedger = CodexTurnLedger(environment: environment)
         guard (try? turnLedger.isCurrent(sessionID: sessionId, surfaceID: surfaceId)) ?? true else {
-            telemetry.breadcrumb("codex-hook.native-title-sync.stale")
             return
         }
         do {
@@ -116,9 +108,7 @@ extension CMUXCLI {
                 "title": title,
                 "cloud_name_context": probe?["cloud_name_context"] ?? NSNull()
             ])
-            telemetry.breadcrumb("codex-hook.native-title-sync.sent")
         } catch {
-            telemetry.breadcrumb("codex-hook.native-title-sync.send-failed")
         }
     }
 
@@ -129,8 +119,7 @@ extension CMUXCLI {
         sessionId: String,
         workspaceId: String,
         surfaceId: String,
-        environment: [String: String],
-        telemetry: CLISocketSentryTelemetry
+        environment: [String: String]
     ) {
         guard !sessionId.isEmpty, !workspaceId.isEmpty, !surfaceId.isEmpty else { return }
         let selfPath: String = {
@@ -162,7 +151,6 @@ extension CMUXCLI {
         do {
             try process.run()
         } catch {
-            telemetry.breadcrumb("codex-hook.native-title-sync.spawn-failed")
         }
     }
 

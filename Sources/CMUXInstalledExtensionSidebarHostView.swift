@@ -776,17 +776,21 @@ struct CMUXInstalledExtensionSidebarHostView: View {
         }
     }
 
+    /// Shows the system ExtensionKit manager (enable/disable installed sidebar
+    /// extensions) in a sheet. It is a local system view, not a web view.
     private func presentExtensionBrowser() {
-        guard let anchorView = browserAnchorView
-            ?? NSApp.keyWindow?.contentView
-            ?? NSApp.mainWindow?.contentView else { return }
-        AppDelegate.shared?.openSidebarExtensionBrowser(
-            from: anchorView,
+        guard CmuxExtensionSidebarSelection.isEnabled else { return }
+        guard let window = browserAnchorView?.window
+            ?? NSApp.keyWindow
+            ?? NSApp.mainWindow,
+            let presenter = window.contentViewController else { return }
+        let viewController = CMUXSidebarExtensionBrowserPresenter.makeViewController(
             title: String(
                 localized: "sidebar.extensions.browser.title",
                 defaultValue: "Sidebar Extensions"
             )
         )
+        presenter.presentAsModalWindow(viewController)
     }
 
     private func extensionAccessBanner(

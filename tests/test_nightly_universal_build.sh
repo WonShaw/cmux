@@ -256,7 +256,7 @@ if ! awk '
   exit 1
 fi
 
-if ! grep -Fq "bundleId: 'com.cmuxterm.app.nightly'," "$WORKFLOW_FILE" || ! grep -Fq "bundleId: 'com.cmuxterm.app.rc'," "$WORKFLOW_FILE"; then
+if ! grep -Fq "bundleId: 'com.comux.app.nightly'," "$WORKFLOW_FILE" || ! grep -Fq "bundleId: 'com.comux.app.rc'," "$WORKFLOW_FILE"; then
   echo "FAIL: nightly workflow must publish the unified nightly bundle ID and the rc channel bundle ID"
   exit 1
 fi

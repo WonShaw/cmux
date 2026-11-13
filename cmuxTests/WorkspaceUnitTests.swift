@@ -14,7 +14,6 @@ import CmuxSidebar
 import UserNotifications
 import Combine
 import CmuxTerminal
-import CmuxBrowser
 import struct CmuxSettings.IntegrationsCatalogSection
 import enum CmuxSettings.KiroNotificationLevel
 @_implementationOnly import XCTest
@@ -33,15 +32,6 @@ private typealias StoredShortcut = cmux.StoredShortcut
 private typealias ShortcutStroke = cmux.ShortcutStroke
 private typealias AppIconMode = cmux.AppIconMode
 #endif
-
-@MainActor
-func makeTemporaryBrowserProfile(named prefix: String) throws -> BrowserProfileDefinition {
-    try XCTUnwrap(
-        BrowserProfileStore.shared.createProfile(
-            named: "\(prefix)-\(UUID().uuidString)"
-        )
-    )
-}
 
 final class SidebarSelectedWorkspaceColorTests: XCTestCase {
     func testLightModeUsesConfiguredSelectedWorkspaceBackgroundColor() {
@@ -1023,107 +1013,6 @@ final class KeyboardShortcutSettingsFileStoreTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: IntegrationsCatalogSection().kiroNotificationLevel.userDefaultsKey))
         XCTAssertEqual(defaults.integer(forKey: AutomationSettings.portBaseKey), 32100)
         XCTAssertEqual(defaults.integer(forKey: AutomationSettings.portRangeKey), 42)
-    }
-
-    func testSettingsFileStoreAppliesBrowserHiddenWebViewDiscardDelayAtMaximum() throws {
-        let defaults = UserDefaults.standard
-        let previousEnabled = defaults.object(forKey: BrowserHiddenWebViewDiscardPolicy.enabledKey)
-        let previousDelay = defaults.object(forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
-        let previousBackups = defaults.data(forKey: settingsFileBackupsDefaultsKey)
-        defer {
-            if let previousEnabled {
-                defaults.set(previousEnabled, forKey: BrowserHiddenWebViewDiscardPolicy.enabledKey)
-            } else {
-                defaults.removeObject(forKey: BrowserHiddenWebViewDiscardPolicy.enabledKey)
-            }
-            if let previousDelay {
-                defaults.set(previousDelay, forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
-            } else {
-                defaults.removeObject(forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
-            }
-            if let previousBackups {
-                defaults.set(previousBackups, forKey: settingsFileBackupsDefaultsKey)
-            } else {
-                defaults.removeObject(forKey: settingsFileBackupsDefaultsKey)
-            }
-        }
-        defaults.removeObject(forKey: BrowserHiddenWebViewDiscardPolicy.enabledKey)
-        defaults.removeObject(forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
-        defaults.removeObject(forKey: settingsFileBackupsDefaultsKey)
-
-        let directoryURL = try makeTemporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directoryURL) }
-
-        let settingsFileURL = directoryURL.appendingPathComponent("cmux.json", isDirectory: false)
-        try writeSettingsFile(
-            """
-            {
-              "browser": {
-                "discardHiddenWebViews": false,
-                "hiddenWebViewDiscardDelaySeconds": 3600
-              }
-            }
-            """,
-            to: settingsFileURL
-        )
-
-        _ = KeyboardShortcutSettingsFileStore(
-            primaryPath: settingsFileURL.path,
-            fallbackPath: nil,
-            startWatching: false
-        )
-
-        XCTAssertEqual(
-            defaults.object(forKey: BrowserHiddenWebViewDiscardPolicy.enabledKey) as? Bool,
-            false
-        )
-        XCTAssertEqual(
-            defaults.double(forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey),
-            BrowserHiddenWebViewDiscardPolicy.maximumHiddenDelay
-        )
-    }
-
-    func testSettingsFileStoreIgnoresBrowserHiddenWebViewDiscardDelayAboveMaximum() throws {
-        let defaults = UserDefaults.standard
-        let previousDelay = defaults.object(forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
-        let previousBackups = defaults.data(forKey: settingsFileBackupsDefaultsKey)
-        defer {
-            if let previousDelay {
-                defaults.set(previousDelay, forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
-            } else {
-                defaults.removeObject(forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
-            }
-            if let previousBackups {
-                defaults.set(previousBackups, forKey: settingsFileBackupsDefaultsKey)
-            } else {
-                defaults.removeObject(forKey: settingsFileBackupsDefaultsKey)
-            }
-        }
-        defaults.removeObject(forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
-        defaults.removeObject(forKey: settingsFileBackupsDefaultsKey)
-
-        let directoryURL = try makeTemporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directoryURL) }
-
-        let settingsFileURL = directoryURL.appendingPathComponent("cmux.json", isDirectory: false)
-        try writeSettingsFile(
-            """
-            {
-              "browser": {
-                "hiddenWebViewDiscardDelaySeconds": 3601
-              }
-            }
-            """,
-            to: settingsFileURL
-        )
-
-        _ = KeyboardShortcutSettingsFileStore(
-            primaryPath: settingsFileURL.path,
-            fallbackPath: nil,
-            startWatching: false
-        )
-
-        XCTAssertNil(defaults.object(forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey))
     }
 
     func testSettingsFileStoreParsesRightSidebarShortcutBindings() throws {
@@ -2730,91 +2619,6 @@ final class StoredShortcutMatchingTests: XCTestCase {
         XCTAssertTrue(shortcut.matches(event: event))
     }
 
-    func testShortcutRecorderResolutionReportsConflictingAction() {
-        KeyboardShortcutSettings.resetAll()
-        defer { KeyboardShortcutSettings.resetAll() }
-
-        let shortcut = StoredShortcut(key: "t", command: true, shift: false, option: false, control: false)
-
-        XCTAssertEqual(
-            KeyboardShortcutSettings.Action.openBrowser.normalizedRecordedShortcutResult(shortcut),
-            .rejected(.conflictsWithAction(.newSurface))
-        )
-    }
-
-    func testShortcutRecorderResolutionRejectsNumberedShortcutAgainstReservedDigitFamily() {
-        KeyboardShortcutSettings.resetAll()
-        defer { KeyboardShortcutSettings.resetAll() }
-
-        KeyboardShortcutSettings.setShortcut(
-            StoredShortcut(key: "3", command: true, shift: false, option: false, control: false),
-            for: .openBrowser
-        )
-
-        let shortcut = StoredShortcut(key: "2", command: true, shift: false, option: false, control: false)
-
-        XCTAssertEqual(
-            KeyboardShortcutSettings.Action.selectWorkspaceByNumber.normalizedRecordedShortcutResult(shortcut),
-            .rejected(.conflictsWithAction(.openBrowser))
-        )
-    }
-
-    func testShortcutRecorderResolutionRejectsSingleStrokeThatMatchesChordPrefix() {
-        KeyboardShortcutSettings.resetAll()
-        defer { KeyboardShortcutSettings.resetAll() }
-
-        KeyboardShortcutSettings.setShortcut(
-            StoredShortcut(
-                key: "k",
-                command: true,
-                shift: false,
-                option: false,
-                control: false,
-                chordKey: "c",
-                chordCommand: true,
-                chordShift: false,
-                chordOption: false,
-                chordControl: false
-            ),
-            for: .openBrowser
-        )
-
-        let shortcut = StoredShortcut(key: "k", command: true, shift: false, option: false, control: false)
-
-        XCTAssertEqual(
-            KeyboardShortcutSettings.Action.newTab.normalizedRecordedShortcutResult(shortcut),
-            .rejected(.conflictsWithAction(.openBrowser))
-        )
-    }
-
-    func testShortcutRecorderResolutionRejectsChordThatMatchesExistingSingleStrokePrefix() {
-        KeyboardShortcutSettings.resetAll()
-        defer { KeyboardShortcutSettings.resetAll() }
-
-        KeyboardShortcutSettings.setShortcut(
-            StoredShortcut(key: "k", command: true, shift: false, option: false, control: false),
-            for: .openBrowser
-        )
-
-        let shortcut = StoredShortcut(
-            key: "k",
-            command: true,
-            shift: false,
-            option: false,
-            control: false,
-            chordKey: "c",
-            chordCommand: true,
-            chordShift: false,
-            chordOption: false,
-            chordControl: false
-        )
-
-        XCTAssertEqual(
-            KeyboardShortcutSettings.Action.newTab.normalizedRecordedShortcutResult(shortcut),
-            .rejected(.conflictsWithAction(.openBrowser))
-        )
-    }
-
     func testSystemWideHotkeyNormalizationReportsCmuxActionConflictByRecordedPhysicalKey() {
         KeyboardShortcutSettings.resetAll()
         defer { KeyboardShortcutSettings.resetAll() }
@@ -2844,56 +2648,6 @@ final class StoredShortcutMatchingTests: XCTestCase {
             KeyboardShortcutSettings.Action.showHideAllWindows.normalizedRecordedShortcutResult(shortcut),
             .rejected(.reservedBySystem)
         )
-    }
-
-    func testShortcutRecorderValidationPresentationSurfacesBareKeyMessage() {
-        let presentation = ShortcutRecorderValidationPresentation(
-            attempt: ShortcutRecorderRejectedAttempt(reason: .bareKeyNotAllowed, proposedShortcut: nil),
-            action: .openBrowser,
-            currentShortcut: KeyboardShortcutSettings.Action.openBrowser.defaultShortcut
-        )
-
-        XCTAssertEqual(presentation?.message, "Shortcuts must include ⌘ ⌥ ⌃ or ⇧")
-        XCTAssertNil(presentation?.swapButtonTitle)
-        XCTAssertFalse(presentation?.canSwap ?? true)
-        XCTAssertEqual(presentation?.undoButtonTitle, "Undo")
-    }
-
-    func testShortcutRecorderValidationPresentationSurfacesConflictActionAndSwapAffordance() {
-        let presentation = ShortcutRecorderValidationPresentation(
-            attempt: ShortcutRecorderRejectedAttempt(
-                reason: .conflictsWithAction(.newSurface),
-                proposedShortcut: StoredShortcut(key: "t", command: true, shift: false, option: false, control: false)
-            ),
-            action: .openBrowser,
-            currentShortcut: KeyboardShortcutSettings.Action.openBrowser.defaultShortcut,
-            shortcutForAction: { $0.defaultShortcut }
-        )
-
-        XCTAssertEqual(presentation?.message, "This shortcut conflicts with New Surface (⌘T). Swap shortcuts?")
-        XCTAssertEqual(presentation?.swapButtonTitle, "Swap")
-        XCTAssertTrue(presentation?.canSwap ?? false)
-        XCTAssertEqual(presentation?.undoButtonTitle, "Undo")
-    }
-
-    func testShortcutRecorderValidationPresentationUsesNumberedDisplayOnlyForNumberedConflicts() {
-        let presentation = ShortcutRecorderValidationPresentation(
-            attempt: ShortcutRecorderRejectedAttempt(
-                reason: .conflictsWithAction(.selectWorkspaceByNumber),
-                proposedShortcut: StoredShortcut(key: "2", command: true, shift: false, option: false, control: false)
-            ),
-            action: .openBrowser,
-            currentShortcut: KeyboardShortcutSettings.Action.openBrowser.defaultShortcut,
-            shortcutForAction: { $0.defaultShortcut }
-        )
-
-        XCTAssertEqual(
-            presentation?.message,
-            "This shortcut conflicts with Select Workspace 1…9 (⌘1…9)."
-        )
-        XCTAssertNil(presentation?.swapButtonTitle)
-        XCTAssertFalse(presentation?.canSwap ?? true)
-        XCTAssertEqual(presentation?.undoButtonTitle, "Undo")
     }
 
     func testShortcutRecorderValidationPresentationSurfacesReservedSystemMessage() {
@@ -3320,9 +3074,6 @@ final class WorkspaceCreationPlacementTests: XCTestCase {
             initialTerminalInput: String?,
             initialTerminalStartupRestoreAgent: SessionRestorableAgentSnapshot?,
             initialTerminalEnvironment: [String: String],
-            initialBrowserURL: URL?,
-            initialBrowserOmnibarVisible: Bool,
-            initialBrowserTransparentBackground: Bool,
             workspaceEnvironment: [String: String],
             allowTextBoxFocusDefault: Bool
         ) -> Workspace {
@@ -3338,9 +3089,6 @@ final class WorkspaceCreationPlacementTests: XCTestCase {
                 initialTerminalInput: initialTerminalInput,
                 initialTerminalStartupRestoreAgent: initialTerminalStartupRestoreAgent,
                 initialTerminalEnvironment: initialTerminalEnvironment,
-                initialBrowserURL: initialBrowserURL,
-                initialBrowserOmnibarVisible: initialBrowserOmnibarVisible,
-                initialBrowserTransparentBackground: initialBrowserTransparentBackground,
                 workspaceEnvironment: workspaceEnvironment,
                 allowTextBoxFocusDefault: allowTextBoxFocusDefault
             )
@@ -3635,9 +3383,6 @@ final class WorkspaceCreationConfigSanitizationTests: XCTestCase {
             initialTerminalInput: String?,
             initialTerminalStartupRestoreAgent: SessionRestorableAgentSnapshot?,
             initialTerminalEnvironment: [String: String],
-            initialBrowserURL: URL?,
-            initialBrowserOmnibarVisible: Bool,
-            initialBrowserTransparentBackground: Bool,
             workspaceEnvironment: [String: String],
             allowTextBoxFocusDefault: Bool
         ) -> Workspace {
@@ -3653,9 +3398,6 @@ final class WorkspaceCreationConfigSanitizationTests: XCTestCase {
                 initialTerminalInput: initialTerminalInput,
                 initialTerminalStartupRestoreAgent: initialTerminalStartupRestoreAgent,
                 initialTerminalEnvironment: initialTerminalEnvironment,
-                initialBrowserURL: initialBrowserURL,
-                initialBrowserOmnibarVisible: initialBrowserOmnibarVisible,
-                initialBrowserTransparentBackground: initialBrowserTransparentBackground,
                 workspaceEnvironment: workspaceEnvironment,
                 allowTextBoxFocusDefault: allowTextBoxFocusDefault
             )
@@ -3677,95 +3419,6 @@ final class WorkspaceCreationConfigSanitizationTests: XCTestCase {
         XCTAssertNil(capturedConfig.workingDirectory)
         XCTAssertNil(capturedConfig.command)
         XCTAssertTrue(capturedConfig.environmentVariables.isEmpty)
-    }
-}
-
-@MainActor
-final class NewBrowserWorkspaceCreationTests: XCTestCase {
-    func testNewBrowserWorkspaceShortcutDefaultsAndMetadata() {
-        XCTAssertEqual(KeyboardShortcutSettings.Action.newBrowserWorkspace.label, "New Browser Workspace")
-        XCTAssertEqual(KeyboardShortcutSettings.Action.newBrowserWorkspace.defaultsKey, "shortcut.newBrowserWorkspace")
-        XCTAssertTrue(KeyboardShortcutSettings.publicShortcutActions.contains(.newBrowserWorkspace))
-
-        let shortcut = KeyboardShortcutSettings.Action.newBrowserWorkspace.defaultShortcut
-        XCTAssertEqual(shortcut.key, "n")
-        XCTAssertTrue(shortcut.command)
-        XCTAssertTrue(shortcut.option)
-        XCTAssertFalse(shortcut.shift)
-        XCTAssertFalse(shortcut.control)
-    }
-
-    func testNewBrowserWorkspaceDefaultDoesNotCollideWithOtherDefaults() {
-        let newDefault = KeyboardShortcutSettings.Action.newBrowserWorkspace.defaultShortcut
-        for action in KeyboardShortcutSettings.Action.allCases where action != .newBrowserWorkspace {
-            let other = action.defaultShortcut
-            guard !other.isUnbound else { continue }
-            XCTAssertFalse(
-                other.key == newDefault.key
-                    && other.command == newDefault.command
-                    && other.shift == newDefault.shift
-                    && other.option == newDefault.option
-                    && other.control == newDefault.control,
-                "Option+Cmd+N default collides with \(action.rawValue)"
-            )
-        }
-    }
-
-    func testAddWorkspaceWithBrowserInitialSurfaceBootsBrowserPane() {
-        let manager = TabManager()
-        let baselineOrder = manager.tabs.map(\.id)
-
-        let workspace = manager.addWorkspace(initialSurface: .browser)
-
-        XCTAssertEqual(manager.selectedTabId, workspace.id)
-        XCTAssertEqual(manager.tabs.map(\.id).filter { $0 != workspace.id }, baselineOrder)
-
-        XCTAssertEqual(workspace.panels.count, 1)
-        guard let browserPanel = workspace.panels.values.first as? BrowserPanel else {
-            XCTFail("Expected the initial surface to be a browser pane")
-            return
-        }
-        XCTAssertNil(workspace.focusedTerminalPanel)
-        XCTAssertNil(browserPanel.currentURL, "Browser should boot in its default new-tab state")
-        XCTAssertNotNil(
-            browserPanel.pendingAddressBarFocusRequestId,
-            "Browser workspace should request address-bar focus for first activation"
-        )
-
-        let tabIds = workspace.bonsplitController.allTabIds
-        XCTAssertEqual(tabIds.count, 1)
-        XCTAssertEqual(
-            tabIds.first.flatMap { workspace.bonsplitController.tab($0)?.kind },
-            SurfaceKind.browser.rawValue
-        )
-        XCTAssertEqual(workspace.title, String(localized: "browser.newTab", defaultValue: "New tab"))
-    }
-
-    func testBrowserInitialSurfacePlacementMatchesTerminalPlacement() {
-        let terminalManager = makeManagerWithThreeWorkspaces()
-        let terminalInserted = terminalManager.addWorkspace()
-        let terminalIndex = terminalManager.tabs.firstIndex { $0.id == terminalInserted.id }
-
-        let browserManager = makeManagerWithThreeWorkspaces()
-        let browserInserted = browserManager.addWorkspace(initialSurface: .browser)
-        let browserIndex = browserManager.tabs.firstIndex { $0.id == browserInserted.id }
-
-        XCTAssertNotNil(terminalIndex)
-        XCTAssertEqual(
-            browserIndex,
-            terminalIndex,
-            "Browser workspaces must follow New Workspace placement semantics"
-        )
-    }
-
-    private func makeManagerWithThreeWorkspaces() -> TabManager {
-        let manager = TabManager()
-        _ = manager.addWorkspace()
-        _ = manager.addWorkspace()
-        if let first = manager.tabs.first {
-            manager.selectWorkspace(first)
-        }
-        return manager
     }
 }
 
@@ -4097,7 +3750,6 @@ final class SidebarWorkspaceAuxiliaryDetailVisibilityTests: XCTestCase {
                 showLog: false,
                 showProgress: true,
                 showBranchDirectory: false,
-                showPullRequests: true,
                 showPorts: false,
                 hideAllDetails: false
             ),
@@ -4106,7 +3758,6 @@ final class SidebarWorkspaceAuxiliaryDetailVisibilityTests: XCTestCase {
                 showsLog: false,
                 showsProgress: true,
                 showsBranchDirectory: false,
-                showsPullRequests: true,
                 showsPorts: false
             )
         )
@@ -4119,7 +3770,6 @@ final class SidebarWorkspaceAuxiliaryDetailVisibilityTests: XCTestCase {
                 showLog: true,
                 showProgress: true,
                 showBranchDirectory: true,
-                showPullRequests: true,
                 showPorts: true,
                 hideAllDetails: true
             ),
@@ -5251,35 +4901,6 @@ final class WorkspaceSidebarExtensionBrowserSurfaceTests: XCTestCase {
         XCTAssertFalse(message.contains("in066h50"))
     }
 
-    func testCreatesExtensionBrowserTabInFocusedPane() {
-        let manager = TabManager()
-        guard let workspace = manager.selectedWorkspace,
-              let leftPanelId = workspace.focusedPanelId,
-              let rightPanel = workspace.newTerminalSplit(from: leftPanelId, orientation: .horizontal),
-              let leftPaneId = workspace.paneId(forPanelId: leftPanelId) else {
-            XCTFail("Expected split workspace setup to succeed")
-            return
-        }
-
-        XCTAssertEqual(workspace.focusedPanelId, rightPanel.id)
-
-        workspace.focusPanel(leftPanelId)
-        XCTAssertEqual(workspace.bonsplitController.focusedPaneId, leftPaneId)
-
-        guard let extensionBrowserPanel = workspace.newSidebarExtensionBrowserSurface(
-            inPane: leftPaneId,
-            title: "Sidebar Extensions",
-            focus: true
-        ) else {
-            XCTFail("Expected extension browser tab creation to succeed")
-            return
-        }
-
-        XCTAssertEqual(extensionBrowserPanel.panelType, .extensionBrowser)
-        XCTAssertEqual(workspace.focusedPanelId, extensionBrowserPanel.id)
-        XCTAssertEqual(workspace.paneId(forPanelId: extensionBrowserPanel.id), leftPaneId)
-        XCTAssertNotEqual(workspace.paneId(forPanelId: extensionBrowserPanel.id), workspace.paneId(forPanelId: rightPanel.id))
-    }
 }
 
 
@@ -5306,26 +4927,6 @@ final class WorkspaceTerminalConfigInheritanceSelectionTests: XCTestCase {
         )
     }
 
-    func testFallsBackToAnotherTerminalInPaneWhenSelectedTabIsBrowser() {
-        let manager = TabManager()
-        guard let workspace = manager.selectedWorkspace,
-              let terminalPanelId = workspace.focusedPanelId,
-              let paneId = workspace.paneId(forPanelId: terminalPanelId),
-              let browserPanel = workspace.newBrowserSurface(inPane: paneId, focus: true) else {
-            XCTFail("Expected workspace browser setup to succeed")
-            return
-        }
-
-        XCTAssertEqual(workspace.focusedPanelId, browserPanel.id)
-
-        let sourcePanel = workspace.terminalPanelForConfigInheritance(inPane: paneId)
-        XCTAssertEqual(
-            sourcePanel?.id,
-            terminalPanelId,
-            "Expected inheritance to fall back to a terminal in the pane when browser is selected"
-        )
-    }
-
     func testPreferredTerminalPanelWinsWhenProvided() {
         let manager = TabManager()
         guard let workspace = manager.selectedWorkspace,
@@ -5338,27 +4939,6 @@ final class WorkspaceTerminalConfigInheritanceSelectionTests: XCTestCase {
         XCTAssertEqual(sourcePanel?.id, terminalPanelId)
     }
 
-    func testPrefersLastFocusedTerminalWhenBrowserFocusedInDifferentPane() {
-        let manager = TabManager()
-        guard let workspace = manager.selectedWorkspace,
-              let leftTerminalPanelId = workspace.focusedPanelId,
-              let rightTerminalPanel = workspace.newTerminalSplit(from: leftTerminalPanelId, orientation: .horizontal),
-              let rightPaneId = workspace.paneId(forPanelId: rightTerminalPanel.id) else {
-            XCTFail("Expected split setup to succeed")
-            return
-        }
-
-        workspace.focusPanel(leftTerminalPanelId)
-        _ = workspace.newBrowserSurface(inPane: rightPaneId, focus: true)
-        XCTAssertNotEqual(workspace.focusedPanelId, leftTerminalPanelId)
-
-        let sourcePanel = workspace.terminalPanelForConfigInheritance(inPane: rightPaneId)
-        XCTAssertEqual(
-            sourcePanel?.id,
-            leftTerminalPanelId,
-            "Expected inheritance to prefer last focused terminal when browser is focused in another pane"
-        )
-    }
 }
 
 
@@ -5490,129 +5070,6 @@ final class WorkspaceAttentionFlashTests: XCTestCase {
 }
 
 
-@MainActor
-final class WorkspaceBrowserProfileSelectionTests: XCTestCase {
-    private final class RejectingCreateTabDelegate: BonsplitDelegate {
-        func splitTabBar(_ controller: BonsplitController, shouldCreateTab tab: Bonsplit.Tab, inPane pane: PaneID) -> Bool {
-            false
-        }
-    }
-
-    private final class RejectingSplitPaneDelegate: BonsplitDelegate {
-        func splitTabBar(_ controller: BonsplitController, shouldSplitPane pane: PaneID, orientation: SplitOrientation) -> Bool {
-            false
-        }
-    }
-
-    func testNewBrowserSurfacePrefersSelectedBrowserProfileInTargetPane() throws {
-        let workspace = Workspace()
-        let profileA = try makeTemporaryBrowserProfile(named: "Alpha")
-        let profileB = try makeTemporaryBrowserProfile(named: "Beta")
-        let paneId = try XCTUnwrap(workspace.bonsplitController.focusedPaneId)
-        let browserA = try XCTUnwrap(
-            workspace.newBrowserSurface(
-                inPane: paneId,
-                focus: true,
-                preferredProfileID: profileA.id
-            )
-        )
-        _ = try XCTUnwrap(
-            workspace.newBrowserSplit(
-                from: browserA.id,
-                orientation: .horizontal,
-                preferredProfileID: profileB.id,
-                focus: true
-            )
-        )
-
-        XCTAssertEqual(
-            workspace.preferredBrowserProfileID,
-            profileB.id,
-            "Expected workspace preference to drift to the most recently created browser profile"
-        )
-
-        let leftSurfaceId = try XCTUnwrap(workspace.surfaceIdFromPanelId(browserA.id))
-        workspace.bonsplitController.focusPane(paneId)
-        workspace.bonsplitController.selectTab(leftSurfaceId)
-
-        let created = try XCTUnwrap(
-            workspace.newBrowserSurface(
-                inPane: paneId,
-                focus: false
-            )
-        )
-
-        XCTAssertEqual(
-            created.profileID,
-            profileA.id,
-            "Expected new browser creation to inherit the selected browser profile from the target pane"
-        )
-    }
-
-    func testNewBrowserSurfaceFailureDoesNotMutatePreferredProfile() throws {
-        let workspace = Workspace()
-        let preferredProfile = try makeTemporaryBrowserProfile(named: "Preferred")
-        let unexpectedProfile = try makeTemporaryBrowserProfile(named: "Unexpected")
-
-        let paneId = try XCTUnwrap(workspace.bonsplitController.focusedPaneId)
-        _ = try XCTUnwrap(
-            workspace.newBrowserSurface(
-                inPane: paneId,
-                focus: false,
-                preferredProfileID: preferredProfile.id
-            )
-        )
-        XCTAssertEqual(workspace.preferredBrowserProfileID, preferredProfile.id)
-
-        let rejectingDelegate = RejectingCreateTabDelegate()
-        workspace.bonsplitController.delegate = rejectingDelegate
-        let created = workspace.newBrowserSurface(
-            inPane: paneId,
-            focus: false,
-            preferredProfileID: unexpectedProfile.id
-        )
-
-        XCTAssertNil(created)
-        XCTAssertEqual(
-            workspace.preferredBrowserProfileID,
-            preferredProfile.id,
-            "Expected a failed browser creation to leave the workspace preferred profile unchanged"
-        )
-    }
-
-    func testNewBrowserSplitFailureDoesNotMutatePreferredProfile() throws {
-        let workspace = Workspace()
-        let preferredProfile = try makeTemporaryBrowserProfile(named: "Preferred")
-        let unexpectedProfile = try makeTemporaryBrowserProfile(named: "Unexpected")
-
-        let paneId = try XCTUnwrap(workspace.bonsplitController.focusedPaneId)
-        let browser = try XCTUnwrap(
-            workspace.newBrowserSurface(
-                inPane: paneId,
-                focus: true,
-                preferredProfileID: preferredProfile.id
-            )
-        )
-        XCTAssertEqual(workspace.preferredBrowserProfileID, preferredProfile.id)
-
-        let rejectingDelegate = RejectingSplitPaneDelegate()
-        workspace.bonsplitController.delegate = rejectingDelegate
-        let created = workspace.newBrowserSplit(
-            from: browser.id,
-            orientation: .horizontal,
-            preferredProfileID: unexpectedProfile.id,
-            focus: false
-        )
-
-        XCTAssertNil(created)
-        XCTAssertEqual(
-            workspace.preferredBrowserProfileID,
-            preferredProfile.id,
-            "Expected a failed browser split to leave the workspace preferred profile unchanged"
-        )
-    }
-}
-
 
 @MainActor
 final class WorkspacePanelGitBranchTests: XCTestCase {
@@ -5648,32 +5105,6 @@ final class WorkspacePanelGitBranchTests: XCTestCase {
             let paneId: String? = nil
             return try XCTUnwrap(paneId, "Expected split child to be a pane")
         }
-    }
-
-    func testBrowserSplitWithFocusFalsePreservesOriginalFocusedPanel() {
-        let workspace = Workspace()
-        guard let originalFocusedPanelId = workspace.focusedPanelId else {
-            XCTFail("Expected initial focused panel")
-            return
-        }
-
-        guard let browserSplitPanel = workspace.newBrowserSplit(
-            from: originalFocusedPanelId,
-            orientation: .horizontal,
-            focus: false
-        ) else {
-            XCTFail("Expected browser split panel to be created")
-            return
-        }
-
-        drainMainQueue()
-
-        XCTAssertNotEqual(browserSplitPanel.id, originalFocusedPanelId)
-        XCTAssertEqual(
-            workspace.focusedPanelId,
-            originalFocusedPanelId,
-            "Expected non-focus browser split to preserve pre-split focus"
-        )
     }
 
     func testTerminalSplitWithFocusFalsePreservesOriginalFocusedPanel() {
@@ -5865,89 +5296,6 @@ final class WorkspacePanelGitBranchTests: XCTestCase {
         XCTAssertFalse(attachedTab.hasCustomTitle)
     }
 
-    func testBrowserSplitWithFocusFalseRecoversFromDelayedStaleSelection() {
-        let workspace = Workspace()
-        guard let originalFocusedPanelId = workspace.focusedPanelId else {
-            XCTFail("Expected initial focused panel")
-            return
-        }
-        guard let originalPaneId = workspace.paneId(forPanelId: originalFocusedPanelId) else {
-            XCTFail("Expected focused pane for initial panel")
-            return
-        }
-
-        guard let browserSplitPanel = workspace.newBrowserSplit(
-            from: originalFocusedPanelId,
-            orientation: .horizontal,
-            focus: false
-        ) else {
-            XCTFail("Expected browser split panel to be created")
-            return
-        }
-        guard let splitPaneId = workspace.paneId(forPanelId: browserSplitPanel.id),
-              let splitTabId = workspace.surfaceIdFromPanelId(browserSplitPanel.id),
-              let splitTab = workspace.bonsplitController
-              .tabs(inPane: splitPaneId)
-              .first(where: { $0.id == splitTabId }) else {
-            XCTFail("Expected split pane/tab mapping")
-            return
-        }
-
-        // Simulate one delayed stale split-selection callback from bonsplit.
-        DispatchQueue.main.async {
-            workspace.splitTabBar(workspace.bonsplitController, didSelectTab: splitTab, inPane: splitPaneId)
-        }
-
-        drainMainQueue()
-        drainMainQueue()
-        drainMainQueue()
-
-        XCTAssertEqual(
-            workspace.focusedPanelId,
-            originalFocusedPanelId,
-            "Expected non-focus split to reassert the pre-split focused panel"
-        )
-        XCTAssertEqual(
-            workspace.bonsplitController.focusedPaneId,
-            originalPaneId,
-            "Expected focused pane to converge back to the pre-split pane"
-        )
-        XCTAssertEqual(
-            workspace.bonsplitController.selectedTab(inPane: originalPaneId)?.id,
-            workspace.surfaceIdFromPanelId(originalFocusedPanelId),
-            "Expected selected tab to converge back to the pre-split focused panel"
-        )
-    }
-
-    func testBrowserSplitWithFocusFalseAllowsSubsequentExplicitFocusOnSplitPanel() {
-        let workspace = Workspace()
-        guard let originalFocusedPanelId = workspace.focusedPanelId else {
-            XCTFail("Expected initial focused panel")
-            return
-        }
-
-        guard let browserSplitPanel = workspace.newBrowserSplit(
-            from: originalFocusedPanelId,
-            orientation: .horizontal,
-            focus: false
-        ) else {
-            XCTFail("Expected browser split panel to be created")
-            return
-        }
-
-        workspace.focusPanel(browserSplitPanel.id)
-
-        drainMainQueue()
-        drainMainQueue()
-        drainMainQueue()
-
-        XCTAssertEqual(
-            workspace.focusedPanelId,
-            browserSplitPanel.id,
-            "Expected explicit focus intent to keep the split panel focused"
-        )
-    }
-
     func testNewTerminalSurfaceWithFocusFalsePreservesFocusedPanel() {
         let workspace = Workspace()
         guard let originalFocusedPanelId = workspace.focusedPanelId,
@@ -5970,36 +5318,6 @@ final class WorkspacePanelGitBranchTests: XCTestCase {
             workspace.focusedPanelId,
             originalFocusedPanelId,
             "Expected non-focus terminal surface creation to preserve the existing focused panel"
-        )
-        XCTAssertEqual(
-            workspace.bonsplitController.selectedTab(inPane: originalPaneId)?.id,
-            workspace.surfaceIdFromPanelId(originalFocusedPanelId),
-            "Expected selected tab to stay on the original focused panel"
-        )
-    }
-
-    func testNewBrowserSurfaceWithFocusFalsePreservesFocusedPanel() {
-        let workspace = Workspace()
-        guard let originalFocusedPanelId = workspace.focusedPanelId,
-              let originalPaneId = workspace.paneId(forPanelId: originalFocusedPanelId) else {
-            XCTFail("Expected initial focused panel and pane")
-            return
-        }
-
-        guard let newPanel = workspace.newBrowserSurface(inPane: originalPaneId, focus: false) else {
-            XCTFail("Expected browser surface to be created")
-            return
-        }
-
-        drainMainQueue()
-        drainMainQueue()
-        drainMainQueue()
-
-        XCTAssertNotEqual(newPanel.id, originalFocusedPanelId)
-        XCTAssertEqual(
-            workspace.focusedPanelId,
-            originalFocusedPanelId,
-            "Expected non-focus browser surface creation to preserve the existing focused panel"
         )
         XCTAssertEqual(
             workspace.bonsplitController.selectedTab(inPane: originalPaneId)?.id,
@@ -6958,54 +6276,6 @@ final class WorkspacePanelGitBranchTests: XCTestCase {
         )
     }
 
-    func testUpdatingFocusedPanelPullRequestWithSameStateDoesNotRepublishWorkspace() {
-        let workspace = Workspace()
-        guard let panelId = workspace.focusedPanelId else {
-            XCTFail("Expected initial focused panel")
-            return
-        }
-
-        workspace.updatePanelGitBranch(panelId: panelId, branch: "feature/sidebar-pr", isDirty: false)
-
-        var publishCount = 0
-        let cancellable = workspace.objectWillChange.sink { _ in
-            publishCount += 1
-        }
-        defer { cancellable.cancel() }
-
-        let pullRequestURL = URL(string: "https://github.com/manaflow-ai/cmux/pull/2388")!
-        workspace.updatePanelPullRequest(
-            panelId: panelId,
-            number: 2388,
-            label: "PR",
-            url: pullRequestURL,
-            status: .open,
-            branch: "feature/sidebar-pr"
-        )
-        let baselinePublishCount = publishCount
-
-        XCTAssertGreaterThan(
-            baselinePublishCount,
-            0,
-            "Expected the first focused pull request update to publish workspace changes"
-        )
-
-        workspace.updatePanelPullRequest(
-            panelId: panelId,
-            number: 2388,
-            label: "PR",
-            url: pullRequestURL,
-            status: .open,
-            branch: "feature/sidebar-pr"
-        )
-
-        XCTAssertEqual(
-            publishCount,
-            baselinePublishCount,
-            "Expected identical focused pull request refreshes to avoid extra workspace publishes"
-        )
-    }
-
     func testSidebarObservationPublisherEmitsForFocusedGitBranchChangesOnlyOncePerState() {
         let workspace = Workspace()
         guard let panelId = workspace.focusedPanelId else {
@@ -7033,40 +6303,6 @@ final class WorkspacePanelGitBranchTests: XCTestCase {
             publishCount,
             baselinePublishCount,
             "Expected identical git metadata refreshes to be ignored by sidebar rows"
-        )
-    }
-
-    @MainActor
-    func testSidebarPullRequestsTrackFocusedPanelOnly() {
-        let workspace = Workspace()
-        guard let firstPanelId = workspace.focusedPanelId,
-              let paneId = workspace.paneId(forPanelId: firstPanelId),
-              let secondPanel = workspace.newTerminalSurface(inPane: paneId, focus: false) else {
-            XCTFail("Expected focused panel and a second panel")
-            return
-        }
-
-        workspace.updatePanelGitBranch(panelId: firstPanelId, branch: "main", isDirty: false)
-        workspace.updatePanelGitBranch(panelId: secondPanel.id, branch: "feature/sidebar-pr", isDirty: false)
-        workspace.updatePanelPullRequest(
-            panelId: secondPanel.id,
-            number: 1629,
-            label: "PR",
-            url: URL(string: "https://github.com/manaflow-ai/cmux/pull/1629")!,
-            status: .open
-        )
-
-        XCTAssertNil(workspace.pullRequest)
-        XCTAssertTrue(
-            workspace.sidebarPullRequestsInDisplayOrder().isEmpty,
-            "Expected background panel PRs to stay hidden while the focused panel has no PR"
-        )
-
-        workspace.focusPanel(secondPanel.id)
-
-        XCTAssertEqual(
-            workspace.sidebarPullRequestsInDisplayOrder().map(\.number),
-            [1629]
         )
     }
 
@@ -7232,58 +6468,6 @@ final class WorkspacePanelGitBranchTests: XCTestCase {
         XCTAssertEqual(
             workspace.sidebarFilesystemDirectoriesInDisplayOrder(orderedPanelIds: orderedPanelIds),
             [sharedDirectory]
-        )
-    }
-
-    func testSidebarDerivedCollectionsMatchWhenUsingPrecomputedPanelOrder() {
-        let workspace = Workspace()
-        guard let leftFirstPanelId = workspace.focusedPanelId,
-              let leftPaneId = workspace.paneId(forPanelId: leftFirstPanelId),
-              let rightFirstPanel = workspace.newTerminalSplit(from: leftFirstPanelId, orientation: .horizontal),
-              let rightPaneId = workspace.paneId(forPanelId: rightFirstPanel.id),
-              let leftSecondPanel = workspace.newTerminalSurface(inPane: leftPaneId, focus: false),
-              let rightSecondPanel = workspace.newTerminalSurface(inPane: rightPaneId, focus: false) else {
-            XCTFail("Expected panes and panels for precomputed ordering test")
-            return
-        }
-
-        workspace.updatePanelGitBranch(panelId: leftFirstPanelId, branch: "main", isDirty: false)
-        workspace.updatePanelGitBranch(panelId: leftSecondPanel.id, branch: "feature/left", isDirty: true)
-        workspace.updatePanelGitBranch(panelId: rightFirstPanel.id, branch: "release/right", isDirty: false)
-
-        workspace.updatePanelDirectory(panelId: leftFirstPanelId, directory: "/repo/left/root")
-        workspace.updatePanelDirectory(panelId: leftSecondPanel.id, directory: "/repo/left/feature")
-        workspace.updatePanelDirectory(panelId: rightFirstPanel.id, directory: "/repo/right/root")
-        workspace.updatePanelDirectory(panelId: rightSecondPanel.id, directory: "/repo/right/extra")
-
-        workspace.updatePanelPullRequest(
-            panelId: leftFirstPanelId,
-            number: 101,
-            label: "PR",
-            url: URL(string: "https://github.com/manaflow-ai/cmux/pull/101")!,
-            status: .open
-        )
-        workspace.updatePanelPullRequest(
-            panelId: rightFirstPanel.id,
-            number: 18,
-            label: "MR",
-            url: URL(string: "https://gitlab.com/manaflow/cmux/-/merge_requests/18")!,
-            status: .merged
-        )
-
-        let orderedPanelIds = workspace.sidebarOrderedPanelIds()
-
-        XCTAssertEqual(
-            workspace.sidebarGitBranchesInDisplayOrder(orderedPanelIds: orderedPanelIds).map { "\($0.branch)|\($0.isDirty)" },
-            workspace.sidebarGitBranchesInDisplayOrder().map { "\($0.branch)|\($0.isDirty)" }
-        )
-        XCTAssertEqual(
-            workspace.sidebarBranchDirectoryEntriesInDisplayOrder(orderedPanelIds: orderedPanelIds),
-            workspace.sidebarBranchDirectoryEntriesInDisplayOrder()
-        )
-        XCTAssertEqual(
-            workspace.sidebarPullRequestsInDisplayOrder(orderedPanelIds: orderedPanelIds),
-            workspace.sidebarPullRequestsInDisplayOrder()
         )
     }
 

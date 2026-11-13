@@ -458,7 +458,7 @@ final class CmuxExtensionProcessTermination: @unchecked Sendable {
 
 enum CmuxExtensionWorktreePrototype {
     private static let logger = Logger(
-        subsystem: "com.cmuxterm.app",
+        subsystem: "com.comux.app",
         category: "ExtensionWorktree"
     )
 
@@ -704,6 +704,7 @@ enum CmuxExtensionWorktreePrototype {
     ) async throws -> Data {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.environment = GitOfflineEnvironment.applying()
         process.arguments = [executable] + arguments
         let standardOutputPipe = Pipe()
         let standardErrorPipe = Pipe()

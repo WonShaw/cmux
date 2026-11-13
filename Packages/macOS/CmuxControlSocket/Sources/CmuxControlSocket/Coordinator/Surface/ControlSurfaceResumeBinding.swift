@@ -39,12 +39,6 @@ public struct ControlSurfaceResumeBinding: Sendable, Equatable {
     public let approvalRecordID: String?
     /// Where the saved command is allowed to execute (`local` or `remote_ssh`).
     public let executionLocationRawValue: String
-    /// The owning remote workspace for a remote binding.
-    public let remoteWorkspaceID: UUID?
-    /// The owning remote surface for a remote binding.
-    public let remoteSurfaceID: UUID?
-    /// The persistent remote PTY session for a remote binding.
-    public let remotePTYSessionID: String?
     /// The last-updated timestamp (seconds since the epoch).
     public let updatedAt: Double
 
@@ -62,9 +56,6 @@ public struct ControlSurfaceResumeBinding: Sendable, Equatable {
     ///   - approvalPolicyRawValue: The approval policy's raw value.
     ///   - approvalRecordID: The approval record identifier.
     ///   - executionLocationRawValue: Where the command is allowed to execute.
-    ///   - remoteWorkspaceID: The owning remote workspace.
-    ///   - remoteSurfaceID: The owning remote surface.
-    ///   - remotePTYSessionID: The persistent remote PTY session.
     ///   - updatedAt: The last-updated timestamp.
     ///   - resumeEvidenceProvenance: The verified Codex hook provenance, when present.
     public init(
@@ -81,9 +72,6 @@ public struct ControlSurfaceResumeBinding: Sendable, Equatable {
         approvalPolicyRawValue: String?,
         approvalRecordID: String?,
         executionLocationRawValue: String,
-        remoteWorkspaceID: UUID?,
-        remoteSurfaceID: UUID?,
-        remotePTYSessionID: String?,
         updatedAt: Double,
         resumeEvidenceProvenance: String? = nil
     ) {
@@ -101,9 +89,6 @@ public struct ControlSurfaceResumeBinding: Sendable, Equatable {
         self.approvalPolicyRawValue = approvalPolicyRawValue
         self.approvalRecordID = approvalRecordID
         self.executionLocationRawValue = executionLocationRawValue
-        self.remoteWorkspaceID = remoteWorkspaceID
-        self.remoteSurfaceID = remoteSurfaceID
-        self.remotePTYSessionID = remotePTYSessionID
         self.updatedAt = updatedAt
     }
 }

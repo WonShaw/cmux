@@ -94,9 +94,6 @@ enum KeyboardShortcutSettings {
         // Titlebar / primary UI
         case toggleSidebar
         case newTab
-        case newBrowserWorkspace
-        case newCloudWorkspace
-        case newCloudMachine
         case saveLayoutTemplate
         case openFolder
         case reopenPreviousSession
@@ -104,7 +101,6 @@ enum KeyboardShortcutSettings {
         case commandPalette
         case commandPaletteNext
         case commandPalettePrevious
-        case sendFeedback
         case showNotifications
         case jumpToUnread
         case toggleUnread
@@ -117,7 +113,6 @@ enum KeyboardShortcutSettings {
         case switchRightSidebarToSessions
         case switchRightSidebarToFeed
         case switchRightSidebarToDock
-        case switchRightSidebarToMachines
         case triggerFlash
 
         // Navigation
@@ -173,8 +168,6 @@ enum KeyboardShortcutSettings {
         case resizePaneRight = "resize-pane-right"
         case resizePaneUp = "resize-pane-up"
         case resizePaneDown = "resize-pane-down"
-        case splitBrowserRight
-        case splitBrowserDown
 
         // Canvas layout
         case toggleCanvasLayout
@@ -200,12 +193,6 @@ enum KeyboardShortcutSettings {
 
         // Panels
         case saveFilePreview
-        case openBrowser
-        case focusBrowserAddressBar
-        case browserBack
-        case browserForward
-        case browserReload
-        case browserHardReload
         case browserZoomIn
         case browserZoomOut
         case browserZoomReset
@@ -218,22 +205,14 @@ enum KeyboardShortcutSettings {
         case findPrevious
         case hideFind
         case useSelectionForFind
-        case toggleBrowserDeveloperTools
-        case showBrowserJavaScriptConsole
-        case toggleBrowserFocusMode
-        case toggleBrowserDesignMode
-        case toggleReactGrab
-        case openDiffViewer
         case diffViewerScrollDown
         case diffViewerScrollUp
         case diffViewerScrollHalfPageDown, diffViewerScrollHalfPageUp
         case diffViewerScrollDownEmacs, diffViewerScrollUpEmacs
         case diffViewerScrollToBottom
         case diffViewerScrollToTop
-        case diffViewerOpenFileSearch
         case simulatorHome, simulatorRotateLeft, simulatorRotateRight
         case simulatorToggleAppearance, simulatorToggleSoftwareKeyboard
-        case diffViewerNextFile, diffViewerPreviousFile
 
         var id: String { rawValue }
 
@@ -249,9 +228,6 @@ enum KeyboardShortcutSettings {
             case .quit: return String(localized: "menu.quitCmux", defaultValue: "Quit cmux")
             case .toggleSidebar: return String(localized: "shortcut.toggleLeftSidebar.label", defaultValue: "Toggle Left Sidebar")
             case .newTab: return String(localized: "shortcut.newWorkspace.label", defaultValue: "New Workspace")
-            case .newBrowserWorkspace: return String(localized: "shortcut.newBrowserWorkspace.label", defaultValue: "New Browser Workspace")
-            case .newCloudWorkspace: return String(localized: "shortcut.newCloudWorkspace.label", defaultValue: "New Cloud Workspace")
-            case .newCloudMachine: return String(localized: "shortcut.newCloudMachine.label", defaultValue: "New Cloud Machine")
             case .saveLayoutTemplate: return String(localized: "shortcut.saveLayoutTemplate.label", defaultValue: "Save Layout as Template…")
             case .openFolder: return String(localized: "shortcut.openFolder.label", defaultValue: "Open Folder")
             case .reopenPreviousSession: return String(localized: "shortcut.reopenPreviousSession.label", defaultValue: "Restore Previous App Launch")
@@ -259,7 +235,6 @@ enum KeyboardShortcutSettings {
             case .commandPalette: return String(localized: "menu.file.commandPalette", defaultValue: "Command Palette…")
             case .commandPaletteNext: return String(localized: "shortcut.commandPaletteNext.label", defaultValue: "Command Palette: Next")
             case .commandPalettePrevious: return String(localized: "shortcut.commandPalettePrevious.label", defaultValue: "Command Palette: Previous")
-            case .sendFeedback: return String(localized: "sidebar.help.sendFeedback", defaultValue: "Send Feedback")
             case .showNotifications: return String(localized: "shortcut.showNotifications.label", defaultValue: "Show Notifications")
             case .jumpToUnread: return String(localized: "shortcut.jumpToUnread.label", defaultValue: "Jump to Latest Unread")
             case .toggleUnread: return String(localized: "shortcut.toggleUnread.label", defaultValue: "Toggle Unread")
@@ -275,7 +250,6 @@ enum KeyboardShortcutSettings {
             case .switchRightSidebarToSessions: return String(localized: "shortcut.switchRightSidebarToSessions.label", defaultValue: "Show Sidebar Vault")
             case .switchRightSidebarToFeed: return String(localized: "shortcut.switchRightSidebarToFeed.label", defaultValue: "Show Sidebar Feed")
             case .switchRightSidebarToDock: return String(localized: "shortcut.switchRightSidebarToDock.label", defaultValue: "Show Sidebar Dock")
-            case .switchRightSidebarToMachines: return String(localized: "shortcut.switchRightSidebarToMachines.label", defaultValue: "Show Sidebar Cloud")
             case .triggerFlash: return String(localized: "shortcut.flashFocusedPanel.label", defaultValue: "Flash Focused Panel")
             case .nextSurface: return String(localized: "shortcut.nextSurface.label", defaultValue: "Next Surface")
             case .prevSurface: return String(localized: "shortcut.previousSurface.label", defaultValue: "Previous Surface")
@@ -347,8 +321,6 @@ enum KeyboardShortcutSettings {
             case .resizePaneRight: return String(localized: "shortcut.resizePaneRight.label", defaultValue: "Resize Pane Right")
             case .resizePaneUp: return String(localized: "shortcut.resizePaneUp.label", defaultValue: "Resize Pane Up")
             case .resizePaneDown: return String(localized: "shortcut.resizePaneDown.label", defaultValue: "Resize Pane Down")
-            case .splitBrowserRight: return String(localized: "shortcut.splitBrowserRight.label", defaultValue: "Split Browser Right")
-            case .splitBrowserDown: return String(localized: "shortcut.splitBrowserDown.label", defaultValue: "Split Browser Down")
             case .toggleCanvasLayout: return String(localized: "shortcut.toggleCanvasLayout.label", defaultValue: "Toggle Canvas Layout")
             case .canvasRevealFocusedPane: return String(localized: "shortcut.canvasRevealFocusedPane.label", defaultValue: "Canvas: Reveal Focused Pane")
             case .canvasOverview: return String(localized: "shortcut.canvasOverview.label", defaultValue: "Canvas: Toggle Overview")
@@ -368,12 +340,6 @@ enum KeyboardShortcutSettings {
             case .fileExplorerOpenSelection: return String(localized: "shortcut.fileExplorerOpenSelection.label", defaultValue: "File Explorer: Open Selection")
             case .fileExplorerOpenSelectionFinderAlias: return String(localized: "shortcut.fileExplorerOpenSelectionFinderAlias.label", defaultValue: "File Explorer: Open Selection (Finder Alias)")
             case .saveFilePreview: return String(localized: "shortcut.saveFilePreview.label", defaultValue: "Save File Preview")
-            case .openBrowser: return String(localized: "shortcut.openBrowser.label", defaultValue: "Open Browser")
-            case .focusBrowserAddressBar: return String(localized: "command.browserFocusAddressBar.title", defaultValue: "Focus Address Bar")
-            case .browserBack: return String(localized: "menu.view.back", defaultValue: "Back")
-            case .browserForward: return String(localized: "menu.view.forward", defaultValue: "Forward")
-            case .browserReload: return String(localized: "menu.view.reloadPage", defaultValue: "Reload Page")
-            case .browserHardReload: return String(localized: "menu.view.hardRefresh", defaultValue: "Hard Refresh")
             case .browserZoomIn: return String(localized: "menu.view.zoomIn", defaultValue: "Zoom In")
             case .browserZoomOut: return String(localized: "menu.view.zoomOut", defaultValue: "Zoom Out")
             case .browserZoomReset: return String(localized: "menu.view.actualSize", defaultValue: "Actual Size")
@@ -386,12 +352,6 @@ enum KeyboardShortcutSettings {
             case .findPrevious: return String(localized: "menu.find.findPrevious", defaultValue: "Find Previous")
             case .hideFind: return String(localized: "menu.find.hideFindBar", defaultValue: "Hide Find Bar")
             case .useSelectionForFind: return String(localized: "menu.find.useSelectionForFind", defaultValue: "Use Selection for Find")
-            case .toggleBrowserDeveloperTools: return String(localized: "shortcut.toggleBrowserDevTools.label", defaultValue: "Toggle Browser Developer Tools")
-            case .showBrowserJavaScriptConsole: return String(localized: "shortcut.showBrowserJSConsole.label", defaultValue: "Show Browser JavaScript Console")
-            case .toggleBrowserFocusMode: return String(localized: "shortcut.toggleBrowserFocusMode.label", defaultValue: "Enter Browser Focus Mode")
-            case .toggleBrowserDesignMode: return String(localized: "shortcut.toggleBrowserDesignMode.label", defaultValue: "Toggle Browser Design Mode")
-            case .toggleReactGrab: return String(localized: "shortcut.toggleReactGrab.label", defaultValue: "Toggle React Grab")
-            case .openDiffViewer: return String(localized: "shortcut.openDiffViewer.label", defaultValue: "Open Diff Viewer")
             case .diffViewerScrollDown: return String(localized: "shortcut.diffViewerScrollDown.label", defaultValue: "Viewers: Scroll Down")
             case .diffViewerScrollUp: return String(localized: "shortcut.diffViewerScrollUp.label", defaultValue: "Viewers: Scroll Up")
             case .diffViewerScrollHalfPageDown: return String(localized: "shortcut.diffViewerScrollHalfPageDown.label", defaultValue: "Viewers: Scroll Half Page Down")
@@ -400,12 +360,9 @@ enum KeyboardShortcutSettings {
             case .diffViewerScrollUpEmacs: return String(localized: "shortcut.diffViewerScrollUpEmacs.label", defaultValue: "Viewers: Scroll Up (Emacs)")
             case .diffViewerScrollToBottom: return String(localized: "shortcut.diffViewerScrollToBottom.label", defaultValue: "Viewers: Scroll to Bottom")
             case .diffViewerScrollToTop: return String(localized: "shortcut.diffViewerScrollToTop.label", defaultValue: "Viewers: Scroll to Top")
-            case .diffViewerOpenFileSearch: return String(localized: "shortcut.diffViewerOpenFileSearch.label", defaultValue: "Diff Viewer: Open File Search")
             case .simulatorHome, .simulatorRotateLeft, .simulatorRotateRight,
                  .simulatorToggleAppearance, .simulatorToggleSoftwareKeyboard:
                 return simulatorLabel
-            case .diffViewerNextFile: return String(localized: "shortcut.diffViewerNextFile.label", defaultValue: "Diff Viewer: Next File")
-            case .diffViewerPreviousFile: return String(localized: "shortcut.diffViewerPreviousFile.label", defaultValue: "Diff Viewer: Previous File")
             }
         }
 
@@ -436,16 +393,6 @@ enum KeyboardShortcutSettings {
                 return StoredShortcut(key: "b", command: true, shift: false, option: false, control: false)
             case .newTab:
                 return StoredShortcut(key: "n", command: true, shift: false, option: false, control: false)
-            case .newBrowserWorkspace:
-                // Option+Cmd+N: sits next to New Workspace (Cmd+N) and New Window (Cmd+Shift+N)
-                // without colliding with any cmux default or an AppKit-reserved keystroke.
-                return StoredShortcut(key: "n", command: true, shift: false, option: true, control: false)
-            case .newCloudWorkspace:
-                // Cmd+Y: free in cmux and in AppKit's standard menus, so the
-                // plus menu, File menu, and palette can all advertise it.
-                return StoredShortcut(key: "y", command: true, shift: false, option: false, control: false)
-            case .newCloudMachine:
-                return StoredShortcut(key: "y", command: true, shift: true, option: false, control: false)
             case .saveLayoutTemplate:
                 return StoredShortcut(key: "s", command: true, shift: false, option: false, control: true)
             case .openFolder:
@@ -460,8 +407,6 @@ enum KeyboardShortcutSettings {
                 return StoredShortcut(key: "n", command: false, shift: false, option: false, control: true)
             case .commandPalettePrevious:
                 return StoredShortcut(key: "p", command: false, shift: false, option: false, control: true)
-            case .sendFeedback:
-                return .unbound
             case .showNotifications:
                 return StoredShortcut(key: "i", command: true, shift: false, option: false, control: false)
             case .jumpToUnread:
@@ -486,8 +431,6 @@ enum KeyboardShortcutSettings {
                 return KeyboardShortcutSettings.rightSidebarPositionalDefaultShortcut(for: .feed)
             case .switchRightSidebarToDock:
                 return KeyboardShortcutSettings.rightSidebarPositionalDefaultShortcut(for: .dock)
-            case .switchRightSidebarToMachines:
-                return KeyboardShortcutSettings.rightSidebarPositionalDefaultShortcut(for: .machines)
             case .triggerFlash:
                 return StoredShortcut(key: "h", command: true, shift: true, option: false, control: false)
             case .nextSidebarTab:
@@ -526,9 +469,8 @@ enum KeyboardShortcutSettings {
             case .newWorkspaceGroup:
                 return StoredShortcut(key: "g", command: true, shift: false, option: false, control: true)
             case .groupSelectedWorkspaces:
-                // Cmd+Shift+G is the user-natural mnemonic. It collides with toggleReactGrab's default,
-                // but handleGroupSelectedWorkspacesShortcut returns false (lets the event propagate) whenever
-                // there are no eligible workspaces to group — so React Grab still fires in browser/terminal contexts where this shortcut wouldn't have done anything anyway.
+                // Cmd+Shift+G is the user-natural mnemonic. handleGroupSelectedWorkspacesShortcut returns
+                // false (lets the event propagate) whenever there are no eligible workspaces to group.
                 return StoredShortcut(key: "g", command: true, shift: true, option: false, control: false)
             case .toggleFocusedWorkspaceGroupCollapsed:
                 // Ctrl+Cmd+period — matches the Ctrl+Cmd modifier family used by other group ops,
@@ -569,10 +511,6 @@ enum KeyboardShortcutSettings {
             case .resizePaneRight: return StoredShortcut(key: "l", command: false, shift: true, option: false, control: true)
             case .resizePaneUp: return StoredShortcut(key: "k", command: false, shift: true, option: false, control: true)
             case .resizePaneDown: return StoredShortcut(key: "j", command: false, shift: true, option: false, control: true)
-            case .splitBrowserRight:
-                return StoredShortcut(key: "d", command: true, shift: false, option: true, control: false)
-            case .splitBrowserDown:
-                return StoredShortcut(key: "d", command: true, shift: true, option: true, control: false)
             case .toggleCanvasLayout:
                 return StoredShortcut(key: "c", command: true, shift: false, option: false, control: true)
             case .canvasRevealFocusedPane:
@@ -647,18 +585,6 @@ enum KeyboardShortcutSettings {
                 return StoredShortcut(key: "↓", command: true, shift: false, option: false, control: false)
             case .saveFilePreview:
                 return StoredShortcut(key: "s", command: true, shift: false, option: false, control: false)
-            case .openBrowser:
-                return StoredShortcut(key: "l", command: true, shift: true, option: false, control: false)
-            case .focusBrowserAddressBar:
-                return StoredShortcut(key: "l", command: true, shift: false, option: false, control: false)
-            case .browserBack:
-                return StoredShortcut(key: "[", command: true, shift: false, option: false, control: false)
-            case .browserForward:
-                return StoredShortcut(key: "]", command: true, shift: false, option: false, control: false)
-            case .browserReload:
-                return StoredShortcut(key: "r", command: true, shift: false, option: false, control: false)
-            case .browserHardReload:
-                return StoredShortcut(key: "r", command: true, shift: true, option: false, control: false)
             case .browserZoomIn:
                 return StoredShortcut(key: "=", command: true, shift: false, option: false, control: false)
             case .browserZoomOut:
@@ -666,7 +592,7 @@ enum KeyboardShortcutSettings {
             case .browserZoomReset:
                 return StoredShortcut(key: "0", command: true, shift: false, option: false, control: false)
             case .markdownZoomIn:
-                // Same chord as browser zoom, but scoped to the markdown panel
+                // Same chord as file-preview zoom, but scoped to the markdown panel
                 // context so the two never collide.
                 return StoredShortcut(key: "=", command: true, shift: false, option: false, control: false)
             case .markdownZoomOut:
@@ -685,29 +611,6 @@ enum KeyboardShortcutSettings {
                 return StoredShortcut(key: "f", command: true, shift: true, option: true, control: false)
             case .useSelectionForFind:
                 return StoredShortcut(key: "e", command: true, shift: false, option: false, control: false)
-            case .toggleBrowserDeveloperTools:
-                // Safari default: Show Web Inspector.
-                return StoredShortcut(key: "i", command: true, shift: false, option: true, control: false)
-            case .showBrowserJavaScriptConsole:
-                // Safari default: Show JavaScript Console.
-                return StoredShortcut(key: "c", command: true, shift: false, option: true, control: false)
-            case .toggleBrowserFocusMode:
-                // Option+Cmd+Return: "enter" focus mode mnemonic. Option+Cmd is a modifier tier web
-                // pages rarely bind, so it stays out of the page's way while focus mode is off and
-                // cmux owns the shortcut, and it avoids the Ctrl+Cmd+Return global hotkey some
-                // screen recorders use. Exit stays double-Escape; rebind in Settings or cmux.json.
-                return StoredShortcut(key: "\r", command: true, shift: false, option: true, control: false)
-            case .toggleBrowserDesignMode:
-                return StoredShortcut(key: "d", command: true, shift: false, option: true, control: true)
-            case .toggleReactGrab:
-                return StoredShortcut(key: "g", command: true, shift: true, option: false, control: false)
-            case .openDiffViewer:
-                // Cmd+Ctrl+Shift+D. The plain Cmd+Ctrl+D chord is reserved by macOS for "Look Up &
-                // data detectors" — the OS swallows it before it reaches the app's key monitor — and
-                // the rest of the Cmd-based "D" family is taken by split actions (Cmd+D, Cmd+Shift+D,
-                // Cmd+Opt+D, Cmd+Shift+Opt+D). Adding Shift yields a chord that reaches cmux while
-                // keeping the "D for Diff" mnemonic. Rebindable in Settings → Keyboard Shortcuts.
-                return StoredShortcut(key: "d", command: true, shift: true, option: false, control: true)
             case .diffViewerScrollDown:
                 return StoredShortcut(key: "j", command: false, shift: false, option: false, control: false)
             case .diffViewerScrollUp:
@@ -726,18 +629,6 @@ enum KeyboardShortcutSettings {
                 return StoredShortcut(
                     first: ShortcutStroke(key: "g", command: false, shift: false, option: false, control: false),
                     second: ShortcutStroke(key: "g", command: false, shift: false, option: false, control: false)
-                )
-            case .diffViewerOpenFileSearch:
-                return StoredShortcut(key: "/", command: false, shift: false, option: false, control: false)
-            case .diffViewerNextFile:
-                return StoredShortcut(
-                    first: ShortcutStroke(key: "]", command: false, shift: false, option: false, control: false),
-                    second: ShortcutStroke(key: "f", command: false, shift: false, option: false, control: false)
-                )
-            case .diffViewerPreviousFile:
-                return StoredShortcut(
-                    first: ShortcutStroke(key: "[", command: false, shift: false, option: false, control: false),
-                    second: ShortcutStroke(key: "f", command: false, shift: false, option: false, control: false)
                 )
             case .simulatorHome, .simulatorRotateLeft, .simulatorRotateRight,
                  .simulatorToggleAppearance, .simulatorToggleSoftwareKeyboard:

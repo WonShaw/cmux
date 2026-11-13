@@ -45,7 +45,6 @@ struct CustomSidebarDataContextBuilderTests {
             customColor: nil,
             gitBranch: nil,
             gitIsDirty: false,
-            pullRequestValues: [],
             progress: nil,
             latestConversationMessage: nil,
             latestSubmittedMessage: nil,
@@ -136,7 +135,6 @@ struct CustomSidebarDataContextBuilderTests {
             customColor: nil,
             gitBranch: nil,
             gitIsDirty: false,
-            pullRequestValues: [],
             progress: nil,
             latestConversationMessage: nil,
             latestSubmittedMessage: nil,
@@ -183,7 +181,6 @@ struct CustomSidebarDataContextBuilderTests {
             customColor: "",
             gitBranch: nil,
             gitIsDirty: false,
-            pullRequestValues: [],
             progress: nil,
             latestConversationMessage: "",
             latestSubmittedMessage: "",
@@ -197,51 +194,6 @@ struct CustomSidebarDataContextBuilderTests {
         #expect(value.member("color") == nil)
         #expect(value.member("latestMessage") == nil)
         #expect(value.member("latestPrompt") == nil)
-    }
-
-    @Test("Optional workspace fields appear when present")
-    func workspaceOptionalFields() {
-        let builder = CustomSidebarDataContextBuilder()
-        let prValue: SwiftValue = .object(["number": .int(42)])
-        let workspace = CustomSidebarWorkspaceSnapshot(
-            id: UUID(),
-            title: "W",
-            isSelected: false,
-            isPinned: false,
-            index: 0,
-            directory: "/",
-            listeningPorts: [],
-            unreadCount: 0,
-            surfaces: [],
-            surfaceCount: 0,
-            customDescription: "desc",
-            customColor: "#fff",
-            gitBranch: "main",
-            gitIsDirty: true,
-            pullRequestValues: [prValue],
-            progress: .init(value: 0.5, label: "building"),
-            latestConversationMessage: "hi",
-            latestSubmittedMessage: "do it",
-            latestSubmittedAt: Date(timeIntervalSince1970: 100),
-            remote: .init(target: "host", stateRawValue: "connected", isConnected: true)
-        )
-
-        let value = builder.workspaceValue(workspace)
-
-        #expect(value.member("description") == .string("desc"))
-        #expect(value.member("color") == .string("#fff"))
-        #expect(value.member("branch") == .string("main"))
-        #expect(value.member("dirty") == .bool(true))
-        #expect(value.member("pr") == prValue)
-        #expect(value.member("prs") == .array([prValue]))
-        #expect(value.member("progress")?.member("value") == .double(0.5))
-        #expect(value.member("progress")?.member("label") == .string("building"))
-        #expect(value.member("latestMessage") == .string("hi"))
-        #expect(value.member("latestPrompt") == .string("do it"))
-        #expect(value.member("latestAt") == .int(100))
-        #expect(value.member("remote")?.member("target") == .string("host"))
-        #expect(value.member("remote")?.member("state") == .string("connected"))
-        #expect(value.member("remote")?.member("connected") == .bool(true))
     }
 
     @Test("Progress without a label omits the label key")
@@ -263,7 +215,6 @@ struct CustomSidebarDataContextBuilderTests {
             customColor: nil,
             gitBranch: nil,
             gitIsDirty: false,
-            pullRequestValues: [],
             progress: .init(value: 0.25, label: nil),
             latestConversationMessage: nil,
             latestSubmittedMessage: nil,
@@ -443,7 +394,6 @@ struct CustomSidebarDataContextBuilderTests {
             customColor: nil,
             gitBranch: nil,
             gitIsDirty: false,
-            pullRequestValues: [],
             progress: nil,
             latestConversationMessage: nil,
             latestSubmittedMessage: nil,

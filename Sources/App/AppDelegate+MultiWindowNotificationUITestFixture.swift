@@ -18,13 +18,11 @@ extension AppDelegate {
         let workspaceTitle2 = "Notification Workspace Two"
         first.tabManager.setCustomTitle(
             tabId: first.tabId,
-            title: workspaceTitle1,
-            propagateToRemoteTmux: false
+            title: workspaceTitle1
         )
         second.tabManager.setCustomTitle(
             tabId: second.tabId,
-            title: workspaceTitle2,
-            propagateToRemoteTmux: false
+            title: workspaceTitle2
         )
 
         // Ensure the second notification isn't suppressed just because its window is focused.

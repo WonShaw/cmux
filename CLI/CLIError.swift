@@ -20,13 +20,6 @@ struct CLIError: Error, CustomStringConvertible {
     /// `busy` answer while the app's process scan settles), so callers can wait
     /// and retry structurally instead of parsing display text.
     let v2Retryable: Bool
-    /// Cloud VM backend error code (e.g. "vm_create_failed") passed through the
-    /// v2 error's data payload, so callers can make idempotency decisions
-    /// structurally instead of parsing display text.
-    let vmBackendCode: String?
-    /// HTTP status from the Cloud VM backend, when the app forwarded an HTTP
-    /// failure through the local v2 socket.
-    let vmBackendHTTPStatus: Int?
     let socketFailureKind: SocketFailureKind?
 
     init(
@@ -35,8 +28,6 @@ struct CLIError: Error, CustomStringConvertible {
         v2Code: String? = nil,
         isStructuredProtocolResponse: Bool = false,
         v2Retryable: Bool = false,
-        vmBackendCode: String? = nil,
-        vmBackendHTTPStatus: Int? = nil,
         socketFailureKind: SocketFailureKind? = nil
     ) {
         self.message = message
@@ -44,8 +35,6 @@ struct CLIError: Error, CustomStringConvertible {
         self.v2Code = v2Code
         self.isStructuredProtocolResponse = isStructuredProtocolResponse
         self.v2Retryable = v2Retryable
-        self.vmBackendCode = vmBackendCode
-        self.vmBackendHTTPStatus = vmBackendHTTPStatus
         self.socketFailureKind = socketFailureKind
     }
 

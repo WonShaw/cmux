@@ -1,7 +1,6 @@
 import AppKit
 import Bonsplit
 import CmuxFoundation
-import CmuxRemoteSession
 import CmuxTerminalCore
 import Testing
 @testable import CmuxTerminal
@@ -389,60 +388,6 @@ private extension TabManager {
 @Suite(.serialized)
 @MainActor
 final class AppDelegateEqualizeSplitsShortcutTests {
-    @Test
-    func testCmdShiftReturnFocusedBrowserTogglesSplitZoom() {
-        withTemporaryShortcut(action: .toggleSplitZoom) {
-            guard let appDelegate = AppDelegate.shared else {
-                XCTFail("Expected AppDelegate.shared")
-                return
-            }
-
-            let windowId = appDelegate.createMainWindow()
-            defer { closeWindow(withId: windowId) }
-
-            guard let window = window(withId: windowId),
-                  let manager = appDelegate.tabManagerFor(windowId: windowId),
-                  let workspace = manager.selectedWorkspace,
-                  let browserPanelId = manager.openBrowser(inWorkspace: workspace.id, preferSplitRight: true),
-                  let browserPanel = workspace.browserPanel(for: browserPanelId),
-                  let event = makeKeyDownEvent(key: "\r", modifiers: [.command, .shift], keyCode: 36, windowNumber: window.windowNumber) else {
-                XCTFail("Expected focused browser panel and Cmd+Shift+Return event")
-                return
-            }
-
-            workspace.focusPanel(browserPanel.id)
-            XCTAssertEqual(workspace.focusedPanelId, browserPanel.id)
-            XCTAssertFalse(workspace.bonsplitController.isSplitZoomed)
-
-            var attachedPresentationView: NSView?
-            if browserPanel.webView.cmuxBrowserViewportAttachmentSuperview == nil,
-               let contentView = window.contentView {
-                let presentationView = browserPanel.webView.cmuxBrowserViewportPresentationView
-                contentView.addSubview(presentationView)
-                browserPanel.webView.cmuxApplyBrowserViewportLayout(in: contentView.bounds)
-                attachedPresentationView = presentationView
-            }
-            defer {
-                attachedPresentationView?.removeFromSuperview()
-            }
-
-            window.makeKeyAndOrderFront(nil)
-            XCTAssertTrue(window.makeFirstResponder(browserPanel.webView))
-            XCTAssertTrue(KeyboardShortcutSettings.shortcut(for: .toggleSplitZoom).matches(event: event))
-
-#if DEBUG
-            XCTAssertTrue(appDelegate.debugHandleShortcutMonitorEvent(event: event))
-            XCTAssertTrue(workspace.bonsplitController.isSplitZoomed)
-            XCTAssertTrue(workspace.clearSplitZoom())
-#else
-            XCTFail("debugHandleShortcutMonitorEvent is only available in DEBUG")
-#endif
-
-            XCTAssertTrue(browserPanel.webView.performKeyEquivalent(with: event))
-            XCTAssertTrue(workspace.bonsplitController.isSplitZoomed)
-        }
-    }
-
     @Test
     func testConfiguredEqualizeSplitsShortcutBalancesWorkspaceDividers() {
         guard let appDelegate = AppDelegate.shared else {
@@ -7095,96 +7040,6 @@ final class AppDelegateEqualizeSplitsShortcutTests {
         XCTAssertEqual(
             firstPanel.surface.fontSizeLineageSnapshot()?.basePoints,
             20
-        )
-    }
-
-    @Test
-    func testTransferOnlyDockTerminalSeedsTerminalFreeWorkspace() {
-        let manager = TabManager()
-        guard let workspace = manager.selectedWorkspace,
-              let firstPanelID = workspace.focusedPanelId,
-              let workspacePane =
-                workspace.bonsplitController.focusedPaneId else {
-            XCTFail("Expected an initial workspace pane")
-            return
-        }
-        guard workspace.newBrowserSurface(
-            inPane: workspacePane,
-            url: URL(string: "about:blank"),
-            focus: false,
-            creationPolicy: .restoration
-        ) != nil,
-        workspace.closePanel(firstPanelID, force: true) else {
-            XCTFail("Expected a terminal-free workspace")
-            return
-        }
-
-        let windowDock = manager.makeWindowDockStore(windowId: UUID())
-        guard let dockPane =
-                windowDock.bonsplitController.focusedPaneId else {
-            XCTFail("Expected a Window Dock pane")
-            return
-        }
-        let dockPanel = TerminalPanel(
-            workspaceId: windowDock.workspaceId,
-            runtimeSpawnPolicy: .pacedSessionRestore
-        )
-        dockPanel.surface.recordCurrentFontSizeLineage(
-            TerminalFontSizeLineage(
-                basePoints: 20,
-                isExplicitOverride: true
-            )
-        )
-        guard windowDock.attachDetachedSurface(
-            makeDormantTerminalTransfer(
-                panel: dockPanel,
-                sourceWorkspaceId: windowDock.workspaceId
-            ),
-            inPane: dockPane,
-            focus: false
-        ) != nil else {
-            XCTFail("Expected a Window Dock terminal")
-            return
-        }
-
-        let coordinator = WorkspaceTerminalFontSizeCoordinator(
-            tabManager: manager,
-            schedule: ManualWorkspaceFontSizeDrainScheduler()
-                .schedule(delay:action:)
-        )
-        coordinator.attachWindowDock(windowDock)
-        defer {
-            coordinator.cancelAll()
-            windowDock.closeAllPanels()
-        }
-        coordinator.enqueue(
-            .relative([-1]),
-            workspaceId: workspace.id,
-            deferFlush: true
-        )
-        guard let detached = windowDock.detachSurface(
-            panelId: dockPanel.id
-        ) else {
-            XCTFail("Expected the Dock terminal to detach")
-            return
-        }
-#if DEBUG
-        coordinator.drainAllForVerification()
-#endif
-        withExtendedLifetime(detached) {}
-
-        guard let inheritedPanel = workspace.newTerminalSurface(
-            inPane: workspacePane,
-            focus: false,
-            runtimeSpawnPolicy: .pacedSessionRestore
-        ) else {
-            XCTFail("Expected an inherited workspace terminal")
-            return
-        }
-        XCTAssertEqual(
-            inheritedPanel.surface.fontSizeLineageSnapshot()?.basePoints,
-            19,
-            "Transfer-only Dock participation must seed its adjusted lineage"
         )
     }
 

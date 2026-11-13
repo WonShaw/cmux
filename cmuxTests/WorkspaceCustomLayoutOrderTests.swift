@@ -28,31 +28,6 @@ import Testing
         #expect(snapshot.selectedTitle == names[focusedIndex])
     }
 
-    @Test(arguments: [0, 1, 2])
-    func mixedTerminalAndBrowserSurfacesPreserveDeclaredOrder(focusedIndex: Int) throws {
-        let names = ["Docs", "Shell", "Logs"]
-        let surfaces = [
-            CmuxSurfaceDefinition(
-                type: .browser,
-                name: names[0],
-                url: nil,
-                focus: focusedIndex == 0
-            ),
-            CmuxSurfaceDefinition(type: .terminal, name: names[1], focus: focusedIndex == 1),
-            CmuxSurfaceDefinition(type: .terminal, name: names[2], focus: focusedIndex == 2),
-        ]
-
-        let workspace = Workspace()
-        workspace.applyCustomLayout(
-            .pane(CmuxPaneDefinition(surfaces: surfaces)),
-            baseCwd: NSTemporaryDirectory()
-        )
-
-        let snapshot = try Self.surfaceSnapshot(in: workspace)
-        #expect(snapshot.titles == names)
-        #expect(snapshot.selectedTitle == names[focusedIndex])
-    }
-
     @Test(arguments: [NewTabPosition.current, .end])
     func layoutApplicationRestoresInteractiveNewTabPlacement(initialPlacement: NewTabPosition) throws {
         let workspace = Workspace()

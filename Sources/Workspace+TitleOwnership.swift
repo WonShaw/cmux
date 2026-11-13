@@ -92,8 +92,7 @@ extension Workspace {
     /// name with the serialized command that launched a resumed agent.
     @discardableResult
     func applyFocusedPanelTitle(panelId: UUID, requiresFocus: Bool = true) -> Bool {
-        guard !isRemoteTmuxMirror,
-              !requiresFocus || focusedPanelId == panelId,
+        guard !requiresFocus || focusedPanelId == panelId,
               let resolvedTitle = panelTitle(panelId: panelId)?.trimmingCharacters(in: .whitespacesAndNewlines),
               !resolvedTitle.isEmpty else {
             return false
@@ -118,24 +117,22 @@ extension Workspace {
 
     @discardableResult
     func updatePanelTitle(panelId: UUID, title: String) -> Bool {
-        let remote = cloudProjectedResource(forPanel: panelId).flatMap { $0.kind == .terminal ? $0 : nil }
-        let trimmed = (remote?.cloudProcessDisplayTitle ?? title).trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, panels[panelId] != nil else { return false }
-        guard remote != nil || shouldApplyRestoredPanelTitle(panelId: panelId, rawTitle: trimmed) else {
+        guard shouldApplyRestoredPanelTitle(panelId: panelId, rawTitle: trimmed) else {
             return false
         }
         var didMutate = false
         var didMutatePanelTitle = false
         var didMutateWorkspaceTitle = false
 
-        if !isRemoteTmuxMirror, panelTitles[panelId] != trimmed {
+        if panelTitles[panelId] != trimmed {
             panelTitles[panelId] = trimmed
             didMutate = true
             didMutatePanelTitle = true
         }
 
-        if !isRemoteTmuxMirror,
-           let tabId = surfaceIdFromPanelId(panelId),
+        if let tabId = surfaceIdFromPanelId(panelId),
            let panel = panels[panelId],
            let existing = bonsplitController.tab(tabId) {
             let baseTitle = panelTitles[panelId] ?? panel.displayTitle

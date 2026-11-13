@@ -1,5 +1,4 @@
 import AppKit
-import CmuxUpdater
 import QuartzCore
 import SwiftUI
 import Testing
@@ -196,10 +195,7 @@ struct SidebarHiddenPresentationTests {
             forKey: CmuxExtensionSidebarSelection.defaultsKey
         )
 
-        let featureFlags = CmuxFeatureFlags(
-            defaults: defaults,
-            remoteFlagValueProvider: { _ in nil }
-        )
+        let featureFlags = CmuxFeatureFlags(defaults: defaults)
         featureFlags.setOverride(true, for: CmuxFeatureFlags.appKitSidebarListFlag)
 
         let tabManager = TabManager(autoWelcomeIfNeeded: false)
@@ -210,7 +206,6 @@ struct SidebarHiddenPresentationTests {
         let notificationStore = TerminalNotificationStore.shared
         var revealRowInputProjections = 0
         let root = ContentView(
-            updateViewModel: UpdateStateModel(),
             windowId: UUID(),
             featureFlags: featureFlags
         )

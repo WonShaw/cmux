@@ -12,8 +12,6 @@ struct WorkspaceSwitchReadiness: Equatable {
         switch contentKind {
         case .terminal:
             return portalPresented && firstFramePresented
-        case .browser:
-            return portalPresented
         case .passive:
             return true
         }

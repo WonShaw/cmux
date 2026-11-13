@@ -33,17 +33,12 @@ public struct SettingCatalog: SettingCatalogSection {
     /// Settings for sidebar workspace groups (the `workspaceGroups.*` keys).
     public let workspaceGroups = WorkspaceGroupsCatalogSection()
     public let automation = AutomationCatalogSection()
-    /// Settings for the local computer-use MCP integration and its menu-bar UI.
-    public let computerUse = ComputerUseCatalogSection()
-    public let browser = BrowserCatalogSection()
     /// Settings for the built-in markdown viewer (the `markdown.*` keys).
     public let markdown = MarkdownCatalogSection()
     /// Settings for the freeform canvas workspace layout (the `canvas.*` keys).
     public let canvas = CanvasCatalogSection()
     /// Settings for the built-in plain-text file editor (the `fileEditor.*` keys).
     public let fileEditor = FileEditorCatalogSection()
-    /// Settings for Mobile pairing and sync.
-    public let mobile = MobileCatalogSection()
     public let betaFeatures = BetaFeaturesCatalogSection()
     /// Settings for custom (user/agent-authored) sidebars (the `customSidebars.*` keys).
     public let customSidebars = CustomSidebarsCatalogSection()

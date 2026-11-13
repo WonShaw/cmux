@@ -16,7 +16,7 @@ struct WorkspaceConfigActionSnapshot {
         collectSurfaceValues { $0.command }
     }
 
-    /// Every URL the saved action would persist (browser tabs, project panels).
+    /// Every URL the saved action would persist (project panels).
     /// Disclosed in the save dialog — URLs can carry OAuth codes, presigned
     /// tokens, or private query parameters.
     var capturedURLs: [String] {
@@ -79,7 +79,7 @@ struct WorkspaceConfigActionSnapshot {
 }
 
 extension Workspace {
-    /// Captures the live split tree, per-panel directories, browser URLs, and
+    /// Captures the live split tree, per-panel directories, and
     /// detected agent CLIs into a `CmuxWorkspaceDefinition` that
     /// `applyCustomLayout` can recreate.
     func captureConfigActionSnapshot() -> WorkspaceConfigActionSnapshot {
@@ -197,12 +197,6 @@ extension Workspace {
                 // command disclosure.
                 surface.command = liveCommand
             }
-            surface.focus = focus
-            return surface
-        case let browser as BrowserPanel:
-            var surface = CmuxSurfaceDefinition(type: .browser)
-            surface.name = customName
-            surface.url = browser.currentURL?.absoluteString
             surface.focus = focus
             return surface
         case let project as ProjectPanel:

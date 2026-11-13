@@ -13,7 +13,7 @@ import os
 /// ends with a visible window. SwiftUI is used only for the window's content.
 @MainActor
 enum SettingsWindowFactory {
-    private nonisolated static let log = Logger(subsystem: "com.cmuxterm.app", category: "Settings")
+    private nonisolated static let log = Logger(subsystem: "com.comux.app", category: "Settings")
 
     /// `onContentAppear` is invoked from the hosted content's `onAppear`, so
     /// the presenter that owns this window learns when the content's

@@ -10,7 +10,7 @@ Scope work to the cmux workspace that invoked the agent.
 - **Window**: a macOS cmux window.
 - **Workspace**: a sidebar entry. The UI calls it a tab; CLI/socket APIs call it a workspace.
 - **Pane**: a split region inside a workspace.
-- **Surface**: a tab inside a pane, terminal or browser.
+- **Surface**: a tab inside a pane, usually a terminal.
 - **Panel**: internal content type inside a surface. Prefer CLI surface commands over panel internals.
 
 ## Default rule
@@ -32,7 +32,6 @@ Treat layout and focus as separate concerns. `select-workspace`, `focus-pane`, `
 Build layout additively in one shot, using commands that create a pane already populated with the right surface:
 
 ```bash
-cmux new-pane --workspace "${CMUX_WORKSPACE_ID}" --type browser --direction right --url "http://127.0.0.1:8765"
 cmux new-pane --workspace "${CMUX_WORKSPACE_ID}" --type terminal --direction down
 cmux new-pane --workspace "${CMUX_WORKSPACE_ID}" --type terminal --direction down --command "npm run dev"
 ```
@@ -41,7 +40,7 @@ When the first command for a new terminal is known, pass `--command <text>` so i
 
 ## Right-side helper pane
 
-For auxiliary output (preview apps, TUIs, logs, one-off shells, browser checks), reuse one helper pane to the right of the caller terminal. Inspect first with `cmux identify --json`, `cmux list-panes`, and `cmux list-pane-surfaces`, then:
+For auxiliary output (preview apps, TUIs, logs, one-off shells), reuse one helper pane to the right of the caller terminal. Inspect first with `cmux identify --json`, `cmux list-panes`, and `cmux list-pane-surfaces`, then:
 
 - Helper pane exists: add a surface to it.
   ```bash
@@ -114,4 +113,3 @@ Use the socket path cmux provided before any default: `SOCK="${CMUX_SOCKET_PATH:
 ## References
 
 - [references/commands.md](references/commands.md): full workspace, pane, surface, notification, and utility command list.
-- [../cmux-browser/SKILL.md](../cmux-browser/SKILL.md): browser surfaces under the same current-workspace rule.

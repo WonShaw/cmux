@@ -410,62 +410,6 @@ struct AppDelegateOptionDigitShortcutRoutingTests {
     }
 
     @Test
-    func browserDefaultsNavigateBrowserHistoryWithoutChangingFocusHistory() throws {
-        try withIsolatedShortcutRoutingState {
-            let appDelegate = try #require(AppDelegate.shared)
-            let windowId = appDelegate.createMainWindow()
-            defer { closeWindow(withId: windowId) }
-
-            let testWindow = try #require(self.window(withId: windowId))
-            let manager = try #require(appDelegate.tabManagerFor(windowId: windowId))
-            let secondWorkspace = try #require(manager.addTab(select: true))
-            let browserPanelId = try #require(manager.openBrowser(inWorkspace: secondWorkspace.id))
-            let browserPanel = try #require(secondWorkspace.browserPanel(for: browserPanelId))
-            let back = KeyboardShortcutSettings.shortcut(for: .browserBack)
-            let forward = KeyboardShortcutSettings.shortcut(for: .browserForward)
-            let originalGhosttyPrevious = appDelegate.ghosttyGotoSplitPreviousShortcut
-            let originalGhosttyNext = appDelegate.ghosttyGotoSplitNextShortcut
-            defer {
-                appDelegate.ghosttyGotoSplitPreviousShortcut = originalGhosttyPrevious
-                appDelegate.ghosttyGotoSplitNextShortcut = originalGhosttyNext
-            }
-            appDelegate.ghosttyGotoSplitPreviousShortcut = back
-            appDelegate.ghosttyGotoSplitNextShortcut = forward
-            browserPanel.restoreSessionNavigationHistory(
-                backHistoryURLStrings: [
-                    "https://example.com/a",
-                    "https://example.com/b",
-                ],
-                forwardHistoryURLStrings: [
-                    "https://example.com/d",
-                ],
-                currentURLString: "https://example.com/c"
-            )
-            testWindow.makeKeyAndOrderFront(nil)
-            #expect(testWindow.makeFirstResponder(browserPanel.webView))
-
-            #expect(Self.dispatch(back, in: testWindow, using: appDelegate))
-            let afterBack = browserPanel.sessionNavigationHistorySnapshot()
-            #expect(afterBack.backHistoryURLStrings == ["https://example.com/a"])
-            #expect(afterBack.forwardHistoryURLStrings == [
-                "https://example.com/c",
-                "https://example.com/d",
-            ])
-            #expect(manager.selectedTabId == secondWorkspace.id)
-
-            #expect(Self.dispatch(forward, in: testWindow, using: appDelegate))
-            let afterForward = browserPanel.sessionNavigationHistorySnapshot()
-            #expect(afterForward.backHistoryURLStrings == [
-                "https://example.com/a",
-                "https://example.com/b",
-            ])
-            #expect(afterForward.forwardHistoryURLStrings == ["https://example.com/d"])
-            #expect(manager.selectedTabId == secondWorkspace.id)
-            #expect(secondWorkspace.focusedPanelId == browserPanelId)
-        }
-    }
-
-    @Test
     func focusHistoryRebindingMatchesCommandShiftOptionAndControlVariants() throws {
         try withIsolatedShortcutRoutingState {
             let appDelegate = try #require(AppDelegate.shared)

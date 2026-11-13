@@ -195,55 +195,6 @@ struct DockPaneDropUnfocusedRoutingTests {
         }
     }
 
-    @Test("Drop mouse-up uses the same browser portal route as hover")
-    @MainActor
-    func dropMouseUpUsesSameBrowserPortalRouteAsHover() throws {
-        let tabId = UUID()
-        let sourcePaneId = UUID()
-        let dragPasteboard = NSPasteboard(name: .drag)
-        dragPasteboard.clearContents()
-        let registry = TabDragTransferRegistry()
-        let registration = try Self.registerPaneDrag(
-            tabId: tabId,
-            sourcePaneId: sourcePaneId,
-            registry: registry,
-            pasteboard: dragPasteboard
-        )
-        defer {
-            registry.end(registration)
-            dragPasteboard.clearContents()
-        }
-
-        let pasteboardTypes = dragPasteboard.types
-        #expect(BrowserPaneDropTargetView.shouldCaptureHitTesting(
-            pasteboardTypes: pasteboardTypes,
-            eventType: .leftMouseDragged,
-            hasLiveTabTransfer: true
-        ))
-        #expect(BrowserPaneDropTargetView.shouldCaptureHitTesting(
-            pasteboardTypes: pasteboardTypes,
-            eventType: .leftMouseUp,
-            hasLiveTabTransfer: true
-        ))
-        #expect(WindowInputRoutingContext(eventType: .leftMouseDragged).allowsBrowserPortalDragRouting)
-        #expect(!WindowInputRoutingContext(eventType: .leftMouseUp).allowsBrowserPortalDragRouting)
-        #expect(WindowInputRoutingContext(eventType: .leftMouseUp).allowsPortalPointerHitTesting)
-        #expect(WindowInputRoutingContext(eventType: .leftMouseUp).allowsPaneDropHitTesting)
-        #expect(WindowBrowserHostView.shouldPassThroughToDragTargets(
-            pasteboardTypes: pasteboardTypes,
-            eventType: .leftMouseDragged,
-            hasLiveTabTransfer: true
-        ))
-        #expect(!WindowBrowserHostView.shouldPassThroughToDragTargets(
-            pasteboardTypes: pasteboardTypes,
-            eventType: .leftMouseUp
-        ))
-        #expect(!WindowBrowserHostView.shouldPassThroughToDragTargets(
-            pasteboardTypes: [.fileURL],
-            eventType: .leftMouseUp
-        ))
-    }
-
     @Test("Sidebar reorder never authorizes terminal mouse-up routing")
     @MainActor
     func sidebarReorderNeverAuthorizesTerminalMouseUpRouting() async throws {

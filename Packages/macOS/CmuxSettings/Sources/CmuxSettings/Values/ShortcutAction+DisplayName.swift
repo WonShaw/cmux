@@ -14,12 +14,6 @@ extension ShortcutAction {
         case .quit: return "Quit cmux"
         case .toggleSidebar: return "Toggle Left Sidebar"
         case .newTab: return "New Workspace"
-        case .newBrowserWorkspace:
-            return String(localized: "shortcut.newBrowserWorkspace.label", defaultValue: "New Browser Workspace")
-        case .newCloudWorkspace:
-            return String(localized: "shortcut.newCloudWorkspace.label", defaultValue: "New Cloud Workspace")
-        case .newCloudMachine:
-            return String(localized: "shortcut.newCloudMachine.label", defaultValue: "New Cloud Machine")
         case .saveLayoutTemplate:
             return String(localized: "shortcut.saveLayoutTemplate.label", defaultValue: "Save Layout as Template…")
         case .openFolder: return "Open Folder"
@@ -28,7 +22,6 @@ extension ShortcutAction {
         case .commandPalette: return "Command Palette…"
         case .commandPaletteNext: return "Command Palette: Next"
         case .commandPalettePrevious: return "Command Palette: Previous"
-        case .sendFeedback: return "Send Feedback"
         case .showNotifications: return "Show Notifications"
         case .jumpToUnread: return "Jump to Latest Unread"
         case .toggleUnread: return "Toggle Unread"
@@ -43,7 +36,6 @@ extension ShortcutAction {
         case .switchRightSidebarToSessions: return "Show Sidebar Vault"
         case .switchRightSidebarToFeed: return "Show Sidebar Feed"
         case .switchRightSidebarToDock: return "Show Sidebar Dock"
-        case .switchRightSidebarToMachines: return "Show Sidebar Cloud"
         case .triggerFlash: return "Flash Focused Panel"
         case .nextSurface: return "Next Surface"
         case .prevSurface: return "Previous Surface"
@@ -133,8 +125,6 @@ extension ShortcutAction {
         case .resizePaneRight: return String(localized: "shortcut.resizePaneRight.label", defaultValue: "Resize Pane Right")
         case .resizePaneUp: return String(localized: "shortcut.resizePaneUp.label", defaultValue: "Resize Pane Up")
         case .resizePaneDown: return String(localized: "shortcut.resizePaneDown.label", defaultValue: "Resize Pane Down")
-        case .splitBrowserRight: return "Split Browser Right"
-        case .splitBrowserDown: return "Split Browser Down"
         case .toggleRightSidebar: return "Toggle Right Sidebar"
         case .fileExplorerOpenSelection:
             return String(localized: "shortcut.fileExplorerOpenSelection.label", defaultValue: "File Explorer: Open Selection")
@@ -170,14 +160,7 @@ extension ShortcutAction {
             return String(localized: "shortcut.canvasDistributeHorizontally.label", defaultValue: "Canvas: Distribute Horizontally")
         case .canvasDistributeVertically:
             return String(localized: "shortcut.canvasDistributeVertically.label", defaultValue: "Canvas: Distribute Vertically")
-        case .openDiffViewer: return "Open Diff Viewer"
         case .saveFilePreview: return "Save File Preview"
-        case .openBrowser: return "Open Browser"
-        case .focusBrowserAddressBar: return "Focus Address Bar"
-        case .browserBack: return "Back"
-        case .browserForward: return "Forward"
-        case .browserReload: return "Reload Page"
-        case .browserHardReload: return String(localized: "menu.view.hardRefresh", defaultValue: "Hard Refresh")
         case .browserZoomIn: return "Zoom In"
         case .browserZoomOut: return "Zoom Out"
         case .browserZoomReset: return "Actual Size"
@@ -190,11 +173,6 @@ extension ShortcutAction {
         case .findPrevious: return "Find Previous"
         case .hideFind: return "Hide Find Bar"
         case .useSelectionForFind: return "Use Selection for Find"
-        case .toggleBrowserDeveloperTools: return "Toggle Browser Developer Tools"
-        case .showBrowserJavaScriptConsole: return "Show Browser JavaScript Console"
-        case .toggleBrowserFocusMode: return "Enter Browser Focus Mode"
-        case .toggleBrowserDesignMode: return String(localized: "shortcut.toggleBrowserDesignMode.label", defaultValue: "Toggle Browser Design Mode")
-        case .toggleReactGrab: return "Toggle React Grab"
         case .diffViewerScrollDown:
             return String(localized: "shortcut.diffViewerScrollDown.label", defaultValue: "Viewers: Scroll Down")
         case .diffViewerScrollUp:
@@ -211,12 +189,6 @@ extension ShortcutAction {
             return String(localized: "shortcut.diffViewerScrollToBottom.label", defaultValue: "Viewers: Scroll to Bottom")
         case .diffViewerScrollToTop:
             return String(localized: "shortcut.diffViewerScrollToTop.label", defaultValue: "Viewers: Scroll to Top")
-        case .diffViewerOpenFileSearch:
-            return String(localized: "shortcut.diffViewerOpenFileSearch.label", defaultValue: "Diff Viewer: Open File Search")
-        case .diffViewerNextFile:
-            return String(localized: "shortcut.diffViewerNextFile.label", defaultValue: "Diff Viewer: Next File")
-        case .diffViewerPreviousFile:
-            return String(localized: "shortcut.diffViewerPreviousFile.label", defaultValue: "Diff Viewer: Previous File")
         case .simulatorHome:
             return String(localized: "shortcut.simulatorHome.label", defaultValue: "Simulator: Home")
         case .simulatorRotateLeft:

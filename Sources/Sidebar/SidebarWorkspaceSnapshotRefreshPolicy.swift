@@ -6,10 +6,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
         let customDescription: String?
         let isPinned: Bool
         let isMuted: Bool
-        let cloudWorkspaceLabel: String?
         let customColorHex: String?
         let finderDirectoryPath: String?
-        let mediaActivity: BrowserMediaActivity
         let taskStatus: WorkspaceTaskStatus?
         let todoStatusMenuModel: SidebarWorkspaceCompactStatusMenuModel?
         let hasManualTaskStatus: Bool
@@ -27,10 +25,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             customDescription: customDescription,
             isPinned: isPinned,
             isMuted: isMuted,
-            cloudWorkspaceLabel: cloudWorkspaceLabel,
             customColorHex: customColorHex,
             finderDirectoryPath: finderDirectoryPath,
-            mediaActivity: mediaActivity,
             taskStatus: taskStatus,
             todoStatusMenuModel: todoStatusMenuModel,
             hasManualTaskStatus: hasManualTaskStatus,
@@ -52,31 +48,21 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             isPinned: snapshot.isPinned,
             isMuted: snapshot.isMuted,
             customColorHex: snapshot.customColorHex,
-            cloudWorkspaceLabel: snapshot.cloudWorkspaceLabel,
-            remoteWorkspaceSidebarText: remoteWorkspaceSidebarText,
-            remoteConnectionStatusText: remoteConnectionStatusText,
-            remoteStateHelpText: remoteStateHelpText,
-            showsRemoteReconnectAffordance: showsRemoteReconnectAffordance,
-            copyableSidebarSSHError: copyableSidebarSSHError,
             latestConversationMessage: latestConversationMessage,
             metadataEntries: metadataEntries,
             metadataBlocks: metadataBlocks,
             latestLog: latestLog,
             progress: progress,
-            // The loading spinner is a leading row glyph like mediaActivity, so
-            // it also updates immediately while the context menu is open.
+            // The loading spinner is a leading row glyph, so it also updates
+            // immediately while the context menu is open.
             activeCodingAgentCount: snapshot.activeCodingAgentCount,
             compactGitBranchSummaryText: compactGitBranchSummaryText,
             compactDirectoryCandidates: compactDirectoryCandidates,
             compactBranchDirectoryCandidates: compactBranchDirectoryCandidates,
             branchDirectoryLines: branchDirectoryLines,
             branchLinesContainBranch: branchLinesContainBranch,
-            pullRequestRows: pullRequestRows,
             listeningPorts: listeningPorts,
             finderDirectoryPath: snapshot.finderDirectoryPath,
-            // Media activity drives a leading row glyph, so stale values are
-            // visually worse than ordinary telemetry text while the menu is open.
-            mediaActivity: snapshot.mediaActivity,
             // Todo status/checklist are mutated FROM this context menu (Status
             // submenu, Mark as Done, checkbox clicks), so the done-row dim and
             // checklist must reflect the change immediately, not on menu close.

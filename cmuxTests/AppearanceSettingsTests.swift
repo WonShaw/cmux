@@ -13,7 +13,7 @@ final class AppearanceSettingsTests: XCTestCase {
     func testBundleIconPersistenceAllowsStableReleaseBundle() {
         XCTAssertTrue(
             AppBundleIconPersistencePolicy.shouldPersist(
-                bundleIdentifier: "com.cmuxterm.app",
+                bundleIdentifier: "com.comux.app",
                 appBundleLastPathComponent: "cmux.app",
                 persistenceDisabled: false
             )
@@ -23,14 +23,14 @@ final class AppearanceSettingsTests: XCTestCase {
     func testBundleIconPersistenceSkipsNightlyBundles() {
         XCTAssertFalse(
             AppBundleIconPersistencePolicy.shouldPersist(
-                bundleIdentifier: "com.cmuxterm.app.nightly",
+                bundleIdentifier: "com.comux.app.nightly",
                 appBundleLastPathComponent: "cmux NIGHTLY.app",
                 persistenceDisabled: false
             )
         )
         XCTAssertFalse(
             AppBundleIconPersistencePolicy.shouldPersist(
-                bundleIdentifier: "com.cmuxterm.app.nightly.issue-4350",
+                bundleIdentifier: "com.comux.app.nightly.issue-4350",
                 appBundleLastPathComponent: "cmux NIGHTLY issue-4350.app",
                 persistenceDisabled: false
             )
@@ -40,7 +40,7 @@ final class AppearanceSettingsTests: XCTestCase {
     func testBundleIconPersistenceRejectsMismatchedStableIdentifierAndPath() {
         XCTAssertFalse(
             AppBundleIconPersistencePolicy.shouldPersist(
-                bundleIdentifier: "com.cmuxterm.app",
+                bundleIdentifier: "com.comux.app",
                 appBundleLastPathComponent: "cmux NIGHTLY.app",
                 persistenceDisabled: false
             )
@@ -50,14 +50,14 @@ final class AppearanceSettingsTests: XCTestCase {
     func testBundleIconPersistenceSkipsDebugBundles() {
         XCTAssertFalse(
             AppBundleIconPersistencePolicy.shouldPersist(
-                bundleIdentifier: "com.cmuxterm.app.debug",
+                bundleIdentifier: "com.comux.app.debug",
                 appBundleLastPathComponent: "cmux DEV.app",
                 persistenceDisabled: false
             )
         )
         XCTAssertFalse(
             AppBundleIconPersistencePolicy.shouldPersist(
-                bundleIdentifier: "com.cmuxterm.app.debug.issue-4350",
+                bundleIdentifier: "com.comux.app.debug.issue-4350",
                 appBundleLastPathComponent: "cmux DEV issue-4350.app",
                 persistenceDisabled: false
             )
@@ -67,7 +67,7 @@ final class AppearanceSettingsTests: XCTestCase {
     func testBundleIconPersistenceHonorsDisableDefault() {
         XCTAssertFalse(
             AppBundleIconPersistencePolicy.shouldPersist(
-                bundleIdentifier: "com.cmuxterm.app",
+                bundleIdentifier: "com.comux.app",
                 appBundleLastPathComponent: "cmux.app",
                 persistenceDisabled: true
             )

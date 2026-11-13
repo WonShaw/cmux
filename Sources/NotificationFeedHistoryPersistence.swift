@@ -2,7 +2,7 @@ import Foundation
 import os
 
 nonisolated private let notificationFeedPersistenceLogger = Logger(
-    subsystem: "com.cmuxterm.app",
+    subsystem: "com.comux.app",
     category: "notification-feed-persistence"
 )
 

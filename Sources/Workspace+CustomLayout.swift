@@ -192,23 +192,6 @@ extension Workspace {
                 sendInputWhenReady(input, to: terminal)
             }
 
-        case .browser:
-            let url = surface.url.flatMap { URL(string: $0) }
-            if let panel = newBrowserSurface(
-                inPane: paneId,
-                url: url,
-                focus: false,
-                creationPolicy: .layoutApplication,
-                // Applying a layout with the browser disabled must not fan
-                // out one system-browser tab per declared browser surface;
-                // the surfaces are simply skipped.
-                allowsExternalBrowserFallback: false
-            ) {
-                _ = closePanel(panelId, force: true)
-                if let name = surface.name { setPanelCustomTitle(panelId: panel.id, title: name) }
-                if surface.focus == true { focusPanelId = panel.id }
-            }
-
         case .project:
             if let panel = newProjectSurface(
                 inPane: paneId,
@@ -243,22 +226,6 @@ extension Workspace {
                 if let input = Self.dequeueInitialTerminalInput(pendingSetup: &pendingSetup, command: surface.command) {
                     sendInputWhenReady(input, to: panel)
                 }
-            }
-
-        case .browser:
-            let url = surface.url.flatMap { URL(string: $0) }
-            if let panel = newBrowserSurface(
-                inPane: paneId,
-                url: url,
-                focus: false,
-                creationPolicy: .layoutApplication,
-                // Applying a layout with the browser disabled must not fan
-                // out one system-browser tab per declared browser surface;
-                // the surfaces are simply skipped.
-                allowsExternalBrowserFallback: false
-            ) {
-                if let name = surface.name { setPanelCustomTitle(panelId: panel.id, title: name) }
-                if surface.focus == true { focusPanelId = panel.id }
             }
 
         case .project:

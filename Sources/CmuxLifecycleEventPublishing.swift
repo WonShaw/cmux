@@ -207,8 +207,6 @@ extension Workspace {
         switch panel.panelType {
         case .terminal:
             return "terminal"
-        case .browser:
-            return "browser"
         case .markdown:
             return "markdown"
         case .filePreview:
@@ -223,18 +221,10 @@ extension Workspace {
             return "agent_session"
         case .project:
             return "project"
-        case .extensionBrowser:
-            return "extension_browser"
         case .workspaceTodo:
             return "workspace_todo"
         case .notifications:
             return "notifications"
-        case .cloudVMLoading:
-            return "cloud_vm_loading"
-        case .mobilePairing:
-            return "mobile_pairing"
-        case .accountSignIn:
-            return "account_sign_in"
         }
     }
 }

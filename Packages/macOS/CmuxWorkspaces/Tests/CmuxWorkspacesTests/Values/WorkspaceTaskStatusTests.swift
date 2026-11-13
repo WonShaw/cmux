@@ -21,9 +21,6 @@ import Testing
         let signals = WorkspaceTaskStatusSignals(
             anyAgentNeedsInput: true,
             anyAgentRunning: true,
-            anyOpenPullRequest: true,
-            hasPullRequests: true,
-            allPullRequestsMergedOrClosed: true,
             isGitDirty: true
         )
         #expect(WorkspaceTaskStatus.inferred(from: signals) == .needsAttention)
@@ -32,37 +29,9 @@ import Testing
     @Test func runningAgentWinsOverPullRequestsAndDirtyTree() {
         let signals = WorkspaceTaskStatusSignals(
             anyAgentRunning: true,
-            anyOpenPullRequest: true,
-            hasPullRequests: true,
             isGitDirty: true
         )
         #expect(WorkspaceTaskStatus.inferred(from: signals) == .working)
-    }
-
-    @Test func openPullRequestWinsOverMergedSetAndDirtyTree() {
-        let signals = WorkspaceTaskStatusSignals(
-            anyOpenPullRequest: true,
-            hasPullRequests: true,
-            allPullRequestsMergedOrClosed: false,
-            isGitDirty: true
-        )
-        #expect(WorkspaceTaskStatus.inferred(from: signals) == .review)
-    }
-
-    @Test func allPullRequestsMergedOrClosedInfersDone() {
-        let signals = WorkspaceTaskStatusSignals(
-            hasPullRequests: true,
-            allPullRequestsMergedOrClosed: true,
-            isGitDirty: true
-        )
-        #expect(WorkspaceTaskStatus.inferred(from: signals) == .done)
-    }
-
-    /// `allPullRequestsMergedOrClosed` without `hasPullRequests` (the vacuous
-    /// truth for zero PRs) must NOT infer done.
-    @Test func mergedOrClosedWithoutAnyPullRequestsDoesNotInferDone() {
-        let signals = WorkspaceTaskStatusSignals(allPullRequestsMergedOrClosed: true)
-        #expect(WorkspaceTaskStatus.inferred(from: signals) == .todo)
     }
 
     @Test func dirtyTreeAloneInfersWorking() {

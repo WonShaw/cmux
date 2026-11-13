@@ -6,7 +6,7 @@ public import Foundation
 /// Mirrors the legacy per-surface dictionary the `v2SurfaceList` body built. The
 /// coordinator mints the surface and pane refs itself and writes the optional
 /// fields with `null` defaults exactly as the legacy `v2OrNull` writes did. The
-/// browser/terminal-only extras are carried as optionals: they are emitted only
+/// terminal-only extras are carried as optionals: they are emitted only
 /// when present, matching the legacy `if let` conditional key writes.
 public struct ControlSurfaceSummary: Sendable, Equatable {
     /// The surface's panel identifier.
@@ -23,8 +23,6 @@ public struct ControlSurfaceSummary: Sendable, Equatable {
     public let indexInPane: Int?
     /// Whether this surface is the selected tab in its pane, if it resolved.
     public let selectedInPane: Bool?
-    /// For browser surfaces, whether developer tools are visible (else `nil`).
-    public let developerToolsVisible: Bool?
     /// For terminal surfaces, the requested working directory (trimmed
     /// non-empty), else `nil`. Present only for terminal surfaces.
     public let requestedWorkingDirectory: String?
@@ -65,7 +63,6 @@ public struct ControlSurfaceSummary: Sendable, Equatable {
     ///   - paneID: The enclosing pane's identifier, if resolved.
     ///   - indexInPane: The surface's index within its pane, if resolved.
     ///   - selectedInPane: Whether this surface is selected in its pane.
-    ///   - developerToolsVisible: For browsers, whether dev tools are visible.
     ///   - requestedWorkingDirectory: For terminals, the requested working dir.
     ///   - initialCommand: For terminals, the initial command.
     ///   - tmuxStartCommand: For terminals, the tmux start command.
@@ -80,7 +77,6 @@ public struct ControlSurfaceSummary: Sendable, Equatable {
         paneID: UUID?,
         indexInPane: Int?,
         selectedInPane: Bool?,
-        developerToolsVisible: Bool?,
         requestedWorkingDirectory: String?,
         initialCommand: String?,
         tmuxStartCommand: String?,
@@ -101,7 +97,6 @@ public struct ControlSurfaceSummary: Sendable, Equatable {
         self.paneID = paneID
         self.indexInPane = indexInPane
         self.selectedInPane = selectedInPane
-        self.developerToolsVisible = developerToolsVisible
         self.requestedWorkingDirectory = requestedWorkingDirectory
         self.initialCommand = initialCommand
         self.tmuxStartCommand = tmuxStartCommand

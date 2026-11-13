@@ -1,9 +1,9 @@
 name: Nightly macOS build
 
 # One workflow, two publish channels. A push to `main` publishes cmux NIGHTLY
-# (bundle id com.cmuxterm.app.nightly, GitHub release `nightly`, feed
+# (bundle id com.comux.app.nightly, GitHub release `nightly`, feed
 # files.cmux.com/nightly). A push to an `rc/**` branch publishes cmux RC
-# (com.cmuxterm.app.rc, release `rc`, feed files.cmux.com/rc). The two channels
+# (com.comux.app.rc, release `rc`, feed files.cmux.com/rc). The two channels
 # install side by side with each other and with stable, and each Sparkle feed
 # only ever advances within its own channel. Everything channel-specific is
 # resolved once in `decide`; every later job reads it from there.
@@ -129,7 +129,7 @@ jobs:
             const channel = isRcRef ? 'rc' : 'nightly';
             const channelIdentity = {
               nightly: {
-                bundleId: 'com.cmuxterm.app.nightly',
+                bundleId: 'com.comux.app.nightly',
                 appName: 'cmux NIGHTLY',
                 urlScheme: 'cmux-nightly',
                 dmgPrefix: 'cmux-nightly-macos',
@@ -140,7 +140,7 @@ jobs:
                 iconName: 'AppIcon-Nightly',
               },
               rc: {
-                bundleId: 'com.cmuxterm.app.rc',
+                bundleId: 'com.comux.app.rc',
                 appName: 'cmux RC',
                 urlScheme: 'cmux-rc',
                 dmgPrefix: 'cmux-rc-macos',

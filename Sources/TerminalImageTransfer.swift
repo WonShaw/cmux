@@ -1,18 +1,11 @@
 import Foundation
-import CmuxCloudImagePaste
 import CmuxTerminal
 import AppKit
-import CmuxRemoteSession
 import UniformTypeIdentifiers
 
 enum TerminalImageTransferMode: Codable, Sendable {
     case paste
     case drop
-}
-
-enum TerminalRemoteUploadTarget: Equatable {
-    case workspaceRemote
-    case detectedSSH(DetectedSSHSession)
 }
 
 enum TerminalImageTransferPreparedContent: Codable, Equatable, Sendable {
@@ -23,16 +16,6 @@ enum TerminalImageTransferPreparedContent: Codable, Equatable, Sendable {
 
 enum TerminalImageTransferExecutionError: Error {
     case cancelled
-}
-
-// The app-side conformer of the session coordinator's transfer-cancellation
-// seam; the operation already provided every member by contract, the
-// extension only names the cancellation error the legacy controller threw
-// directly.
-extension TerminalImageTransferOperation: RemoteTransferCancelling {
-    var cancellationError: any Error {
-        TerminalImageTransferExecutionError.cancelled
-    }
 }
 
 final class TerminalImageTransferOperation: @unchecked Sendable {
@@ -212,8 +195,6 @@ enum TerminalImageTransferPlanner {
         guard !fileURLs.isEmpty else { return .reject }
 
         switch target {
-        case .cloud:
-            return .pasteCloudImages(fileURLs)
         case .local:
             if mode == .drop,
                fileURLs.count > 1,
@@ -224,11 +205,6 @@ enum TerminalImageTransferPlanner {
                 )
             }
             return .insertText(insertedText(forFileURLs: fileURLs))
-        case .remote(let remoteTarget):
-            guard fileURLs.allSatisfy(isRemoteUploadableFileURL) else {
-                return .insertText(insertedText(forFileURLs: fileURLs))
-            }
-            return .uploadFiles(fileURLs, remoteTarget)
         }
     }
 
@@ -236,8 +212,6 @@ enum TerminalImageTransferPlanner {
     static func executeForTesting(
         plan: TerminalImageTransferPlan,
         operation: TerminalImageTransferOperation? = nil,
-        uploadWorkspaceRemote: ([URL], TerminalImageTransferOperation, @escaping (Result<[String], Error>) -> Void) -> Void,
-        uploadDetectedSSH: (DetectedSSHSession, [URL], TerminalImageTransferOperation, @escaping (Result<[String], Error>) -> Void) -> Void,
         insertText: @escaping (String) -> Void,
         scheduleAfter: @escaping (TimeInterval, @escaping () -> Void) -> Void = { delay, work in
             DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
@@ -247,8 +221,6 @@ enum TerminalImageTransferPlanner {
         execute(
             plan: plan,
             operation: operation,
-            uploadWorkspaceRemote: uploadWorkspaceRemote,
-            uploadDetectedSSH: uploadDetectedSSH,
             insertText: insertText,
             scheduleAfter: scheduleAfter,
             onFailure: onFailure
@@ -259,8 +231,6 @@ enum TerminalImageTransferPlanner {
     static func execute(
         plan: TerminalImageTransferPlan,
         operation: TerminalImageTransferOperation? = nil,
-        uploadWorkspaceRemote: ([URL], TerminalImageTransferOperation, @escaping (Result<[String], Error>) -> Void) -> Void,
-        uploadDetectedSSH: (DetectedSSHSession, [URL], TerminalImageTransferOperation, @escaping (Result<[String], Error>) -> Void) -> Void,
         insertText: @escaping (String) -> Void,
         scheduleAfter: @escaping (TimeInterval, @escaping () -> Void) -> Void = { delay, work in
             DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
@@ -268,12 +238,6 @@ enum TerminalImageTransferPlanner {
         onFailure: @escaping (Error) -> Void
     ) -> TerminalImageTransferOperation? {
         switch plan {
-        case .pasteCloudImages:
-            // The native Cloud session owns both upload and remote paste. A
-            // caller without that transport must fail instead of inserting a path.
-            if let operation, !operation.finish() { return operation }
-            onFailure(CloudImagePasteError.unavailable)
-            return operation
         case .insertText(let text):
             if let operation, !operation.finish() {
                 return operation
@@ -290,20 +254,6 @@ enum TerminalImageTransferPlanner {
                 insertText: insertText,
                 scheduleAfter: scheduleAfter
             )
-            return operation
-        case .uploadFiles(let fileURLs, .workspaceRemote):
-            let operation = operation ?? TerminalImageTransferOperation()
-            uploadWorkspaceRemote(fileURLs, operation) { result in
-                guard operation.finish() else { return }
-                finishUpload(result: result, insertText: insertText, onFailure: onFailure)
-            }
-            return operation
-        case .uploadFiles(let fileURLs, .detectedSSH(let session)):
-            let operation = operation ?? TerminalImageTransferOperation()
-            uploadDetectedSSH(session, fileURLs, operation) { result in
-                guard operation.finish() else { return }
-                finishUpload(result: result, insertText: insertText, onFailure: onFailure)
-            }
             return operation
         case .reject:
             return operation
@@ -351,7 +301,7 @@ enum TerminalImageTransferPlanner {
         return true
     }
 
-    private static func isRemoteUploadableFileURL(_ fileURL: URL) -> Bool {
+    private static func isRegularFileURL(_ fileURL: URL) -> Bool {
         let normalizedFileURL = fileURL.standardizedFileURL
         guard normalizedFileURL.isFileURL,
               let resourceValues = try? normalizedFileURL.resourceValues(forKeys: [.isRegularFileKey]),
@@ -446,7 +396,7 @@ enum TerminalImageTransferPlanner {
         // Finder adds image previews to file selections. Preserve the original
         // files without decoding those previews for either paste or drop.
         // Folder, web, and expired URLs can still accompany actual image copies.
-        guard !urls.isEmpty, urls.allSatisfy(isRemoteUploadableFileURL) else { return nil }
+        guard !urls.isEmpty, urls.allSatisfy(isRegularFileURL) else { return nil }
         guard let durableURLs = pasteboardService.durableDroppedFileURLs(
             urls,
             sourceIsTransient: PasteboardFileURLReader.hasPromisedFileURLType(pasteboard.types ?? [])
@@ -474,26 +424,6 @@ enum TerminalImageTransferPlanner {
 
     private static func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
         PasteboardFileURLReader.fileURLs(from: pasteboard)
-    }
-
-    private static func finishUpload(
-        result: Result<[String], Error>,
-        insertText: @escaping (String) -> Void,
-        onFailure: @escaping (Error) -> Void
-    ) {
-        switch result {
-        case .success(let remotePaths):
-            let content = remotePaths
-                .map(escapeForShell)
-                .joined(separator: " ")
-            guard !content.isEmpty else {
-                onFailure(NSError(domain: "cmux.remote.drop", code: 5))
-                return
-            }
-            insertText(content)
-        case .failure(let error):
-            onFailure(error)
-        }
     }
 
     private static func sendTextSegments(

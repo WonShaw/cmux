@@ -65,22 +65,6 @@ private extension DockSplitStore {
         return panel
     }
 
-    @discardableResult
-    func seedBrowserTestPanel(_ panel: BrowserPanel) throws -> BrowserPanel {
-        let pane = try #require(bonsplitController.allPaneIds.first)
-        panels[panel.id] = panel
-        let tabId = try #require(
-            bonsplitController.createTab(
-                title: panel.displayTitle,
-                icon: panel.displayIcon,
-                kind: "browser",
-                isDirty: panel.isDirty,
-                inPane: pane
-            )
-        )
-        bindSurface(tabId, toPanelId: panel.id)
-        return panel
-    }
 }
 
 /// Per-window Dock registry lifecycle: every main window owns an independent
@@ -182,72 +166,6 @@ struct WindowDockLifecycleTests {
                 appDelegate.focusedDockStoreForShortcut(preferredWindow: nil) == nil,
                 "Low-level surface creation must not steal keyboard routing from its caller"
             )
-        }
-    }
-
-    @Test("Dock activation restores a loaded browser's address-bar focus intent")
-    @MainActor
-    func dockActivationRestoresLoadedBrowserAddressBarIntent() throws {
-        try withIsolatedAppDelegate { appDelegate in
-            let manager = TabManager(autoWelcomeIfNeeded: false)
-            let windowId = appDelegate.registerMainWindowContextForTesting(tabManager: manager)
-            defer {
-                appDelegate.unregisterMainWindowContextForTesting(windowId: windowId)
-                manager.tabs.forEach { $0.teardownAllPanels() }
-            }
-
-            let dock = appDelegate.windowDock(forWindowId: windowId)
-            let hostId = UUID()
-            dock.setVisibleInUI(true, hostId: hostId)
-            defer { dock.setVisibleInUI(false, hostId: hostId) }
-
-            let browser = try dock.seedBrowserTestPanel(
-                BrowserPanel(
-                    workspaceId: dock.workspaceId,
-                    initialURL: try #require(URL(string: "https://example.com/address")),
-                    renderInitialNavigation: false
-                )
-            )
-            browser.prepareFocusIntentForActivation(.browser(.addressBar))
-            #expect(browser.pendingAddressBarFocusRequestId == nil)
-
-            dock.focusPanelFromDockInteraction(browser.id, window: nil)
-
-            #expect(browser.preferredFocusIntentForActivation() == .browser(.addressBar))
-            #expect(browser.pendingAddressBarFocusRequestId != nil)
-        }
-    }
-
-    @Test("Dock activation restores a loaded browser's find-field focus intent")
-    @MainActor
-    func dockActivationRestoresLoadedBrowserFindFieldIntent() throws {
-        try withIsolatedAppDelegate { appDelegate in
-            let manager = TabManager(autoWelcomeIfNeeded: false)
-            let windowId = appDelegate.registerMainWindowContextForTesting(tabManager: manager)
-            defer {
-                appDelegate.unregisterMainWindowContextForTesting(windowId: windowId)
-                manager.tabs.forEach { $0.teardownAllPanels() }
-            }
-
-            let dock = appDelegate.windowDock(forWindowId: windowId)
-            let hostId = UUID()
-            dock.setVisibleInUI(true, hostId: hostId)
-            defer { dock.setVisibleInUI(false, hostId: hostId) }
-
-            let browser = try dock.seedBrowserTestPanel(
-                BrowserPanel(
-                    workspaceId: dock.workspaceId,
-                    initialURL: try #require(URL(string: "https://example.com/find")),
-                    renderInitialNavigation: false
-                )
-            )
-            browser.prepareFocusIntentForActivation(.browser(.findField))
-            #expect(browser.searchState == nil)
-
-            dock.focusPanelFromDockInteraction(browser.id, window: nil)
-
-            #expect(browser.preferredFocusIntentForActivation() == .browser(.findField))
-            #expect(browser.searchState != nil)
         }
     }
 
@@ -496,77 +414,6 @@ struct WindowDockLifecycleTests {
             #expect(dock.isRetired)
             #expect(!dock.containsPanel(panel.id))
             #expect(panel.closeCount == 1)
-        }
-    }
-
-    @Test("Abandoned browser-only route retires its transferred Dock when its owner deinitializes")
-    @MainActor
-    func abandonedBrowserOnlyRouteRetiresTransferredDock() async throws {
-        try await AppContextSerialGate.withExclusiveAppContext {
-            _ = NSApplication.shared
-            let previousAppDelegate = AppDelegate.shared
-            let previousActiveManager =
-                TerminalController.shared.activeTabManagerForCallerNotification()
-            let wasBrowserDisabled = BrowserAvailabilitySettings.isDisabled()
-            let appDelegate = AppDelegate()
-            AppDelegate.shared = appDelegate
-            BrowserAvailabilitySettings.setDisabled(false)
-
-            var manager: TabManager? = TabManager(autoWelcomeIfNeeded: false)
-            weak var releasedManager = manager
-            let workspace = try #require(manager?.selectedWorkspace)
-            let terminal = try #require(workspace.focusedTerminalPanel)
-            let workspacePane = try #require(
-                workspace.bonsplitController.focusedPaneId
-                    ?? workspace.bonsplitController.allPaneIds.first
-            )
-            let workspaceBrowser = try #require(
-                workspace.newBrowserSurface(
-                    inPane: workspacePane,
-                    url: URL(string: "https://example.com/route-owner"),
-                    focus: true,
-                    creationPolicy: .restoration
-                )
-            )
-            #expect(workspace.closePanel(terminal.id, force: true))
-            #expect(workspace.browserPanel(for: workspaceBrowser.id) === workspaceBrowser)
-            #expect(!workspace.panels.values.contains { $0 is TerminalPanel })
-            // Drain the initial terminal's unregister before a recoverable route
-            // exists, so no terminal-topology callback can satisfy this test.
-            await drainMainActorQueue()
-
-            let windowId = appDelegate.registerMainWindowContextForTesting(
-                tabManager: try #require(manager)
-            )
-            let dock = appDelegate.windowDock(forWindowId: windowId)
-            let dockPane = try #require(dock.bonsplitController.allPaneIds.first)
-            let dockBrowserId = try #require(
-                dock.newSurface(
-                    kind: .browser,
-                    inPane: dockPane,
-                    url: URL(string: "https://example.com/transferred-dock"),
-                    focus: true
-                )
-            )
-            defer {
-                appDelegate.forgetRecoverableMainWindowRoute(windowId: windowId)
-                workspace.teardownAllPanels()
-                TerminalController.shared.setActiveTabManager(previousActiveManager)
-                BrowserAvailabilitySettings.setDisabled(wasBrowserDisabled)
-                AppDelegate.shared = previousAppDelegate
-            }
-
-            appDelegate.unregisterMainWindowContextForTesting(windowId: windowId)
-            #expect(!dock.isRetired)
-            #expect(dock.containsPanel(dockBrowserId))
-
-            manager = nil
-            await drainMainActorQueue()
-
-            #expect(releasedManager == nil)
-            #expect(dock.isRetired)
-            #expect(!dock.containsPanel(dockBrowserId))
-            #expect(dock.panels.isEmpty)
         }
     }
 

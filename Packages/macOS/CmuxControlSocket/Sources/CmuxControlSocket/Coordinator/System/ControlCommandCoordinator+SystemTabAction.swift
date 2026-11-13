@@ -8,8 +8,8 @@ extension ControlCommandCoordinator {
     private static let tabActionSupportedActions = [
         "rename", "clear_name",
         "close_left", "close_right", "close_others",
-        "new_terminal_right", "new_browser_right",
-        "reload", "duplicate", "move_to_new_workspace", "detach_to_workspace", "detach_to_new_workspace",
+        "new_terminal_right",
+        "move_to_new_workspace", "detach_to_workspace", "detach_to_new_workspace",
         "pin", "unpin", "mark_read", "mark_unread", "toggle_full_width_tab",
     ]
 
@@ -31,7 +31,6 @@ extension ControlCommandCoordinator {
             routing: routingSelectors(params),
             actionKey: action,
             title: string(params, "title"),
-            rawURL: string(params, "url"),
             surfaceID: surfaceID ?? tabID,
             requestedFocus: bool(params, "focus") ?? false,
             moveParams: params
@@ -68,18 +67,6 @@ extension ControlCommandCoordinator {
             )
         case .invalidTitle:
             return .err(code: "invalid_params", message: "Missing or invalid title", data: nil)
-        case .invalidURL(let rawURL):
-            return .err(
-                code: "invalid_params",
-                message: "Invalid URL",
-                data: .object(["url": .string(rawURL)])
-            )
-        case .reloadNotBrowser:
-            return .err(code: "invalid_state", message: "Reload is only available for browser tabs", data: nil)
-        case .duplicateNotBrowser:
-            return .err(code: "invalid_state", message: "Duplicate is only available for browser tabs", data: nil)
-        case .browserDisabled(let outcome):
-            return browserDisabledResult(outcome)
         case .tabPaneNotFound:
             return .err(code: "not_found", message: "Tab pane not found", data: nil)
         case .fullWidthTabToggleFailed:
@@ -88,8 +75,6 @@ extension ControlCommandCoordinator {
             return .err(code: "not_found", message: "Tab not found in pane", data: nil)
         case .createFailed:
             return .err(code: "internal_error", message: "Failed to create tab", data: nil)
-        case .duplicateFailed:
-            return .err(code: "internal_error", message: "Failed to duplicate tab", data: nil)
         case .bridged(let result):
             return result
         case .completed(let outcome):

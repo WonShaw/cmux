@@ -2,7 +2,6 @@ import Bonsplit
 
 extension DockSplitStore {
     func removeAllPanels() {
-        cancelDockReactGrabTask()
         let tabIds = Set(bonsplitController.allTabIds)
         pendingCloseConfirmDockTabIds.removeAll()
         tabCloseButtonCloseDockTabIds.removeAll()

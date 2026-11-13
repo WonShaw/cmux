@@ -288,10 +288,9 @@ extension TerminalController {
                 captureDeadline - ProcessInfo.processInfo.systemUptime
             guard remainingBudget > 0 else { break }
             do {
-                let image = try await BrowserScreenshotWebViewSnapshotter.captureVisibleViewport(
-                    from: webView,
-                    timeout: min(2, remainingBudget)
-                )
+                let snapshotConfiguration = WKSnapshotConfiguration()
+                snapshotConfiguration.afterScreenUpdates = true
+                let image = try await webView.takeSnapshot(configuration: snapshotConfiguration)
                 guard !Task.isCancelled else { return nil }
                 var proposedRect = NSRect(origin: .zero, size: image.size)
                 guard let cgImage = image.cgImage(

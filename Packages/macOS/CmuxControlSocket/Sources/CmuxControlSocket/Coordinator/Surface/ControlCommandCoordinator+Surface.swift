@@ -161,9 +161,6 @@ extension ControlCommandCoordinator {
                     "index_in_pane": surface.indexInPane.map { .int(Int64($0)) } ?? .null,
                     "selected_in_pane": surface.selectedInPane.map { .bool($0) } ?? .null,
                 ]
-                if let dev = surface.developerToolsVisible {
-                    item["developer_tools_visible"] = .bool(dev)
-                }
                 if surface.isTerminal {
                     item["requested_working_directory"] = orNull(surface.requestedWorkingDirectory)
                     item["initial_command"] = orNull(surface.initialCommand)
@@ -333,6 +330,9 @@ extension ControlCommandCoordinator {
         if let error = incompatibleTerminalCreationInputError(params) {
             return error
         }
+        if let error = unsupportedSurfaceTypeError(params) {
+            return error
+        }
         let routing = routingSelectors(params)
         guard context?.controlSurfaceRoutingResolvesTabManager(routing: routing) ?? false else {
             return .err(code: "unavailable", message: "TabManager not available", data: nil)
@@ -362,16 +362,13 @@ extension ControlCommandCoordinator {
         let inputs = ControlSurfaceSplitInputs(
             directionRaw: directionRaw,
             typeRaw: string(params, "type"),
-            urlRaw: string(params, "url"),
             requestedSourceSurfaceID: uuid(params, "surface_id"),
             workingDirectory: optionalTrimmedRawString(params, "working_directory"),
             initialCommand: optionalTrimmedRawString(params, "initial_command"),
             initialInput: nonBlankRawString(params, "initial_input"),
             tmuxStartCommand: optionalTrimmedRawString(params, "tmux_start_command"),
-            remotePTYSessionID: optionalTrimmedRawString(params, "remote_pty_session_id"),
             remoteContextRaw: optionalTrimmedRawString(params, "remote_context"),
             startupEnvironment: trimmedStringMap(params, keys: ["startup_environment", "initial_env"]),
-            clientUnsupportedRemoteTmuxOptions: stringArray(params, "remote_tmux_unsupported_options") ?? [],
             requestedFocus: bool(params, "focus") ?? false,
             initialDividerPosition: parsedDivider.value
         )
@@ -396,8 +393,6 @@ extension ControlCommandCoordinator {
                 message: "agent-session is only supported by surface.create",
                 data: .object(["type": .string(typeRawValue)])
             )
-        case .browserDisabled(let outcome):
-            return browserDisabledResult(outcome)
         case .workspaceNotFound:
             return .err(code: "not_found", message: "Workspace not found", data: nil)
         case .requestedSurfaceNotFound(let id):
@@ -410,8 +405,6 @@ extension ControlCommandCoordinator {
             return .err(code: "not_found", message: "No focused surface", data: nil)
         case .createFailed:
             return .err(code: "internal_error", message: "Failed to create split", data: nil)
-        case .mirrorUnsupportedOptions(let unsupported):
-            return mirrorUnsupportedOptionsResult(unsupported)
         case .routedToRemote(let windowID, let workspaceID, let typeRawValue):
             return remoteRoutedCreationResult(
                 windowID: windowID,
@@ -520,6 +513,9 @@ extension ControlCommandCoordinator {
         if let error = incompatibleTerminalCreationInputError(params) {
             return error
         }
+        if let error = unsupportedSurfaceTypeError(params) {
+            return error
+        }
         let routing = routingSelectors(params)
         guard context?.controlSurfaceRoutingResolvesTabManager(routing: routing) ?? false else {
             return .err(code: "unavailable", message: "TabManager not available", data: nil)
@@ -529,12 +525,10 @@ extension ControlCommandCoordinator {
             typeRaw: string(params, "type"),
             providerRaw: string(params, "provider_id") ?? string(params, "provider"),
             rendererRaw: string(params, "renderer_kind") ?? string(params, "renderer"),
-            urlRaw: string(params, "url"),
             workingDirectory: optionalTrimmedRawString(params, "working_directory"),
             initialCommand: optionalTrimmedRawString(params, "initial_command"),
             initialInput: nonBlankRawString(params, "initial_input"),
             tmuxStartCommand: optionalTrimmedRawString(params, "tmux_start_command"),
-            remotePTYSessionID: optionalTrimmedRawString(params, "remote_pty_session_id"),
             remoteContextRaw: optionalTrimmedRawString(params, "remote_context"),
             startupEnvironment: trimmedStringMap(params, keys: ["startup_environment", "initial_env"]),
             requestedPaneID: uuid(params, "pane_id"),
@@ -565,25 +559,12 @@ extension ControlCommandCoordinator {
             return .err(code: "invalid_params", message: message, data: .object(["type": .string(typeRawValue)]))
         case .dockUnavailable(let message): return .err(code: "invalid_params", message: message, data: .object(["placement": .string("dock")]))
         case .dockConflictingRoutingSelectors(let message): return .err(code: "invalid_params", message: message, data: nil)
-        case .browserDisabled(let outcome):
-            return browserDisabledResult(outcome)
         case .workspaceNotFound:
             return .err(code: "not_found", message: "Workspace not found", data: nil)
         case .paneNotFound:
             return .err(code: "not_found", message: "Pane not found", data: nil)
-        case .mirrorPaneTargetUnsupportedType(let typeRawValue, let message):
-            return .err(
-                code: "invalid_params",
-                message: message,
-                data: .object([
-                    "type": .string(typeRawValue),
-                    "target": .string("remote-tmux-pane"),
-                ])
-            )
         case .createFailed:
             return .err(code: "internal_error", message: "Failed to create surface", data: nil)
-        case .mirrorUnsupportedOptions(let unsupported):
-            return mirrorUnsupportedOptionsResult(unsupported)
         case .routedToRemote(let windowID, let workspaceID, let typeRawValue):
             return remoteRoutedCreationResult(
                 windowID: windowID,

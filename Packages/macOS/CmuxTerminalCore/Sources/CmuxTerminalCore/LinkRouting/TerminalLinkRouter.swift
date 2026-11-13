@@ -3,25 +3,14 @@ import Foundation
 import CMUXDebugLog
 #endif
 
-/// Routes a link activated inside a terminal to the embedded browser or the
-/// system.
+/// Resolves a link activated inside a terminal into a system open target.
 ///
-/// Routing precedence, preserved exactly from the legacy resolver: absolute
-/// file-system paths open externally; `http`/`https` URLs open embedded when
-/// the injected ``BrowserHostNormalizing`` accepts their host, externally
-/// otherwise; other schemes open externally; scheme-less text that the
-/// browser can navigate (bare domains, localhost) opens embedded subject to
-/// the same host check; anything else falls back to an external URL when it
-/// parses at all.
+/// Absolute file-system paths become file URLs; anything else that parses as
+/// a URL is handed to the system as-is (default browser, Finder, or scheme
+/// handler).
 public struct TerminalLinkRouter: Sendable {
-    private let hostNormalizer: any BrowserHostNormalizing
-
-    /// Creates a router that validates web hosts through the browser domain.
-    ///
-    /// - Parameter hostNormalizer: The browser-domain host validation seam.
-    public init(hostNormalizer: any BrowserHostNormalizing) {
-        self.hostNormalizer = hostNormalizer
-    }
+    /// Creates a router.
+    public init() {}
 
     /// Resolves raw link text into an open target.
     ///
@@ -49,35 +38,10 @@ public struct TerminalLinkRouter: Sendable {
 
         if let parsed = URL(string: trimmed),
            let scheme = parsed.scheme?.lowercased() {
-            if scheme == "http" || scheme == "https" {
-                guard hostNormalizer.normalizedHost(parsed.host ?? "") != nil else {
-                    #if DEBUG
-                    logDebugEvent("link.resolve result=external(invalidHost) url=\(parsed)")
-                    #endif
-                    return .external(parsed)
-                }
-                #if DEBUG
-                logDebugEvent("link.resolve result=embeddedBrowser url=\(parsed)")
-                #endif
-                return .embeddedBrowser(parsed)
-            }
             #if DEBUG
             logDebugEvent("link.resolve result=external(scheme=\(scheme)) url=\(parsed)")
             #endif
             return .external(parsed)
-        }
-
-        if let webURL = hostNormalizer.navigableWebURL(trimmed) {
-            guard hostNormalizer.normalizedHost(webURL.host ?? "") != nil else {
-                #if DEBUG
-                logDebugEvent("link.resolve result=external(bareHost-invalidHost) url=\(webURL)")
-                #endif
-                return .external(webURL)
-            }
-            #if DEBUG
-            logDebugEvent("link.resolve result=embeddedBrowser(bareHost) url=\(webURL)")
-            #endif
-            return .embeddedBrowser(webURL)
         }
 
         guard let fallback = URL(string: trimmed) else {

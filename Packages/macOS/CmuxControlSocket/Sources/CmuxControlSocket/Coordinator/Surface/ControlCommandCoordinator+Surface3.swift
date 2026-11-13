@@ -45,17 +45,6 @@ extension ControlCommandCoordinator {
         }
 
         let source = publicResumeSource(params)
-        let remoteWorkspaceID = uuid(params, "_cmux_remote_workspace_id")
-        if hasNonNull(params, "_cmux_remote_workspace_id"), remoteWorkspaceID == nil {
-            return .err(
-                code: "invalid_params",
-                message: String(
-                    localized: "socket.surfaceSplitOff.error.invalidWorkspaceId",
-                    defaultValue: "Missing or invalid workspace_id"
-                ),
-                data: nil
-            )
-        }
         let launchCommand: ControlAgentLaunchCommand?
         switch params["launch_command"] {
         case nil, .null:
@@ -82,8 +71,6 @@ extension ControlCommandCoordinator {
             launchCommand: launchCommand,
             permissionMode: optionalTrimmedRawString(params, "permission_mode"),
             autoResume: source == "agent-hook" ? (bool(params, "auto_resume") ?? false) : false,
-            remoteWorkspaceID: remoteWorkspaceID,
-            remoteRelayParameters: remoteWorkspaceID == nil ? nil : params,
             resumeEvidenceProvenance: optionalTrimmedRawString(params, "resume_evidence_provenance")
         )
         return surfaceResumeResult(
@@ -247,9 +234,6 @@ extension ControlCommandCoordinator {
             "approval_policy": orNull(binding.approvalPolicyRawValue),
             "approval_record_id": orNull(binding.approvalRecordID),
             "execution_location": .string(binding.executionLocationRawValue),
-            "remote_workspace_id": orNull(binding.remoteWorkspaceID?.uuidString),
-            "remote_surface_id": orNull(binding.remoteSurfaceID?.uuidString),
-            "remote_pty_session_id": orNull(binding.remotePTYSessionID),
             "updated_at": .double(binding.updatedAt),
         ])
     }

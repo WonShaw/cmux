@@ -29,14 +29,6 @@ enum CommandClickFileOpenRouter {
             return false
         }
 
-        if TerminalHTMLFileBrowserAction(defaults: defaults).open(
-            fileURL: URL(fileURLWithPath: filePath),
-            sourcePanelId: sourcePanelId,
-            container: workspace
-        ) {
-            return true
-        }
-
         return workspace.openOrFocusFilePreviewSplit(from: sourcePanelId, filePath: filePath) != nil
     }
 
@@ -86,10 +78,6 @@ enum CommandClickFileOpenRouter {
                 panelId: surfaceId,
                 preferredWorkspaceId: preferredWorkspaceId
             )?.workspace ?? workspace
-            guard !resolvedWorkspace.isRemoteTerminalSurface(surfaceId) else {
-                fallback?()
-                return
-            }
             guard shouldRouteInCmux(path: filePath, defaults: defaults) else {
                 fallback?()
                 return

@@ -26,16 +26,16 @@ struct ManagedDevicePolicyTests {
         defer { cleanup() }
 
         // A plain (user-level) write is not a managed policy.
-        defaults.set(true, forKey: ManagedDevicePolicyKey.disableEmbeddedBrowser.rawValue)
+        defaults.set(true, forKey: ManagedDevicePolicyKey.disableFileTransfer.rawValue)
         let policy = ManagedDevicePolicy(
             defaults: defaults,
             releaseDomainDefaults: nil,
             forcedObject: Self.probe
         )
 
-        #expect(!policy.isEnforced(.disableEmbeddedBrowser))
-        #expect(policy.forcedBool(for: .disableEmbeddedBrowser) == nil)
-        #expect(!policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.disableEmbeddedBrowser.rawValue))
+        #expect(!policy.isEnforced(.disableFileTransfer))
+        #expect(policy.forcedBool(for: .disableFileTransfer) == nil)
+        #expect(!policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.disableFileTransfer.rawValue))
     }
 
     @Test func forcedTrueEnforcesThePolicyRegardlessOfUserValue() throws {
@@ -43,10 +43,10 @@ struct ManagedDevicePolicyTests {
         defer { cleanup() }
 
         // The user "disagrees" with the profile; the forced value must win.
-        defaults.set(false, forKey: ManagedDevicePolicyKey.disableRemoteControl.rawValue)
+        defaults.set(false, forKey: ManagedDevicePolicyKey.disableCustomSidebars.rawValue)
         defaults.set(
             true,
-            forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.disableRemoteControl.rawValue
+            forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.disableCustomSidebars.rawValue
         )
         let policy = ManagedDevicePolicy(
             defaults: defaults,
@@ -54,44 +54,9 @@ struct ManagedDevicePolicyTests {
             forcedObject: Self.probe
         )
 
-        #expect(policy.isEnforced(.disableRemoteControl))
-        #expect(policy.forcedBool(for: .disableRemoteControl) == true)
-        #expect(policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.disableRemoteControl.rawValue))
-    }
-
-    @Test func forcedCloudDisableIsEnforcedAndLocksTheKey() throws {
-        let (defaults, cleanup) = try makeSuite("cloud")
-        defer { cleanup() }
-
-        defaults.set(false, forKey: ManagedDevicePolicyKey.disableCloud.rawValue)
-        defaults.set(true, forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.disableCloud.rawValue)
-        let policy = ManagedDevicePolicy(
-            defaults: defaults,
-            releaseDomainDefaults: nil,
-            forcedObject: Self.probe
-        )
-
-        #expect(policy.isEnforced(.disableCloud))
-        #expect(policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.disableCloud.rawValue))
-    }
-
-    @Test func allowStyleKeysAreOnlyOffWhenForcedFalse() throws {
-        let (defaults, cleanup) = try makeSuite("allowStyle")
-        defer { cleanup() }
-        let policy = ManagedDevicePolicy(
-            defaults: defaults,
-            releaseDomainDefaults: nil,
-            forcedObject: Self.probe
-        )
-
-        #expect(policy.isAllowed(.browserAllowLocalhost))
-        defaults.set(true, forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.browserAllowLocalhost.rawValue)
-        #expect(policy.isAllowed(.browserAllowLocalhost))
-        defaults.set("off", forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.browserAllowLocalhost.rawValue)
-        #expect(policy.isAllowed(.browserAllowLocalhost))
-        defaults.set(false, forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.browserAllowLocalhost.rawValue)
-        #expect(!policy.isAllowed(.browserAllowLocalhost))
-        #expect(policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.browserAllowLocalhost.rawValue))
+        #expect(policy.isEnforced(.disableCustomSidebars))
+        #expect(policy.forcedBool(for: .disableCustomSidebars) == true)
+        #expect(policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.disableCustomSidebars.rawValue))
     }
 
     @Test func forcedFalseLocksTheKeyWithoutEnforcingThePolicy() throws {
@@ -100,7 +65,7 @@ struct ManagedDevicePolicyTests {
 
         defaults.set(
             false,
-            forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.disableEmbeddedBrowser.rawValue
+            forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.disableFileTransfer.rawValue
         )
         let policy = ManagedDevicePolicy(
             defaults: defaults,
@@ -108,10 +73,10 @@ struct ManagedDevicePolicyTests {
             forcedObject: Self.probe
         )
 
-        #expect(!policy.isEnforced(.disableEmbeddedBrowser))
-        #expect(policy.forcedBool(for: .disableEmbeddedBrowser) == false)
+        #expect(!policy.isEnforced(.disableFileTransfer))
+        #expect(policy.forcedBool(for: .disableFileTransfer) == false)
         // Still forced: writers must not fight it even though the policy is off.
-        #expect(policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.disableEmbeddedBrowser.rawValue))
+        #expect(policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.disableFileTransfer.rawValue))
     }
 
     @Test func nonBooleanForcedValueDoesNotEnforceThePolicy() throws {
@@ -120,7 +85,7 @@ struct ManagedDevicePolicyTests {
 
         defaults.set(
             "yes",
-            forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.disableEmbeddedBrowser.rawValue
+            forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.disableFileTransfer.rawValue
         )
         let policy = ManagedDevicePolicy(
             defaults: defaults,
@@ -128,10 +93,10 @@ struct ManagedDevicePolicyTests {
             forcedObject: Self.probe
         )
 
-        #expect(!policy.isEnforced(.disableEmbeddedBrowser))
-        #expect(policy.forcedBool(for: .disableEmbeddedBrowser) == nil)
+        #expect(!policy.isEnforced(.disableFileTransfer))
+        #expect(policy.forcedBool(for: .disableFileTransfer) == nil)
         // The key is still forced from a write-suppression standpoint.
-        #expect(policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.disableEmbeddedBrowser.rawValue))
+        #expect(policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.disableFileTransfer.rawValue))
     }
 
     @Test func channelBuildsFallBackToTheReleaseDomain() throws {
@@ -142,7 +107,7 @@ struct ManagedDevicePolicyTests {
 
         releaseDefaults.set(
             true,
-            forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.disableEmbeddedBrowser.rawValue
+            forKey: Self.forcedMirrorPrefix + ManagedDevicePolicyKey.disableFileTransfer.rawValue
         )
         let policy = ManagedDevicePolicy(
             defaults: appDefaults,
@@ -150,9 +115,9 @@ struct ManagedDevicePolicyTests {
             forcedObject: Self.probe
         )
 
-        #expect(policy.isEnforced(.disableEmbeddedBrowser))
+        #expect(policy.isEnforced(.disableFileTransfer))
         // Write suppression is scoped to the app's own domain.
-        #expect(!policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.disableEmbeddedBrowser.rawValue))
+        #expect(!policy.isKeyForcedInAppDomain(ManagedDevicePolicyKey.disableFileTransfer.rawValue))
     }
 
     @Test func appDomainForcedValueWinsOverTheReleaseDomain() throws {
@@ -161,7 +126,7 @@ struct ManagedDevicePolicyTests {
         let (releaseDefaults, releaseCleanup) = try makeSuite("precedenceRelease")
         defer { releaseCleanup() }
 
-        let key = ManagedDevicePolicyKey.disableRemoteControl.rawValue
+        let key = ManagedDevicePolicyKey.disableCustomSidebars.rawValue
         appDefaults.set(false, forKey: Self.forcedMirrorPrefix + key)
         releaseDefaults.set(true, forKey: Self.forcedMirrorPrefix + key)
         let policy = ManagedDevicePolicy(
@@ -170,8 +135,8 @@ struct ManagedDevicePolicyTests {
             forcedObject: Self.probe
         )
 
-        #expect(policy.forcedBool(for: .disableRemoteControl) == false)
-        #expect(!policy.isEnforced(.disableRemoteControl))
+        #expect(policy.forcedBool(for: .disableCustomSidebars) == false)
+        #expect(!policy.isEnforced(.disableCustomSidebars))
     }
 
     @Test func releaseBuildHasNoFallbackDomain() {
@@ -179,7 +144,7 @@ struct ManagedDevicePolicyTests {
             bundleIdentifier: ManagedDevicePolicy.releasePayloadDomain
         ) == nil)
         #expect(ManagedDevicePolicy.defaultReleaseDomainDefaults(
-            bundleIdentifier: "com.cmuxterm.app.debug"
+            bundleIdentifier: "com.comux.app.debug"
         ) != nil)
     }
 
@@ -187,23 +152,9 @@ struct ManagedDevicePolicyTests {
         // These strings are the administrator-facing contract documented in
         // docs/managed-device-policies.md; renaming them breaks deployed
         // configuration profiles.
-        #expect(ManagedDevicePolicyKey.disableEmbeddedBrowser.rawValue == "DisableEmbeddedBrowser")
-        #expect(ManagedDevicePolicyKey.disableRemoteControl.rawValue == "DisableRemoteControl")
-        #expect(ManagedDevicePolicyKey.disableCloud.rawValue == "DisableCloud")
-        #expect(ManagedDevicePolicyKey.disableRemoteConnections.rawValue == "DisableRemoteConnections")
         #expect(ManagedDevicePolicyKey.disableFileTransfer.rawValue == "DisableFileTransfer")
-        #expect(ManagedDevicePolicyKey.disableIrohNetworking.rawValue == "DisableIrohNetworking")
-        #expect(ManagedDevicePolicyKey.disableTelemetry.rawValue == "DisableTelemetry")
-        #expect(ManagedDevicePolicyKey.disableAutoUpdate.rawValue == "DisableAutoUpdate")
-        #expect(ManagedDevicePolicyKey.disableAutomationWebhooks.rawValue == "DisableAutomationWebhooks")
-        #expect(ManagedDevicePolicyKey.disableTLSTrustBypass.rawValue == "DisableTLSTrustBypass")
-        #expect(ManagedDevicePolicyKey.disableComputerUse.rawValue == "DisableComputerUse")
         #expect(ManagedDevicePolicyKey.disableCustomSidebars.rawValue == "DisableCustomSidebars")
-        #expect(ManagedDevicePolicyKey.disableAICredentialUpload.rawValue == "DisableAICredentialUpload")
-        #expect(ManagedDevicePolicyKey.browserURLAllowlist.rawValue == "BrowserURLAllowlist")
-        #expect(ManagedDevicePolicyKey.browserAllowLocalhost.rawValue == "BrowserAllowLocalhost")
-        #expect(ManagedDevicePolicyKey.browserAllowLocalFiles.rawValue == "BrowserAllowLocalFiles")
-        #expect(ManagedDevicePolicyKey.allowStyleKeys == [.browserAllowLocalhost, .browserAllowLocalFiles])
-        #expect(ManagedDevicePolicy.releasePayloadDomain == "com.cmuxterm.app")
+        #expect(ManagedDevicePolicyKey.allowStyleKeys.isEmpty)
+        #expect(ManagedDevicePolicy.releasePayloadDomain == "com.comux.app")
     }
 }

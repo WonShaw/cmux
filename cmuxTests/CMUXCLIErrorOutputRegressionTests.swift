@@ -2349,11 +2349,9 @@ import Testing
             (["settings", "invalid-target"], "Unknown settings subcommand 'invalid-target'"),
             (["shortcuts", "--invalid"], "shortcuts: unknown flag '--invalid'"),
             (["open"], "open requires at least one path or URL"),
-            (["diff", "one.patch", "two.patch"], "diff accepts at most one patch file"),
             (["restore", "codex", UUID().uuidString.lowercased()], "restore: cmux is still opening."),
             (["fork", "pi", UUID().uuidString.lowercased()], "fork: cmux is still opening."),
             (["restore-session", "--invalid"], "restore-session: unknown flag '--invalid'"),
-            (["feedback", "--invalid"], "feedback: unknown flag '--invalid'"),
         ]
 
         for testCase in cases {
@@ -2614,7 +2612,7 @@ import Testing
         let fakeStableCLIPath = try fakeTaggedBundledCLIPath(
             sourceCLIPath: cliPath,
             tagSlug: "stable-\(UUID().uuidString.lowercased())",
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             bundleName: "cmux"
         )
         let defaultResponder = try UnixSocketResponder(path: defaultStableSocketPath, response: "OK DEFAULT")
@@ -2679,7 +2677,7 @@ import Testing
         let fakeStableCLIPath = try fakeTaggedBundledCLIPath(
             sourceCLIPath: cliPath,
             tagSlug: "stable-\(UUID().uuidString.lowercased())",
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             bundleName: "cmux"
         )
         let defaultResponder = try UnixSocketResponder(path: defaultStableSocketPath, response: "OK DEFAULT")
@@ -2733,7 +2731,7 @@ import Testing
         let fakeStableCLIPath = try fakeTaggedBundledCLIPath(
             sourceCLIPath: cliPath,
             tagSlug: "stable-\(UUID().uuidString.lowercased())",
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.comux.app",
             bundleName: "cmux"
         )
         let defaultResponder = try UnixSocketResponder(path: defaultStableSocketPath, response: "OK DEFAULT")
@@ -2925,7 +2923,7 @@ import Testing
         // run's expectation and appends to its list, so the identifier carries a per-run
         // suffix. The CLI takes the identifier from CMUX_BUNDLE_ID here because this
         // socket file name has no channel prefix to derive one from.
-        let bundleIdentifier = "com.cmuxterm.app.debug.issue-4355-test."
+        let bundleIdentifier = "com.comux.app.debug.issue-4355-test."
             + UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
         let notificationQueue = OperationQueue()
         notificationQueue.maxConcurrentOperationCount = 1
@@ -3007,14 +3005,14 @@ import Testing
         try writeTheme(named: "Theme A", background: "#101010", to: themesURL)
 
         // The reload target is derived from the socket file name, not from CMUX_BUNDLE_ID:
-        // `cmux-debug-<slug>.sock` becomes `com.cmuxterm.app.debug.<slug>`, where every run of
+        // `cmux-debug-<slug>.sock` becomes `com.comux.app.debug.<slug>`, where every run of
         // non-alphanumerics in the slug collapses to a dot. A raw UUID here would put its dashes
         // into the identifier as dots, so keep the unique part hex-only and the expected
         // identifier stays a plain template rather than a call into the CLI's own helper.
         let uniqueSuffix = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
         let socketPath = "/tmp/cmux-debug-active-theme-\(uniqueSuffix).sock"
-        let staleBundleIdentifier = "com.cmuxterm.app.debug.stale.theme"
-        let targetBundleIdentifier = "com.cmuxterm.app.debug.active.theme.\(uniqueSuffix)"
+        let staleBundleIdentifier = "com.comux.app.debug.stale.theme"
+        let targetBundleIdentifier = "com.comux.app.debug.active.theme.\(uniqueSuffix)"
         let reloadExpectation = expectation(description: "cmux themes set targets the resolved socket bundle")
         let notificationQueue = OperationQueue()
         notificationQueue.maxConcurrentOperationCount = 1
@@ -3123,7 +3121,7 @@ import Testing
         let socketPath = "/tmp/cmux-theme-picker-\(UUID().uuidString.prefix(8)).sock"
         let responder = try UnixSocketResponder(path: socketPath, response: "OK")
         defer { responder.stop() }
-        let bundleIdentifier = "com.cmuxterm.app.debug.theme-picker.\(UUID().uuidString.lowercased())"
+        let bundleIdentifier = "com.comux.app.debug.theme-picker.\(UUID().uuidString.lowercased())"
         let reloadExpectation = expectation(description: "bare cmux themes posts final reload notification")
         let notificationQueue = OperationQueue()
         notificationQueue.maxConcurrentOperationCount = 1
@@ -3242,88 +3240,6 @@ import Testing
             result.diagnostics
         )
         XCTAssertEqual(responder.receivedRequests, [], result.diagnostics)
-    }
-
-    @Test func testBrowserDownloadWaitUsesRequestedTimeoutForSocketResponse() throws {
-        let cliPath = try bundledCLIPath()
-        let socketPath = "/tmp/cmux-dw-\(UUID().uuidString.prefix(8)).sock"
-        let response = #"{"ok":true,"result":{"downloaded":true}}"#
-        let responder = try UnixSocketResponder(path: socketPath, response: response, responseDelay: 0.4)
-        defer { responder.stop() }
-
-        var environment = ProcessInfo.processInfo.environment
-        for key in Array(environment.keys) where key.hasPrefix("CMUX_") {
-            environment.removeValue(forKey: key)
-        }
-        environment["CMUX_SOCKET_PATH"] = socketPath
-        environment["CMUX_CLI_SENTRY_DISABLED"] = "1"
-        environment["CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC"] = "0.1"
-
-        let result = runProcess(
-            executablePath: cliPath,
-            arguments: [
-                "browser",
-                UUID().uuidString,
-                "download",
-                "wait",
-                "--timeout-ms",
-                "1000",
-            ],
-            environment: environment,
-            // A deliberate cap, not a hang guard: the responder answers after 0.4s and the
-            // request asks for 1000ms, so this run has to finish well inside 3s. Raising it
-            // to the suite default would let a CLI that ignored --timeout-ms still pass.
-            timeout: 3
-        )
-
-        XCTAssertFalse(result.timedOut, result.diagnostics)
-        XCTAssertEqual(result.status, 0, result.diagnostics)
-        XCTAssertEqual(
-            result.stdout.trimmingCharacters(in: .whitespacesAndNewlines),
-            "OK",
-            result.diagnostics
-        )
-    }
-
-    @Test func testBrowserDownloadWaitDefaultTimeoutMatchesServerDefaultWindow() throws {
-        let cliPath = try bundledCLIPath()
-        let socketPath = "/tmp/cmux-dw-\(UUID().uuidString.prefix(8)).sock"
-        let response = #"{"ok":true,"result":{"downloaded":true}}"#
-        let responder = try UnixSocketResponder(path: socketPath, response: response, responseDelay: 10.5)
-        defer { responder.stop() }
-
-        var environment = ProcessInfo.processInfo.environment
-        for key in Array(environment.keys) where key.hasPrefix("CMUX_") {
-            environment.removeValue(forKey: key)
-        }
-        environment["CMUX_SOCKET_PATH"] = socketPath
-        environment["CMUX_CLI_SENTRY_DISABLED"] = "1"
-        environment["CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC"] = "0.1"
-
-        let result = runProcess(
-            executablePath: cliPath,
-            arguments: [
-                "browser",
-                UUID().uuidString,
-                "download",
-                "wait",
-            ],
-            environment: environment,
-            // A deliberate cap, and the only upper bound that gives this test meaning: the
-            // responder answers after 10.5s, so waiting the server's default window has to
-            // land between there and 16s. Under the suite default a CLI that waited a full
-            // minute would still pass, and "matches the server default window" would stop
-            // being a claim about anything.
-            timeout: 16
-        )
-
-        XCTAssertFalse(result.timedOut, result.diagnostics)
-        XCTAssertEqual(result.status, 0, result.diagnostics)
-        XCTAssertEqual(
-            result.stdout.trimmingCharacters(in: .whitespacesAndNewlines),
-            "OK",
-            result.diagnostics
-        )
     }
 
     @Test func testDotPathOpenBypassesProtectedSocketForExternalCLI() throws {
@@ -3877,7 +3793,7 @@ import Testing
         try FileManager.default.createDirectory(at: binURL, withIntermediateDirectories: true)
 
         let info: [String: Any] = [
-            "CFBundleIdentifier": bundleIdentifier ?? "com.cmuxterm.app.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))",
+            "CFBundleIdentifier": bundleIdentifier ?? "com.comux.app.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))",
             "CFBundleName": bundleName ?? "cmux DEV \(tagSlug)",
             "CFBundlePackageType": "APPL"
         ]

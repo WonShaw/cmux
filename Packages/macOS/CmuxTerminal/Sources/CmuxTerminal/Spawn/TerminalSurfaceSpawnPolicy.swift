@@ -51,11 +51,6 @@ public struct TerminalSurfaceSpawnPolicy: Sendable {
     /// Whether sidebar git-status watching is enabled (`CMUX_NO_GIT_WATCH`).
     public var watchGitStatusEnabled: Bool
 
-    /// Whether sidebar pull-request watching is enabled (`CMUX_NO_PR_WATCH`).
-    public var showPullRequestsEnabled: Bool
-
-    /// Whether supported agent sessions may attach the local computer-use MCP server.
-    public var computerUseEnabled: Bool
 
     /// Creates a spawn policy snapshot.
     public init(
@@ -71,9 +66,7 @@ public struct TerminalSurfaceSpawnPolicy: Sendable {
         kiroNotificationLevel: String,
         ampHooksEnabled: Bool,
         shellIntegrationEnabled: Bool,
-        watchGitStatusEnabled: Bool,
-        showPullRequestsEnabled: Bool,
-        computerUseEnabled: Bool = true
+        watchGitStatusEnabled: Bool
     ) {
         self.socketAuthenticationEnvironment = socketAuthenticationEnvironment
         self.claudeHooksEnabled = claudeHooksEnabled
@@ -88,7 +81,5 @@ public struct TerminalSurfaceSpawnPolicy: Sendable {
         self.ampHooksEnabled = ampHooksEnabled
         self.shellIntegrationEnabled = shellIntegrationEnabled
         self.watchGitStatusEnabled = watchGitStatusEnabled
-        self.showPullRequestsEnabled = showPullRequestsEnabled
-        self.computerUseEnabled = computerUseEnabled
     }
 }

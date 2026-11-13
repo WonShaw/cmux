@@ -26,15 +26,4 @@ extension NSImageView {
         contentTintColor = tint
     }
 
-    /// Reserves one leading accessory slot without changing the row's vertical layout.
-    func layoutLeadingSidebarWorkspaceAccessory(
-        minX: CGFloat, centerY: CGFloat, side: CGFloat, spacing: CGFloat, apply: Bool
-    ) -> CGFloat {
-        guard !isHidden else { return minX }
-        if apply {
-            frame = NSRect(x: minX, y: centerY - side / 2, width: side, height: side)
-        }
-        return minX + side + spacing
-    }
-
 }

@@ -3,11 +3,10 @@ public import Foundation
 public import Observation
 
 /// The per-workspace sidebar-metadata sub-model: owns the sidebar status
-/// entries, metadata blocks, log entries, progress, and git-branch /
-/// pull-request presentation state the legacy `Workspace` god object kept as
+/// entries, metadata blocks, log entries, progress, and git-branch
+/// presentation state the legacy `Workspace` god object kept as
 /// loose `@Published` stored properties (`statusEntries`, `metadataBlocks`,
-/// `logEntries`, `progress`, `gitBranch`, `panelGitBranches`, `pullRequest`,
-/// `panelPullRequests`).
+/// `logEntries`, `progress`, `gitBranch`, `panelGitBranches`).
 ///
 /// `Workspace` owns one instance and forwards each former stored property
 /// through a computed `get`/`set` pair, so every call site (`statusEntries[key]
@@ -61,18 +60,6 @@ public final class WorkspaceSidebarMetadataModel {
         didSet { panelGitBranchesSubject.send(panelGitBranches) }
     }
 
-    /// The workspace-level pull-request state shown in the sidebar (legacy
-    /// `Workspace.pullRequest`).
-    public var pullRequest: SidebarPullRequestState? {
-        didSet { pullRequestSubject.send(pullRequest) }
-    }
-
-    /// Per-panel pull-request state keyed by panel id (legacy
-    /// `Workspace.panelPullRequests`).
-    public var panelPullRequests: [UUID: SidebarPullRequestState] = [:] {
-        didSet { panelPullRequestsSubject.send(panelPullRequests) }
-    }
-
     /// Per-panel directory display labels keyed by panel id, reported via
     /// `report_pwd <label> --path=<real-path>`. Display-only sidebar text:
     /// the File Explorer, Finder root, and git probing always use the real
@@ -96,10 +83,6 @@ public final class WorkspaceSidebarMetadataModel {
     private lazy var gitBranchSubject = CurrentValueSubject<SidebarGitBranchState?, Never>(gitBranch)
     @ObservationIgnored
     private lazy var panelGitBranchesSubject = CurrentValueSubject<[UUID: SidebarGitBranchState], Never>(panelGitBranches)
-    @ObservationIgnored
-    private lazy var pullRequestSubject = CurrentValueSubject<SidebarPullRequestState?, Never>(pullRequest)
-    @ObservationIgnored
-    private lazy var panelPullRequestsSubject = CurrentValueSubject<[UUID: SidebarPullRequestState], Never>(panelPullRequests)
     @ObservationIgnored
     private lazy var panelDirectoryDisplayLabelsSubject = CurrentValueSubject<[UUID: String], Never>(panelDirectoryDisplayLabels)
 
@@ -145,18 +128,6 @@ public final class WorkspaceSidebarMetadataModel {
     /// every change (replaces the legacy `Workspace.$panelGitBranches`).
     public var panelGitBranchesPublisher: AnyPublisher<[UUID: SidebarGitBranchState], Never> {
         panelGitBranchesSubject.eraseToAnyPublisher()
-    }
-
-    /// Emits the current workspace pull-request state on subscription, then on
-    /// every change (replaces the legacy `Workspace.$pullRequest`).
-    public var pullRequestPublisher: AnyPublisher<SidebarPullRequestState?, Never> {
-        pullRequestSubject.eraseToAnyPublisher()
-    }
-
-    /// Emits the current per-panel pull-request states on subscription, then on
-    /// every change (replaces the legacy `Workspace.$panelPullRequests`).
-    public var panelPullRequestsPublisher: AnyPublisher<[UUID: SidebarPullRequestState], Never> {
-        panelPullRequestsSubject.eraseToAnyPublisher()
     }
 
     /// Emits the current per-panel directory display labels on subscription,
@@ -217,13 +188,6 @@ public final class WorkspaceSidebarMetadataModel {
     /// - Parameter gitBranch: The new git-branch state, or `nil` to clear it.
     public func updateGitBranch(_ gitBranch: SidebarGitBranchState?) {
         self.gitBranch = gitBranch
-    }
-
-    /// Sets or clears the workspace-level pull-request state (legacy
-    /// `Workspace.pullRequest = …`).
-    /// - Parameter pullRequest: The new pull-request state, or `nil` to clear.
-    public func updatePullRequest(_ pullRequest: SidebarPullRequestState?) {
-        self.pullRequest = pullRequest
     }
 
     /// Returns the metadata blocks sorted for sidebar display: descending

@@ -10,34 +10,22 @@ import Foundation
 enum TerminalNotificationOrigin: Hashable, Sendable {
     /// A local process (socket caller, OSC from a local PTY, the app itself).
     case local
-    /// A `cmux ssh` remote host, confined to the workspace that owns the relay.
-    case sshRelay(ownerWorkspaceID: UUID)
-    /// A cmux Cloud machine's daemon event stream, attributed by the Mac's surface catalog.
-    case cloudVM(machineID: String)
 
     static let localWireValue = "local"
-    static let sshRelayWirePrefix = "ssh-relay:"
-    static let cloudVMWirePrefix = "cloud-vm:"
 
-    /// `local`, `ssh-relay:<workspace uuid>`, or `cloud-vm:<machine id>`; what hooks see
+    /// `local`; what hooks see
     /// in `CMUX_NOTIFICATION_ORIGIN` and in the envelope's `origin.value`.
     var wireValue: String {
         switch self {
         case .local:
             return Self.localWireValue
-        case .sshRelay(let ownerWorkspaceID):
-            return Self.sshRelayWirePrefix + ownerWorkspaceID.uuidString.lowercased()
-        case .cloudVM(let machineID):
-            return Self.cloudVMWirePrefix + machineID
         }
     }
 
-    /// Envelope `origin.kind`: `local`, `ssh-relay`, or `cloud-vm`.
+    /// Envelope `origin.kind`: `local` or `ssh-relay`.
     var kind: String {
         switch self {
         case .local: return "local"
-        case .sshRelay: return "ssh-relay"
-        case .cloudVM: return "cloud-vm"
         }
     }
 
@@ -49,15 +37,7 @@ enum TerminalNotificationOrigin: Hashable, Sendable {
     /// Parses a wire value; anything unrecognized reads as `.local`, so a persisted
     /// history record written by a newer build still decodes.
     init(wireValue: String) {
-        if wireValue.hasPrefix(Self.sshRelayWirePrefix),
-           let id = UUID(uuidString: String(wireValue.dropFirst(Self.sshRelayWirePrefix.count))) {
-            self = .sshRelay(ownerWorkspaceID: id)
-        } else if wireValue.hasPrefix(Self.cloudVMWirePrefix) {
-            let machineID = String(wireValue.dropFirst(Self.cloudVMWirePrefix.count))
-            self = machineID.isEmpty ? .local : .cloudVM(machineID: machineID)
-        } else {
-            self = .local
-        }
+        self = .local
     }
 }
 
@@ -74,18 +54,13 @@ extension TerminalNotificationOrigin: Codable {
 }
 
 /// The `origin` block of the notification-hook envelope. Informational input for hooks
-/// (`case "$CMUX_NOTIFICATION_ORIGIN" in cloud-vm:*) …`), never patchable by them.
+/// (`case "$CMUX_NOTIFICATION_ORIGIN" in ssh-relay:*) …`), never patchable by them.
 struct TerminalNotificationPolicyOriginContext: Codable, Sendable, Equatable {
     var kind: String
     var value: String
-    /// The cloud machine id for `cloud-vm`; absent otherwise.
-    var machine: String?
 
     init(_ origin: TerminalNotificationOrigin) {
         kind = origin.kind
         value = origin.wireValue
-        if case .cloudVM(let machineID) = origin {
-            machine = machineID
-        }
     }
 }

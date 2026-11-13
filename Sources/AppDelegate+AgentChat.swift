@@ -119,10 +119,6 @@ extension AppDelegate {
             NSSound.beep()
             return false
         }
-        guard BrowserAvailabilitySettings.isEnabled() else {
-            NSSound.beep()
-            return false
-        }
         AgentChatThemeSync.start()
         guard AgentChatActionInFlightGate.begin() else {
             NSSound.beep()
@@ -146,16 +142,15 @@ extension AppDelegate {
                 )
                 return
             }
-            guard let workspace = self.openAgentChatWorkspace(
-                tabManager: tabManager,
-                url: browserURL
-            ) else {
+            // The embedded browser pane is gone: the chat UI opens in the
+            // system default browser, in response to this explicit user action.
+            guard NSWorkspace.shared.open(browserURL) else {
                 NSSound.beep()
                 return
             }
             if !availability.isReachable {
                 self.postAgentChatServerUnavailableNotification(
-                    workspace: workspace,
+                    workspace: tabManager.selectedWorkspace,
                     agentChat: agentChat
                 )
             }
@@ -163,48 +158,6 @@ extension AppDelegate {
         }
         return true
     }
-
-    @discardableResult
-    private func openAgentChatWorkspace(
-        tabManager: TabManager,
-        url: URL
-    ) -> Workspace? {
-        let beforeIds = Set(tabManager.tabs.map(\.id))
-        let workspaceName = String(
-            localized: "workspace.agentChat.defaultTitle",
-            defaultValue: "Agent Chat"
-        )
-        let workspaceDefinition = CmuxWorkspaceDefinition(
-            name: workspaceName,
-            layout: .pane(CmuxPaneDefinition(surfaces: [
-                CmuxSurfaceDefinition(
-                    type: .browser,
-                    name: workspaceName,
-                    command: nil,
-                    cwd: nil,
-                    env: nil,
-                    url: url.absoluteString,
-                    focus: true
-                ),
-            ]))
-        )
-        let command = CmuxCommandDefinition(
-            name: workspaceName,
-            workspace: workspaceDefinition
-        )
-        let baseCwd = tabManager.selectedWorkspace?.currentDirectory
-            ?? FileManager.default.homeDirectoryForCurrentUser.path
-        guard CmuxConfigExecutor.executeWorkspaceCommand(
-            command: command,
-            workspace: workspaceDefinition,
-            tabManager: tabManager,
-            baseCwd: baseCwd
-        ) else {
-            return nil
-        }
-        return tabManager.tabs.first { !beforeIds.contains($0.id) } ?? tabManager.selectedWorkspace
-    }
-
 
     private func ensureAgentChatServerAvailable(
         _ agentChat: CmuxAgentChatConfiguration,
@@ -391,6 +344,7 @@ extension AppDelegate {
         healthURL: URL,
         timeout: TimeInterval
     ) async -> Bool {
+        guard agentSessionIsLoopbackURL(healthURL) else { return false }
         var request = URLRequest(
             url: healthURL,
             cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,

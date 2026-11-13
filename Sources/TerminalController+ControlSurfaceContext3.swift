@@ -28,12 +28,6 @@ extension TerminalController {
     // MARK: - move (bridge to still-app-side v2SurfaceMove)
 
     func controlSurfaceMove(params: [String: JSONValue]) -> ControlCallResult {
-        if let surfaceID = remoteTmuxMirrorContainerID(in: params) {
-            return .err(
-                code: "not_found", message: "Surface not found",
-                data: .object(["surface_id": .string(surfaceID.uuidString)])
-            )
-        }
         // `v2SurfaceMove` walks windows/workspaces/panes and mutates Bonsplit; it
         // stays in TerminalController.swift (shared with pane.join). We forward the
         // raw params and bridge its Foundation result, exactly as pane.join does.
@@ -322,13 +316,6 @@ extension TerminalController {
         case .unresolved(let resolution): return resolution
         case .surface(let id): requestedSurfaceID = id
         }
-        guard remoteRelayTargetIsCurrent(
-            routing: routing,
-            workspace: ws,
-            surfaceID: requestedSurfaceID
-        ) else {
-            return .surfaceNotFoundForID
-        }
         guard ws.controlTerminalTarget(for: requestedSurfaceID) != nil else {
             return .surfaceNotTerminal(requestedSurfaceID)
         }
@@ -336,14 +323,6 @@ extension TerminalController {
             return .surfaceUnavailable(requestedSurfaceID)
         }
         let surfaceId = target.surfaceID
-        if let remote = controlRemoteTmuxSendText(
-            workspace: ws,
-            tabManager: tabManager,
-            surfaceID: surfaceId,
-            text: text
-        ) {
-            return remote
-        }
         let queued: Bool
         switch target.sendInputResult(text) {
         case .sent:
@@ -429,13 +408,6 @@ extension TerminalController {
         case .unresolved(let resolution): return resolution
         case .surface(let id): requestedSurfaceID = id
         }
-        guard remoteRelayTargetIsCurrent(
-            routing: routing,
-            workspace: ws,
-            surfaceID: requestedSurfaceID
-        ) else {
-            return .surfaceNotFoundForID
-        }
         guard ws.controlTerminalTarget(for: requestedSurfaceID) != nil else {
             return .surfaceNotTerminal(requestedSurfaceID)
         }
@@ -443,14 +415,6 @@ extension TerminalController {
             return .surfaceUnavailable(requestedSurfaceID)
         }
         let surfaceId = target.surfaceID
-        if let remote = controlRemoteTmuxSendKey(
-            workspace: ws,
-            tabManager: tabManager,
-            surfaceID: surfaceId,
-            key: key
-        ) {
-            return remote
-        }
         let sendResult = target.sendNamedKeyResult(key)
         switch sendResult {
         case .sent:

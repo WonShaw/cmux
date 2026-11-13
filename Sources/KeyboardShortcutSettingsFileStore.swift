@@ -4,13 +4,13 @@ import CmuxSettings
 import Foundation
 import os
 
-nonisolated private let cmuxSettingsFileStoreLogger = Logger(subsystem: "com.cmuxterm.app", category: "SettingsStore")
+nonisolated private let cmuxSettingsFileStoreLogger = Logger(subsystem: "com.comux.app", category: "SettingsStore")
 
 final class CmuxSettingsFileStore {
     static let currentSchemaVersion = 1
     static let schemaURLString = "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json"
     private static let legacySchemaURLString = "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux-settings.schema.json"
-    private static let releaseBundleIdentifier = "com.cmuxterm.app"
+    private static let releaseBundleIdentifier = "com.comux.app"
     private static let backupsDefaultsKey = "cmux.settingsFile.backups.v1"
     private static let importedManagedDefaultsDefaultsKey = "cmux.settingsFile.importedManagedDefaults.v1"
     fileprivate static let socketPasswordBackupIdentifier = "automation.socketPassword"
@@ -80,13 +80,7 @@ final class CmuxSettingsFileStore {
         passwordStore: SocketControlPasswordStore = SocketControlPasswordStore(),
         startWatching: Bool = true,
         isUserDefaultsKeyForcedByProfile: @escaping (String) -> Bool = { key in
-            let policy = ManagedDevicePolicy()
-            if key == BrowserURLAllowlistPolicy.userDefaultsKey {
-                return policy.isBrowserURLAllowlistLocked(
-                    userDefaultsKey: BrowserURLAllowlistPolicy.userDefaultsKey
-                )
-            }
-            return policy.isKeyForcedInAppDomain(key)
+            ManagedDevicePolicy().isKeyForcedInAppDomain(key)
         },
         onWatchedFileReload: @escaping @MainActor @Sendable (String) -> Void = { _ in }
     ) {
@@ -396,12 +390,6 @@ final class CmuxSettingsFileStore {
         }
         if let automationSection = root["automation"] as? [String: Any] {
             parseAutomationSection(automationSection, sourcePath: sourcePath, snapshot: &snapshot)
-        }
-        if let browserSection = root["browser"] as? [String: Any] {
-            parseBrowserSection(browserSection, sourcePath: sourcePath, snapshot: &snapshot)
-        }
-        if let mobileSection = root["mobile"] as? [String: Any] {
-            parseMobileSection(mobileSection, sourcePath: sourcePath, snapshot: &snapshot)
         }
         if let markdownSection = root["markdown"] as? [String: Any] {
             parseMarkdownSection(markdownSection, sourcePath: sourcePath, snapshot: &snapshot)
@@ -835,62 +823,6 @@ final class CmuxSettingsFileStore {
         }
     }
 
-    private func parseBrowserSection(
-        _ section: [String: Any],
-        sourcePath: String,
-        snapshot: inout ResolvedSettingsSnapshot
-    ) {
-        let browserSearchSettings = BrowserSearchSettingsStore()
-
-        if section.keys.contains("defaultZoomLevel") {
-            if let rawZoom = jsonDouble(section["defaultZoomLevel"]), rawZoom.isFinite {
-                snapshot.managedUserDefaults[BrowserZoomSettings.userDefaultsKey] = .double(
-                    BrowserZoomSettings().normalized(rawZoom)
-                )
-            } else {
-                logInvalid("browser.defaultZoomLevel", sourcePath: sourcePath)
-            }
-        }
-
-        if let raw = jsonString(section["defaultSearchEngine"]) {
-            guard let engine = BrowserSearchEngine(rawValue: raw) else {
-                logInvalid("browser.defaultSearchEngine", sourcePath: sourcePath)
-                return
-            }
-            snapshot.managedUserDefaults[BrowserSearchSettingsStore.searchEngineKey] = .string(engine.rawValue)
-        }
-        if let raw = jsonString(section["customSearchEngineName"]) {
-            snapshot.managedUserDefaults[BrowserSearchSettingsStore.customSearchEngineNameKey] = .string(
-                browserSearchSettings.normalizedCustomSearchEngineName(raw)
-                    ?? BrowserSearchSettingsStore.defaultCustomSearchEngineName
-            )
-        }
-        if let raw = jsonString(section["customSearchEngineURLTemplate"]) {
-            if browserSearchSettings.isValidSearchURLTemplate(raw) {
-                snapshot.managedUserDefaults[BrowserSearchSettingsStore.customSearchEngineURLTemplateKey] = .string(raw)
-            } else {
-                logInvalid("browser.customSearchEngineURLTemplate", sourcePath: sourcePath)
-            }
-        }
-        applyBooleanSettings(BrowserSettingsFileMapping.booleanSettings, from: section, sourcePath: sourcePath, snapshot: &snapshot)
-        applyStringSettings(BrowserSettingsFileMapping.stringSettings, from: section, snapshot: &snapshot)
-        if let raw = jsonString(section["theme"]) {
-            guard let mode = BrowserThemeMode(rawValue: raw) else {
-                logInvalid("browser.theme", sourcePath: sourcePath)
-                return
-            }
-            snapshot.managedUserDefaults[BrowserThemeSettings.modeKey] = .string(mode.rawValue)
-        }
-        if let value = jsonDouble(section["hiddenWebViewDiscardDelaySeconds"]) {
-            guard let delay = BrowserHiddenWebViewDiscardPolicy.resolvedHiddenDelay(value) else {
-                logInvalid("browser.hiddenWebViewDiscardDelaySeconds", sourcePath: sourcePath)
-                return
-            }
-            snapshot.managedUserDefaults[BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey] = .double(delay)
-        }
-        applyNormalizedStringArraySettings(BrowserSettingsFileMapping.stringArraySettings, from: section, sourcePath: sourcePath, snapshot: &snapshot)
-    }
-
     private func parseWorkspaceGroupsSection(
         _ section: [String: Any],
         sourcePath: String,
@@ -1239,14 +1171,6 @@ final class CmuxSettingsFileStore {
             guard defaults.object(forKey: defaultsKey) != nil else { return .absent }
             return .double(defaults.double(forKey: defaultsKey))
         case .string, .nullableString:
-            // `browserExternalOpenPatterns` was persisted as an array by
-            // older releases. Preserve the raw array in the backup instead
-            // of routing it through the bounded runtime matcher; the catalog
-            // still decodes that array as a newline string when it is active.
-            if defaultsKey == BrowserExternalURLPolicy.userDefaultsKey,
-               let legacyArray = defaults.array(forKey: defaultsKey) as? [String] {
-                return .stringArray(legacyArray)
-            }
             guard let value = defaults.string(forKey: defaultsKey) else { return .absent }
             return .string(value)
         case .stringArray:
@@ -1731,24 +1655,6 @@ final class CmuxSettingsFileStore {
         for setting in settings {
             if let raw = jsonString(section[setting.jsonKey]) {
                 snapshot.managedUserDefaults[setting.defaultsKey] = .string(raw)
-            }
-        }
-    }
-
-    private func applyNormalizedStringArraySettings(
-        _ settings: [SettingsFileStringArrayMapping],
-        from section: [String: Any],
-        sourcePath: String,
-        snapshot: inout ResolvedSettingsSnapshot
-    ) {
-        for setting in settings {
-            if let values = jsonStringArray(section[setting.jsonKey]) {
-                let normalized = values
-                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                    .filter { !$0.isEmpty }
-                snapshot.managedUserDefaults[setting.defaultsKey] = .string(normalized.joined(separator: "\n"))
-            } else if section.keys.contains(setting.jsonKey) {
-                logInvalid(setting.invalidPath, sourcePath: sourcePath)
             }
         }
     }

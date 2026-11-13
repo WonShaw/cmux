@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import os.log
 
-nonisolated private let menuBarProfilingLogger = Logger(subsystem: "com.cmuxterm.app", category: "MenuBarProfiling")
+nonisolated private let menuBarProfilingLogger = Logger(subsystem: "com.comux.app", category: "MenuBarProfiling")
 
 enum MenuBarProfilingLauncher {
     static let defaultDurationSeconds = 15
@@ -10,10 +10,6 @@ enum MenuBarProfilingLauncher {
 
     static func bundledScriptURL(bundle: Bundle = .main) -> URL? {
         bundle.url(forResource: "start-cmux-profiling", withExtension: nil, subdirectory: "bin")
-    }
-
-    static func bundledSubmitterURL(bundle: Bundle = .main) -> URL? {
-        bundle.url(forResource: "submit-cmux-profile", withExtension: nil, subdirectory: "bin")
     }
 
     static func estimatedCaptureSeconds(
@@ -26,15 +22,11 @@ enum MenuBarProfilingLauncher {
     static func arguments(
         pid: Int32 = ProcessInfo.processInfo.processIdentifier,
         durationSeconds: Int = defaultDurationSeconds,
-        openOutput: Bool = false,
-        submitProfile: Bool = true
+        openOutput: Bool = false
     ) -> [String] {
         var args = ["--pid", String(pid), "--duration", String(durationSeconds)]
         if openOutput {
             args.append("--open-output")
-        }
-        if !submitProfile {
-            args.append("--no-submit")
         }
         return args
     }

@@ -163,8 +163,6 @@ struct TabsVisibleSidebarView: View {
         switch kind {
         case .terminal:
             return "terminal"
-        case .browser:
-            return "globe"
         case .markdown:
             return "doc.text"
         case .filePreview:

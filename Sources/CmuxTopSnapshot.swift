@@ -852,9 +852,6 @@ final class CmuxTopProcessSnapshot: @unchecked Sendable {
         if let reason = process.cmuxAttributionReason {
             return reason
         }
-        if rootPIDs.contains(process.pid), isWebKitWebContentProcess(process) {
-            return "webview-root-pid"
-        }
         if rootPIDs.contains(process.pid) {
             return "explicit-root-pid"
         }
@@ -862,13 +859,6 @@ final class CmuxTopProcessSnapshot: @unchecked Sendable {
             return "child-process"
         }
         return "included-process"
-    }
-
-    private func isWebKitWebContentProcess(_ process: CmuxTopProcessInfo) -> Bool {
-        if process.name.localizedCaseInsensitiveContains("WebContent") {
-            return true
-        }
-        return process.path?.localizedCaseInsensitiveContains("com.apple.WebKit.WebContent") == true
     }
 
     private func processSortKey(_ pid: Int) -> String {

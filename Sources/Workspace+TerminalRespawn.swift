@@ -82,10 +82,8 @@ extension Workspace {
             closePanel: false,
             publishSurfaceClosedEvent: false,
             clearSurfaceNotifications: false,
-            requestTransferredRemoteCleanup: true,
             discardAgentHibernationTracking: false,
-            cleanupControllerSurfaceState: false,
-            preservesRemoteTerminalTracking: true
+            cleanupControllerSurfaceState: false
         )
         oldPanel.removeOwnedSessionScrollbackReplayArtifact()
         oldPanel.surface.teardownSurface()
@@ -152,7 +150,6 @@ extension Workspace {
             panelId: panelId,
             reason: "terminalRespawn"
         )
-        markRemoteTerminalSessionLaunching(surfaceId: panelId)
         scheduleTerminalGeometryReconcile()
         scheduleFocusReconcile()
         return replacementPanel

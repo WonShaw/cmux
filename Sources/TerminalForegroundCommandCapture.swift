@@ -1,4 +1,5 @@
 import CMUXAgentLaunch
+import Darwin
 import Foundation
 
 /// Resolves the shell command to save for each live terminal when capturing a
@@ -42,7 +43,7 @@ enum TerminalForegroundCommandCapture {
 
         var commands: [Int64: String] = [:]
         for (ttyDevice, process) in bestByTTY {
-            guard let argv = TerminalSSHSessionDetector.commandLineArguments(forPID: Int32(process.pid)),
+            guard let argv = commandLineArguments(forPID: Int32(process.pid)),
                   let command = commandLine(fromArgv: argv),
                   !command.isEmpty else { continue }
             commands[ttyDevice] = command
@@ -162,5 +163,58 @@ enum TerminalForegroundCommandCapture {
             return argument
         }
         return "'" + argument.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// Reads a process's argv through `KERN_PROCARGS2`.
+    private static func commandLineArguments(forPID pid: Int32) -> [String]? {
+        var mib = [CTL_KERN, KERN_PROCARGS2, pid]
+        var size: size_t = 0
+        guard sysctl(&mib, u_int(mib.count), nil, &size, nil, 0) == 0, size > 4 else {
+            return nil
+        }
+
+        var buffer = [UInt8](repeating: 0, count: size)
+        let success = buffer.withUnsafeMutableBytes { rawBuffer in
+            sysctl(&mib, u_int(mib.count), rawBuffer.baseAddress, &size, nil, 0) == 0
+        }
+        guard success else { return nil }
+
+        return parseKernProcArgs(Array(buffer.prefix(Int(size))))
+    }
+
+    private static func parseKernProcArgs(_ bytes: [UInt8]) -> [String]? {
+        guard bytes.count > 4 else { return nil }
+
+        var argcRaw: Int32 = 0
+        withUnsafeMutableBytes(of: &argcRaw) { rawBuffer in
+            rawBuffer.copyBytes(from: bytes.prefix(4))
+        }
+        let argc = Int(Int32(littleEndian: argcRaw))
+        guard argc > 0 else { return nil }
+
+        var index = 4
+        while index < bytes.count, bytes[index] != 0 {
+            index += 1
+        }
+        while index < bytes.count, bytes[index] == 0 {
+            index += 1
+        }
+
+        var arguments: [String] = []
+        while index < bytes.count, arguments.count < argc {
+            let start = index
+            while index < bytes.count, bytes[index] != 0 {
+                index += 1
+            }
+            guard let argument = String(bytes: bytes[start..<index], encoding: .utf8) else {
+                return nil
+            }
+            arguments.append(argument)
+            while index < bytes.count, bytes[index] == 0 {
+                index += 1
+            }
+        }
+
+        return arguments.count == argc ? arguments : nil
     }
 }

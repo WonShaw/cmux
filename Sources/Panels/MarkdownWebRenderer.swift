@@ -5,7 +5,6 @@ import WebKit
 
 struct MarkdownWebRenderer: NSViewRepresentable {
     static let localImageURLScheme = MarkdownWebViewerScheme.localImage
-    static let remoteImageURLScheme = MarkdownWebViewerScheme.remoteImage
 
     let markdown: String
     let theme: MarkdownWebTheme
@@ -66,10 +65,6 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         config.setURLSchemeHandler(
             context.coordinator,
             forURLScheme: Self.localImageURLScheme
-        )
-        config.setURLSchemeHandler(
-            context.coordinator,
-            forURLScheme: Self.remoteImageURLScheme
         )
         let webView = MarkdownWebView(frame: .zero, configuration: config)
         webView.onPointerDown = onRequestPanelFocus
@@ -568,17 +563,6 @@ struct MarkdownWebRenderer: NSViewRepresentable {
                 }
             }
 
-            if scheme == MarkdownWebRenderer.remoteImageURLScheme {
-                let remoteURL = MarkdownRemoteImageSecurity.remoteImageURL(from: requestURL)
-                return Task.detached(priority: .userInitiated) {
-                    guard let remoteURL,
-                          let fetched = await MarkdownRemoteImageFetcher.fetch(remoteURL) else {
-                        return ImageLoadResult(data: Data(), mimeType: "image/png")
-                    }
-                    return ImageLoadResult(data: fetched.data, mimeType: fetched.mimeType)
-                }
-            }
-
             return Task.detached {
                 ImageLoadResult(data: Data(), mimeType: "image/png")
             }
@@ -835,7 +819,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
 
             // The first load (loadHTMLString) has navigationType = .other —
             // allow it. Anything the user clicks (links, anchors, ...) we
-            // route through the cmux tab/browser machinery.
+            // route to a markdown tab or the system default handler.
             if navigationAction.navigationType == .linkActivated,
                let url = navigationAction.request.url {
 #if DEBUG
@@ -851,7 +835,31 @@ struct MarkdownWebRenderer: NSViewRepresentable {
                 decisionHandler(.cancel)
                 return
             }
+            // The viewer only ever renders the bundled shell against a local
+            // file base URL. Any other navigation (script-driven location
+            // changes, subframes, redirects) to a non-local URL is refused so
+            // the WebView cannot reach the network.
+            if let url = navigationAction.request.url, !Self.isLocalViewerNavigationURL(url) {
+#if DEBUG
+                NSLog("MarkdownPanel.nav blocked non-local url=\(url.absoluteString)")
+#endif
+                decisionHandler(.cancel)
+                return
+            }
             decisionHandler(.allow)
+        }
+
+        /// Whether `url` is something the offline viewer may navigate to:
+        /// local files, inline documents, and the host-mediated local-image
+        /// scheme. Everything else (http, https, ws, ftp, ...) is rejected.
+        static func isLocalViewerNavigationURL(_ url: URL) -> Bool {
+            guard let scheme = url.scheme?.lowercased() else { return true }
+            switch scheme {
+            case "file", "about", "data", "blob", MarkdownWebRenderer.localImageURLScheme:
+                return true
+            default:
+                return false
+            }
         }
 
         func webView(
@@ -860,8 +868,10 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             for navigationAction: WKNavigationAction,
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
-            // target=_blank / window.open from inside the rendered markdown.
-            if let url = navigationAction.request.url {
+            // target=_blank link clicked inside the rendered markdown. Scripted
+            // window.open calls are not user clicks and are ignored.
+            if navigationAction.navigationType == .linkActivated,
+               let url = navigationAction.request.url {
                 handleExternalLink(url)
             }
             return nil
@@ -869,53 +879,25 @@ struct MarkdownWebRenderer: NSViewRepresentable {
 
         // MARK: - Link routing
 
-        /// Route a clicked link to a brand-new cmux browser tab in the same
-        /// pane as this markdown panel — mirroring how Browser panels open
-        /// child links via `openLinkInNewTab`. Falls back to the system
-        /// browser only when the in-app browser is disabled or the panel
-        /// can't be located in any workspace.
+        /// Route a clicked link: local markdown files open as markdown tabs,
+        /// everything else goes to the system default handler (the default
+        /// browser for http/https).
         private func handleExternalLink(_ url: URL) {
 #if DEBUG
             NSLog("MarkdownPanel.handleExternalLink url=\(url.absoluteString)")
 #endif
             // First preference: links that resolve to local markdown files
-            // open as markdown tabs in cmux, not in the browser.
+            // open as markdown tabs in cmux, not in the system browser.
             let fileCandidate = url.scheme == "file" ? url.path : url.absoluteString
             if let markdownPath = resolvedMarkdownFilePath(fileCandidate) {
                 openMarkdownFile(markdownPath)
                 return
             }
 
-            // Schemes the in-app browser doesn't (and shouldn't) handle:
-            // mailto:, tel:, slack://, vscode://, file:// non-markdown, etc.
-            // Route those to the system handler so the user's default app picks them up.
-            if let scheme = url.scheme?.lowercased(),
-               scheme != "http", scheme != "https" {
-                NSWorkspace.shared.open(url)
-                return
-            }
-
-            guard BrowserAvailabilitySettings.isEnabled() else {
-                NSWorkspace.shared.open(url)
-                return
-            }
-
-            guard let app = AppDelegate.shared,
-                  let location = app.workspaceContainingPanel(
-                      panelId: panelId,
-                      preferredWorkspaceId: workspaceId
-                  ),
-                  let paneId = location.workspace.paneId(forPanelId: panelId) else {
-                // No workspace context — last-resort fallback.
-                NSWorkspace.shared.open(url)
-                return
-            }
-
-            _ = location.workspace.newBrowserSurface(
-                inPane: paneId,
-                url: url,
-                focus: true
-            )
+            // Everything else (http/https, mailto:, tel:, slack://, vscode://,
+            // file:// non-markdown, etc.) goes to the system handler so the
+            // user's default app picks it up.
+            NSWorkspace.shared.open(url)
         }
 
         private func isInPageFragment(_ url: URL) -> Bool {

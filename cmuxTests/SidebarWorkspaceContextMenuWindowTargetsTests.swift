@@ -170,7 +170,6 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
             setNotificationsMuted: { _, _ in },
             openNotification: { _ in },
             copyWorkspaceLinks: { _ in },
-            openPullRequest: { _ in },
             openPort: { _ in },
             checklist: SidebarWorkspaceChecklistActions(
                 setItemState: { _, _ in },

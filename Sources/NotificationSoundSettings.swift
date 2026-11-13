@@ -11,7 +11,7 @@ import UserNotifications
 // facade remains a small, stable seam for the rest of the app and tests.
 
 nonisolated private let notificationSoundLogger = Logger(
-    subsystem: "com.cmuxterm.app",
+    subsystem: "com.comux.app",
     category: "notification-sound"
 )
 
@@ -404,7 +404,7 @@ enum NotificationSoundSettings {
             commandEnvironment["CMUX_NOTIFICATION_TITLE"] = title
             commandEnvironment["CMUX_NOTIFICATION_SUBTITLE"] = subtitle
             commandEnvironment["CMUX_NOTIFICATION_BODY"] = body
-            // Remote-origin text (ssh relay, cloud machine) is untrusted data; the
+            // Remote-origin text (a cloud machine) is untrusted data; the
             // command can gate on this instead of trusting every notification alike.
             commandEnvironment["CMUX_NOTIFICATION_ORIGIN"] = origin.wireValue
             let environment = commandEnvironment

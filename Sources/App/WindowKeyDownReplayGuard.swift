@@ -62,14 +62,12 @@ extension NSWindow {
         guard event.cmuxIsUndoRedoCommandEquivalent else { return false }
 
         let terminalView = firstResponder.cmuxTerminalKeyEquivalentOwningGhosttyView()
-        let webView = firstResponder.flatMap {
-            NSWindow.cmuxOwningWebViewForKeyRouting(for: $0, in: self, event: event)
-        } ?? firstResponder.flatMap { cmuxOwningUndoableWebView(for: $0) }
+        let webView = firstResponder.flatMap { cmuxOwningUndoableWebView(for: $0) }
         return cmuxRouteUndoRedoCommandEquivalentAwayFromAppKit(
             event,
             terminalView: terminalView,
             webView: webView,
-            webKitKeyDownReentry: webView?.browserNativeInputDeliveryOwner.isDispatchActive ?? false
+            webKitKeyDownReentry: false
         )
     }
 

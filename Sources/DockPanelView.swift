@@ -6,7 +6,7 @@ import CmuxTerminal
 import SwiftUI
 
 /// Right-sidebar Dock. Renders the window's own Dock `BonsplitController` tree
-/// (terminals + browsers) using the same split machinery as the main content
+/// (terminals) using the same split machinery as the main content
 /// area, just constrained to the sidebar width. Every window mounts its own
 /// store, so multiple windows can each show a live Dock simultaneously.
 struct DockPanelView: View {
@@ -151,7 +151,6 @@ struct DockPanelView: View {
 /// Offers the same in-app create affordances as the tab-bar split buttons.
 struct DockEmptyPaneView: View {
     let onNewTerminal: () -> Void
-    let onNewBrowser: () -> Void
 
     var body: some View {
         VStack(spacing: 12) {
@@ -166,12 +165,6 @@ struct DockEmptyPaneView: View {
                     Label(
                         String(localized: "dock.action.newTerminal", defaultValue: "New Terminal"),
                         systemImage: "terminal.fill"
-                    )
-                }
-                Button(action: onNewBrowser) {
-                    Label(
-                        String(localized: "dock.action.newBrowser", defaultValue: "New Browser"),
-                        systemImage: "globe"
                     )
                 }
             }
@@ -248,16 +241,12 @@ private struct DockKeyboardFocusBridge: NSViewRepresentable {
         nsView.focusFirstControl = { [weak store] in
             store?.focusFirstControl() == true
         }
-        nsView.ownsDockBrowserFocus = { [weak store] responder, window in
-            store?.browserPanel(owning: responder, in: window) != nil
-        }
         nsView.registerWithKeyboardFocusCoordinatorIfNeeded()
     }
 }
 
 final class DockKeyboardFocusView: NSView {
     var focusFirstControl: (() -> Bool)?
-    var ownsDockBrowserFocus: ((NSResponder, NSWindow) -> Bool)?
     override var acceptsFirstResponder: Bool { true }
     override var canBecomeKeyView: Bool { true }
 
@@ -267,7 +256,6 @@ final class DockKeyboardFocusView: NSView {
 
     func ownsKeyboardFocus(_ responder: NSResponder) -> Bool {
         if responder === self { return true }
-        if let window, ownsDockBrowserFocus?(responder, window) == true { return true }
         guard let ghosttyView = responder.cmuxStrictOwningGhosttyView(),
               let surfaceId = ghosttyView.terminalSurface?.id else {
             return false

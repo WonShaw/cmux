@@ -7,9 +7,8 @@ internal import Foundation
 /// identical, so the encoded wire bytes match.
 ///
 /// The `workspace.group.*` methods live in `+WorkspaceGroup.swift`;
-/// `workspace.action` / `extension.sidebar.snapshot` and the worker-lane
-/// `workspace.remote.pty_*` (sessions/close/detach/bridge/resize) methods stay
-/// on the app-side dispatcher.
+/// `workspace.action` / `extension.sidebar.snapshot` stay on the app-side
+/// dispatcher.
 extension ControlCommandCoordinator {
     /// Dispatches the non-group workspace methods this coordinator owns; returns
     /// `nil` for anything else so the core `handle(_:)` can fall through.
@@ -49,20 +48,6 @@ extension ControlCommandCoordinator {
             return workspaceLast(request.params)
         case "workspace.equalize_splits":
             return workspaceEqualizeSplits(request.params)
-        case "workspace.remote.configure":
-            return workspaceRemoteConfigure(request.params)
-        case "workspace.remote.foreground_auth_ready":
-            return workspaceRemoteForegroundAuthReady(request.params)
-        case "workspace.remote.reconnect":
-            return workspaceRemoteReconnect(request.params)
-        case "workspace.remote.disconnect":
-            return workspaceRemoteDisconnect(request.params)
-        case "workspace.remote.status":
-            return workspaceRemoteStatus(request.params)
-        case "workspace.remote.pty_attach_end":
-            return workspaceRemotePTYAttachEnd(request.params)
-        case "workspace.remote.terminal_session_end":
-            return workspaceRemoteTerminalSessionEnd(request.params)
         default:
             return nil
         }
@@ -90,7 +75,6 @@ extension ControlCommandCoordinator {
             "selected": .bool(selected),
             "pinned": .bool(summary.isPinned),
             "listening_ports": .array(summary.listeningPorts.map { .int(Int64($0)) }),
-            "remote": summary.remoteStatus,
             "current_directory": orNull(summary.currentDirectory),
             "custom_color": orNull(summary.customColor),
             "latest_conversation_message": orNull(summary.latestConversationMessage),
@@ -688,186 +672,6 @@ extension ControlCommandCoordinator {
                 "workspace_id": .string(workspaceID.uuidString),
                 "workspace_ref": ref(.workspace, workspaceID),
                 "equalized": .bool(equalized),
-            ]))
-        }
-    }
-
-    // MARK: - Remote
-
-    /// Shapes the shared remote-mutation result for disconnect / reconnect /
-    /// foreground_auth_ready / status.
-    private func workspaceRemoteResult(_ resolution: ControlWorkspaceRemoteResolution?) -> ControlCallResult {
-        switch resolution ?? .missingWorkspaceID {
-        case .missingWorkspaceID:
-            return .err(code: "invalid_params", message: "Missing workspace_id", data: nil)
-        case .notFound(let workspaceID):
-            return .err(code: "not_found", message: "Workspace not found", data: .object([
-                "workspace_id": .string(workspaceID.uuidString),
-                "workspace_ref": ref(.workspace, workspaceID),
-            ]))
-        case .notConfigured(let workspaceID):
-            return .err(code: "invalid_state", message: "Remote workspace is not configured", data: .object([
-                "workspace_id": .string(workspaceID.uuidString),
-                "workspace_ref": ref(.workspace, workspaceID),
-            ]))
-        case .unavailable(let workspaceID, let message):
-            return .err(code: "unavailable", message: message, data: .object([
-                "workspace_id": .string(workspaceID.uuidString),
-                "workspace_ref": ref(.workspace, workspaceID),
-            ]))
-        case .resolved(let windowID, let workspaceID, let remoteStatus):
-            return .ok(.object([
-                "window_id": orNull(windowID?.uuidString),
-                "window_ref": ref(.window, windowID),
-                "workspace_id": .string(workspaceID.uuidString),
-                "workspace_ref": ref(.workspace, workspaceID),
-                "remote": remoteStatus,
-            ]))
-        }
-    }
-
-    /// Resolves the explicit-or-fallback workspace id for the remote methods,
-    /// reproducing the legacy `requestedWorkspaceId ?? selectedTabId` rule and
-    /// its two `invalid_params` failures.
-    private func remoteWorkspaceID(
-        _ params: [String: JSONValue]
-    ) -> (workspaceID: UUID?, error: ControlCallResult?) {
-        let requested = uuid(params, "workspace_id")
-        if hasNonNull(params, "workspace_id"), requested == nil {
-            return (nil, .err(code: "invalid_params", message: "Missing or invalid workspace_id", data: nil))
-        }
-        let resolved = context?.controlResolveRemoteWorkspaceID(
-            routing: routingSelectors(params),
-            requestedWorkspaceID: requested
-        )
-        guard let resolved else {
-            return (nil, .err(code: "invalid_params", message: "Missing workspace_id", data: nil))
-        }
-        return (resolved, nil)
-    }
-
-    /// `workspace.remote.configure` — configure a workspace's remote connection.
-    func workspaceRemoteConfigure(_ params: [String: JSONValue]) -> ControlCallResult {
-        let resolution = remoteWorkspaceID(params)
-        if let error = resolution.error { return error }
-        guard let workspaceID = resolution.workspaceID else {
-            return .err(code: "invalid_params", message: "Missing workspace_id", data: nil)
-        }
-        return context?.controlConfigureWorkspaceRemote(params: params, workspaceID: workspaceID)
-            ?? .err(code: "not_found", message: "Workspace not found", data: .object([
-                "workspace_id": .string(workspaceID.uuidString),
-                "workspace_ref": ref(.workspace, workspaceID),
-            ]))
-    }
-
-    /// `workspace.remote.disconnect` — disconnect a workspace's remote.
-    func workspaceRemoteDisconnect(_ params: [String: JSONValue]) -> ControlCallResult {
-        let resolution = remoteWorkspaceID(params)
-        if let error = resolution.error { return error }
-        guard let workspaceID = resolution.workspaceID else {
-            return .err(code: "invalid_params", message: "Missing workspace_id", data: nil)
-        }
-        let clearConfiguration = bool(params, "clear") ?? false
-        return workspaceRemoteResult(context?.controlDisconnectWorkspaceRemote(
-            workspaceID: workspaceID,
-            clearConfiguration: clearConfiguration
-        ))
-    }
-
-    /// `workspace.remote.reconnect` — reconnect a workspace's remote.
-    func workspaceRemoteReconnect(_ params: [String: JSONValue]) -> ControlCallResult {
-        let resolution = remoteWorkspaceID(params)
-        if let error = resolution.error { return error }
-        guard let workspaceID = resolution.workspaceID else {
-            return .err(code: "invalid_params", message: "Missing workspace_id", data: nil)
-        }
-        let surfaceID = uuid(params, "surface_id")
-        if hasNonNull(params, "surface_id"), surfaceID == nil {
-            return .err(code: "invalid_params", message: "Missing or invalid surface_id", data: nil)
-        }
-        return workspaceRemoteResult(context?.controlReconnectWorkspaceRemote(
-            workspaceID: workspaceID,
-            surfaceID: surfaceID
-        ))
-    }
-
-    /// `workspace.remote.foreground_auth_ready` — arm/continue a pending connect.
-    func workspaceRemoteForegroundAuthReady(_ params: [String: JSONValue]) -> ControlCallResult {
-        let resolution = remoteWorkspaceID(params)
-        if let error = resolution.error { return error }
-        guard let workspaceID = resolution.workspaceID else {
-            return .err(code: "invalid_params", message: "Missing workspace_id", data: nil)
-        }
-        guard let token = optionalTrimmedRawString(
-            params,
-            "foreground_auth_token"
-        ) else {
-            return .err(
-                code: "invalid_params",
-                message: "Missing foreground_auth_token",
-                data: nil
-            )
-        }
-        let controlPath = optionalTrimmedRawString(params, "control_path")
-        return workspaceRemoteResult(context?.controlWorkspaceRemoteForegroundAuthReady(
-            workspaceID: workspaceID,
-            foregroundAuthToken: token,
-            resolvedControlPath: controlPath
-        ))
-    }
-
-    /// `workspace.remote.status` — read a workspace's remote status.
-    func workspaceRemoteStatus(_ params: [String: JSONValue]) -> ControlCallResult {
-        let resolution = remoteWorkspaceID(params)
-        if let error = resolution.error { return error }
-        guard let workspaceID = resolution.workspaceID else {
-            return .err(code: "invalid_params", message: "Missing workspace_id", data: nil)
-        }
-        return workspaceRemoteResult(context?.controlWorkspaceRemoteStatus(workspaceID: workspaceID))
-    }
-
-    /// `workspace.remote.pty_attach_end` — record a remote PTY attach end.
-    func workspaceRemotePTYAttachEnd(_ params: [String: JSONValue]) -> ControlCallResult {
-        guard let workspaceID = uuid(params, "workspace_id") else {
-            return .err(code: "invalid_params", message: "Missing or invalid workspace_id", data: nil)
-        }
-        guard let surfaceID = uuid(params, "surface_id") else {
-            return .err(code: "invalid_params", message: "Missing or invalid surface_id", data: nil)
-        }
-        guard let sessionID = optionalTrimmedRawString(params, "session_id") else {
-            return .err(code: "invalid_params", message: "Missing session_id", data: nil)
-        }
-
-        let resolution = context?.controlWorkspaceRemotePTYAttachEnd(
-            workspaceID: workspaceID,
-            surfaceID: surfaceID,
-            sessionID: sessionID
-        ) ?? .notFound
-        switch resolution {
-        case .notFound:
-            return .ok(.object([
-                "workspace_id": .string(workspaceID.uuidString),
-                "workspace_ref": ref(.workspace, workspaceID),
-                "surface_id": .string(surfaceID.uuidString),
-                "surface_ref": ref(.surface, surfaceID),
-                "session_id": .string(sessionID),
-                "workspace_found": .bool(false),
-                "cleared_remote_pty_session": .bool(false),
-                "untracked_remote_terminal": .bool(false),
-            ]))
-        case .resolved(let windowID, let resolvedWorkspaceID, let cleared, let untracked, let remoteStatus):
-            return .ok(.object([
-                "window_id": orNull(windowID?.uuidString),
-                "window_ref": ref(.window, windowID),
-                "workspace_id": .string(resolvedWorkspaceID.uuidString),
-                "workspace_ref": ref(.workspace, resolvedWorkspaceID),
-                "surface_id": .string(surfaceID.uuidString),
-                "surface_ref": ref(.surface, surfaceID),
-                "session_id": .string(sessionID),
-                "workspace_found": .bool(true),
-                "cleared_remote_pty_session": .bool(cleared),
-                "untracked_remote_terminal": .bool(untracked),
-                "remote": remoteStatus,
             ]))
         }
     }

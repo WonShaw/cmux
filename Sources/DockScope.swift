@@ -4,7 +4,7 @@ import Foundation
 ///
 /// - ``workspace``: the legacy per-workspace Dock, seeded from the project
 ///   `.cmux/dock.json` resolved upward from that workspace's directory. Its live
-///   panels (terminals/browsers) belong to the workspace and are torn down when
+///   panels (terminals) belong to the workspace and are torn down when
 ///   the workspace closes.
 /// - ``global``: a per-window Dock, seeded from the global config at
 ///   `~/.config/cmux/dock.json` with a home base directory. Each main window

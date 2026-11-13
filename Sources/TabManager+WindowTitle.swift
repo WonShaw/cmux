@@ -98,7 +98,7 @@ extension TabManager {
            tab.allowsLocalDirectoryFallback(panelId: focusedPanelId) {
             return trimmedWindowTitleDirectory(tab.reportedPanelDirectory(panelId: focusedPanelId))
                 ?? trimmedWindowTitleDirectory(tab.terminalPanel(for: focusedPanelId)?.requestedWorkingDirectory)
-                ?? (tab.isRemoteWorkspace ? "" : trimmedWindowTitleDirectory(tab.presentedCurrentDirectory) ?? "")
+                ?? trimmedWindowTitleDirectory(tab.presentedCurrentDirectory) ?? ""
         }
         return trimmedWindowTitleDirectory(tab.presentedCurrentDirectory) ?? ""
     }

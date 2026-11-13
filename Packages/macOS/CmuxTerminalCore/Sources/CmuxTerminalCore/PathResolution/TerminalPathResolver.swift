@@ -12,8 +12,7 @@ public import Foundation
 /// The resolver is an instantiated value because resolution is pure only up
 /// to the file system: every resolve probes candidates for existence, so the
 /// file-existence capability is injected at init. Production uses the real
-/// file system; tests inject a fake probe. This mirrors
-/// ``TerminalLinkRouter``'s injected `BrowserHostNormalizing` seam.
+/// file system; tests inject a fake probe.
 public struct TerminalPathResolver: Sendable {
     private let fileExists: @Sendable (String) -> Bool
 

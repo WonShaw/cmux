@@ -40,28 +40,11 @@ struct SidebarWorkspaceAuxiliaryDetailVisibilityTests {
             showLog: true,
             showProgress: true,
             showBranchDirectory: false,
-            showPullRequests: false,
             showPorts: true,
             hideAllDetails: false
         )
 
         #expect(!visibility.requiresGitMetadata)
-        #expect(!visibility.requiresPullRequestPolling)
-    }
-
-    @Test func pullRequestRowRequiresLocalMetadataAndGitHubPolling() {
-        let visibility = SidebarWorkspaceAuxiliaryDetailVisibility.resolved(
-            showMetadata: false,
-            showLog: false,
-            showProgress: false,
-            showBranchDirectory: false,
-            showPullRequests: true,
-            showPorts: false,
-            hideAllDetails: false
-        )
-
-        #expect(visibility.requiresGitMetadata)
-        #expect(visibility.requiresPullRequestPolling)
     }
 
     @Test func hideAllDetailsSuppressesBackgroundGitRequirements() {
@@ -70,13 +53,11 @@ struct SidebarWorkspaceAuxiliaryDetailVisibilityTests {
             showLog: true,
             showProgress: true,
             showBranchDirectory: true,
-            showPullRequests: true,
             showPorts: true,
             hideAllDetails: true
         )
 
         #expect(!visibility.requiresGitMetadata)
-        #expect(!visibility.requiresPullRequestPolling)
     }
 
     @Test func hideAllWinsOverEveryToggle() {
@@ -85,7 +66,6 @@ struct SidebarWorkspaceAuxiliaryDetailVisibilityTests {
             showLog: true,
             showProgress: true,
             showBranchDirectory: true,
-            showPullRequests: true,
             showPorts: true,
             hideAllDetails: true
         )
@@ -100,7 +80,6 @@ struct SidebarWorkspaceAuxiliaryDetailVisibilityTests {
             showLog: false,
             showProgress: true,
             showBranchDirectory: false,
-            showPullRequests: true,
             showPorts: false,
             hideAllDetails: false
         )
@@ -108,7 +87,6 @@ struct SidebarWorkspaceAuxiliaryDetailVisibilityTests {
         #expect(!visibility.showsLog)
         #expect(visibility.showsProgress)
         #expect(!visibility.showsBranchDirectory)
-        #expect(visibility.showsPullRequests)
         #expect(!visibility.showsPorts)
     }
 }

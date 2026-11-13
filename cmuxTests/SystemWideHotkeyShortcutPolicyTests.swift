@@ -59,23 +59,6 @@ extension GlobalSearchShortcutBehaviorTests {
         #expect(KeyboardShortcutSettings.Action.allCases.filter(\.isSystemWideHotkey) == [.showHideAllWindows])
     }
 
-    @Test func sharedShortcutCatalogCoversEveryAppActionAndPreservesDefaults() {
-        let appActionIDs = Set(KeyboardShortcutSettings.Action.allCases.map(\.rawValue))
-        let sharedActionIDs = Set(ShortcutAction.allCases.map(\.rawValue))
-
-        #expect(sharedActionIDs == appActionIDs)
-        #expect(
-            KeyboardShortcutSettings.shortcut(for: .toggleBrowserDesignMode)
-                == StoredShortcut(
-                    key: "d",
-                    command: true,
-                    shift: false,
-                    option: true,
-                    control: true
-                )
-        )
-    }
-
     @Test func foregroundGlobalSearchDoesNotUseSystemWideReservationPolicy() {
         let shortcut = commandGraveShortcut()
         #expect(KeyboardShortcutSettings.Action.globalSearch.normalizedRecordedShortcutResult(shortcut) == .accepted(shortcut))

@@ -118,21 +118,14 @@ struct GotoSplitCycleUITestSupport {
             if let terminal = workspace.terminalPanel(for: focusedPanelId) {
                 updates["focusedPanelKind"] = "terminal"
                 updates["focusedTerminalFindNeedle"] = terminal.searchState?.needle ?? ""
-                updates["focusedBrowserFindNeedle"] = ""
-            } else if let browser = workspace.browserPanel(for: focusedPanelId) {
-                updates["focusedPanelKind"] = "browser"
-                updates["focusedBrowserFindNeedle"] = browser.searchState?.needle ?? ""
-                updates["focusedTerminalFindNeedle"] = ""
             } else {
                 updates["focusedPanelKind"] = "other"
                 updates["focusedTerminalFindNeedle"] = ""
-                updates["focusedBrowserFindNeedle"] = ""
             }
         } else {
             updates["focusedPanelId"] = ""
             updates["focusedPanelKind"] = "none"
             updates["focusedTerminalFindNeedle"] = ""
-            updates["focusedBrowserFindNeedle"] = ""
         }
 
         let terminalWithFind = workspace.panels.values
@@ -141,17 +134,6 @@ struct GotoSplitCycleUITestSupport {
         updates["terminalFindPanelId"] = terminalWithFind?.id.uuidString ?? ""
         updates["terminalFindNeedle"] = terminalWithFind?.searchState?.needle ?? ""
         updates["terminalFindVisible"] = terminalWithFind == nil ? "false" : "true"
-
-        let browserWithFind = workspace.panels.values
-            .compactMap { $0 as? BrowserPanel }
-            .first(where: { $0.searchState != nil })
-        updates["browserFindPanelId"] = browserWithFind?.id.uuidString ?? ""
-        updates["browserFindNeedle"] = browserWithFind?.searchState?.needle ?? ""
-        updates["browserFindSelected"] = browserWithFind?.searchState?.selected.map {
-            String($0 + 1)
-        } ?? ""
-        updates["browserFindTotal"] = browserWithFind?.searchState?.total.map(String.init) ?? ""
-        updates["browserFindVisible"] = browserWithFind == nil ? "false" : "true"
 
         let currentResponder = (NSApp.keyWindow ?? NSApp.mainWindow)?.firstResponder
         updates["firstResponderTerminalPanelId"] =

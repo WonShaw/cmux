@@ -2261,12 +2261,6 @@ struct TextBoxInputContainer: View {
     @State private var textViewReference = TextBoxInputViewReference()
     @State private var contentRevision: UInt64 = 0
     @State var pendingProviderLaunchTimeoutScheduler = MainActorDeferredActionScheduler()
-    @ObservedObject private var commentPool: DiffCommentSubmissionPool = .shared
-
-    private var pendingCommentCount: Int {
-        commentPool.pendingCount(workspaceId: surface.owningWorkspace()?.id)
-    }
-
     private var textBasePointSize: CGFloat { max(14, terminalFont.pointSize / max(GlobalFontMagnification.scale, 0.01) + 2) }
 
     private var textFont: NSFont {
@@ -2304,17 +2298,13 @@ struct TextBoxInputContainer: View {
         let background = Color(nsColor: terminalBackgroundColor)
         let baseCanSend = TextBoxSubmitAvailability.shouldEnableSubmit(
             text: text,
-            attachmentCount: attachments.count + pendingCommentCount,
+            attachmentCount: attachments.count,
             hasPendingAttachmentUpload: hasPendingAttachmentUpload,
             hasMarkedText: hasMarkedText
         )
         let canSend = Self.shouldEnableSubmitButton(baseCanSend: baseCanSend, pendingProviderLaunchAction: pendingProviderLaunchAction, action: effectiveSubmitAction, shouldForceTextEntrySubmit: shouldForceTextEntrySubmit, allowsCommandTemplateSubmit: allowsCommandTemplateSubmit)
 
         VStack(alignment: .leading, spacing: 6) {
-            if pendingCommentCount > 0 {
-                pendingCommentsChip(count: pendingCommentCount, foreground: foreground)
-                    .padding(.top, 6)
-            }
             HStack(alignment: .bottom, spacing: 6) {
             addFilesButton(foreground: foreground)
                 .offset(x: TextBoxLayout.leadingButtonHorizontalOffset)
@@ -2450,93 +2440,6 @@ struct TextBoxInputContainer: View {
         .frame(height: TextBoxLayout.attachmentChipHeight)
     }
 
-    @State private var showPendingCommentsPreview = false
-
-    private func pendingCommentsChip(count: Int, foreground: Color) -> some View {
-        HStack(spacing: 5) {
-            Button {
-                showPendingCommentsPreview.toggle()
-            } label: {
-                HStack(spacing: 5) {
-                    CmuxSystemSymbolImage(magnified: "text.bubble", pointSize: 11, weight: .medium, tint: foreground.opacity(0.92))
-                    Text(pendingCommentsLabel(count))
-                        .cmuxFont(size: 12, weight: .medium)
-                        .lineLimit(1)
-                }
-            }
-            .buttonStyle(.plain)
-            .help(String(
-                localized: "textbox.diffComments.preview",
-                defaultValue: "Show comments"
-            ))
-            Button {
-                dismissPendingComments()
-            } label: {
-                CmuxSystemSymbolImage(magnified: "xmark", pointSize: 9, weight: .bold, tint: foreground.opacity(0.92))
-                    .frame(width: 16, height: 16)
-                    .background(Circle().fill(foreground.opacity(0.12)))
-            }
-            .buttonStyle(.plain)
-            .help(String(
-                localized: "textbox.diffComments.dismiss",
-                defaultValue: "Dismiss comments without sending"
-            ))
-        }
-        .padding(.leading, 9)
-        .padding(.trailing, 5)
-        .frame(height: 26)
-        .background(
-            Capsule().fill(foreground.opacity(0.10))
-        )
-        .overlay(
-            Capsule().strokeBorder(foreground.opacity(0.18), lineWidth: 1)
-        )
-        .foregroundStyle(foreground.opacity(0.92))
-        .popover(isPresented: $showPendingCommentsPreview, arrowEdge: .top) {
-            pendingCommentsPreview()
-        }
-        .accessibilityLabel(pendingCommentsLabel(count))
-    }
-
-    private func pendingCommentsPreview() -> some View {
-        let entries = surface.owningWorkspace().map {
-            commentPool.entriesByWorkspace[$0.id] ?? []
-        } ?? []
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
-                    Text(entry.submissionText.trimmingCharacters(in: .whitespacesAndNewlines))
-                        .cmuxFont(size: 11, design: .monospaced)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
-            .padding(.bottom, 12)
-        }
-        .frame(minWidth: 320, idealWidth: 440, maxWidth: 520, maxHeight: 360)
-    }
-
-    private func dismissPendingComments() {
-        guard let workspaceId = surface.owningWorkspace()?.id else { return }
-        let dismissed = DiffCommentSubmissionPool.shared.consumeAll(workspaceId: workspaceId)
-        // Mark consumed so viewer reloads do not resurrect the chip; the
-        // comments stay saved in the diff viewer.
-        for (repoRoot, entries) in Dictionary(grouping: dismissed, by: \.repoRoot) {
-            DiffCommentStore.shared.markConsumed(ids: entries.map(\.commentId), repoRoot: repoRoot)
-        }
-    }
-
-    private func pendingCommentsLabel(_ count: Int) -> String {
-        count == 1
-            ? String(localized: "textbox.diffComments.one", defaultValue: "1 comment")
-            : String(
-                format: String(localized: "textbox.diffComments.many", defaultValue: "%d comments"),
-                count
-            )
-    }
-
     func submit() {
         let textView = textViewReference.textView
         guard TextBoxSubmitAvailability.shouldSubmit(
@@ -2548,9 +2451,7 @@ struct TextBoxInputContainer: View {
         }
         let submittedParts = textView?.submissionParts()
             ?? [TextBoxSubmissionPart.text(text.trimmingCharacters(in: .newlines))]
-        let poolWorkspaceId = surface.owningWorkspace()?.id
-        let hasTypedContent = TextBoxSubmissionFormatter.hasSubmittableContent(submittedParts)
-        guard hasTypedContent || pendingCommentCount > 0 else {
+        guard TextBoxSubmissionFormatter.hasSubmittableContent(submittedParts) else {
             NSSound.beep()
             return
         }
@@ -2582,16 +2483,6 @@ struct TextBoxInputContainer: View {
             }
             return
         }
-        // Claim the workspace's pending diff comments: this submission carries
-        // them, and the chip clears from every other TextBox in the workspace.
-        let pendingComments = poolWorkspaceId.map {
-            DiffCommentSubmissionPool.shared.consumeAll(workspaceId: $0)
-        } ?? []
-        var partsToSend = submittedParts
-        if !pendingComments.isEmpty {
-            let bundle = pendingComments.map(\.submissionText).joined(separator: "\n")
-            partsToSend.append(.text(hasTypedContent ? "\n\n" + bundle : bundle))
-        }
         let submittedTextView = textView
         let preservedContent = submittedTextView?.attributedContentForPreservation()
         submittedTextView?.prepareForSubmit()
@@ -2605,7 +2496,7 @@ struct TextBoxInputContainer: View {
             text: "",
             attachmentCount: 0
         )
-        let submitPlan = dispatchPlan(partsToSend, applying: effectiveSubmitAction)
+        let submitPlan = dispatchPlan(submittedParts, applying: effectiveSubmitAction)
         if let launchContextCommand = submitPlan.launchContextCommand {
             startPendingProviderLaunch(launchAction)
             onRecordLaunchCommand(launchContextCommand)
@@ -2618,12 +2509,6 @@ struct TextBoxInputContainer: View {
                 if submitPlan.launchContextCommand != nil {
                     clearPendingProviderLaunch()
                     onClearLaunchCommand()
-                }
-                if let poolWorkspaceId, !pendingComments.isEmpty {
-                    DiffCommentSubmissionPool.shared.restorePending(
-                        pendingComments,
-                        workspaceId: poolWorkspaceId
-                    )
                 }
                 guard TextBoxFailedSubmitRollbackPolicy.shouldRestore(
                     rollbackSnapshot: rollbackSnapshot,
@@ -2643,11 +2528,6 @@ struct TextBoxInputContainer: View {
                 }
                 NSSound.beep()
                 return
-            }
-            if !pendingComments.isEmpty {
-                for (repoRoot, entries) in Dictionary(grouping: pendingComments, by: \.repoRoot) {
-                    DiffCommentStore.shared.markConsumed(ids: entries.map(\.commentId), repoRoot: repoRoot)
-                }
             }
             resetPanelSubmitActionAfterSuccessfulSubmit(submittedAction: launchAction)
             let submittedAttachments = submittedParts.compactMap { part -> TextBoxAttachment? in
@@ -2790,156 +2670,34 @@ struct TextBoxInputContainer: View {
         }
     }
 
-    func uploadFileAttachments(
-        _ fileURLs: [URL],
-        remoteTarget: TerminalRemoteUploadTarget,
-        focusing textView: TextBoxInputTextView,
-        replacingPlaceholderID existingPlaceholderID: UUID? = nil,
-        validationToken existingValidationToken: UInt64? = nil,
-        preparedAttachments: [TextBoxPreparedAttachment] = [],
-        preparationService: TerminalImageTransferPreparationService? = nil
-    ) {
-        let placeholderID = existingPlaceholderID ?? UUID()
-        if existingPlaceholderID == nil {
-            guard textView.beginPendingPasteReservation(id: placeholderID)
-            else {
-                cleanupPreparedPasteFileURLs(
-                    fileURLs,
-                    using: preparationService
-                )
-                return
-            }
-        }
-        let operation = TerminalImageTransferOperation()
-        let uploadValidationToken = existingValidationToken
-            ?? textView.pendingAttachmentUploadValidationToken()
-        let preparedAttachmentsByPath = Dictionary(
-            preparedAttachments.map {
-                ($0.fileURL.standardizedFileURL.path, $0)
-            },
-            uniquingKeysWith: { first, _ in first }
-        )
-        surface.hostedView.beginImageTransferIndicator(
-            for: operation,
-            onCancel: { _ = operation.cancel() }
+    func attachFileURLs(_ fileURLs: [URL], into textView: TextBoxInputTextView) -> Bool {
+        let standardizedURLs = fileURLs
+            .filter(\.isFileURL)
+            .map(\.standardizedFileURL)
+        guard !standardizedURLs.isEmpty else { return false }
+
+        let plan = TerminalImageTransferPlanner.plan(
+            fileURLs: standardizedURLs,
+            target: surface.resolvedImageTransferTarget(),
+            mode: .paste
         )
 
-        let finish: (Result<[String], Error>) -> Void = { [weak surface] result in
-            DispatchQueue.main.async {
-                @MainActor func removePendingPlaceholder() {
-                    guard textView.removePendingAttachmentUploadPlaceholder(
-                        id: placeholderID
-                    ) else {
-                        return
-                    }
-                    guard textViewReference.textView === textView else { return }
-                    attachments = textView.inlineAttachments()
-                    text = textView.plainText()
+        switch plan {
+        case .insertText, .insertTextSegments:
+            textView.insertAttachments(
+                standardizedURLs.map {
+                        TextBoxAttachment(
+                            localURL: $0,
+                            submissionText: TextBoxAttachment.submissionText(forLocalFileURL: $0),
+                            cleanupLocalURLWhenDisposed: TextBoxAttachment.shouldCleanupLocalURLWhenDisposed($0)
+                        )
                 }
-
-                surface?.hostedView.endImageTransferIndicator(for: operation)
-                guard operation.finish() else {
-                    removePendingPlaceholder()
-                    cleanupPreparedPasteFileURLs(
-                        fileURLs,
-                        using: preparationService
-                    )
-                    return
-                }
-
-                switch result {
-                case .success(let remotePaths):
-                    guard !remotePaths.isEmpty else {
-                        removePendingPlaceholder()
-                        cleanupPreparedPasteFileURLs(
-                            fileURLs,
-                            using: preparationService
-                        )
-                        NSSound.beep()
-                        return
-                    }
-                    let newAttachments = fileURLs.enumerated().compactMap { index, fileURL -> TextBoxAttachment? in
-                        guard remotePaths.indices.contains(index) else { return nil }
-                        if let preparedAttachment = preparedAttachmentsByPath[
-                            fileURL.standardizedFileURL.path
-                        ] {
-                            return TextBoxAttachment(
-                                preparedAttachment: preparedAttachment,
-                                submissionText: TextBoxAttachment.submissionText(
-                                    forPath: remotePaths[index]
-                                ),
-                                submissionPath: remotePaths[index],
-                                cleanupLocalURLWhenDisposed: true
-                            )
-                        }
-                        return TextBoxAttachment(
-                            localURL: fileURL,
-                            submissionText: TextBoxAttachment.submissionText(forPath: remotePaths[index]),
-                            submissionPath: remotePaths[index],
-                            cleanupLocalURLWhenDisposed: true
-                        )
-                    }
-                    guard !newAttachments.isEmpty else {
-                        removePendingPlaceholder()
-                        cleanupPreparedPasteFileURLs(
-                            fileURLs,
-                            using: preparationService
-                        )
-                        NSSound.beep()
-                        return
-                    }
-                    guard textViewReference.textView === textView,
-                          textView.canAcceptPendingAttachmentUpload(validationToken: uploadValidationToken) else {
-                        removePendingPlaceholder()
-                        cleanupPreparedPasteFileURLs(
-                            fileURLs,
-                            using: preparationService
-                        )
-                        return
-                    }
-                    guard textView.replacePendingAttachmentUploadPlaceholder(
-                        id: placeholderID,
-                        with: newAttachments
-                    ) else {
-                        removePendingPlaceholder()
-                        cleanupPreparedPasteFileURLs(
-                            fileURLs,
-                            using: preparationService
-                        )
-                        return
-                    }
-                    attachments = textView.inlineAttachments()
-                    text = textView.plainText()
-                case .failure:
-                    removePendingPlaceholder()
-                    cleanupPreparedPasteFileURLs(
-                        fileURLs,
-                        using: preparationService
-                    )
-                    NSSound.beep()
-                }
-            }
-        }
-
-        switch remoteTarget {
-        case .workspaceRemote:
-            guard let workspace = MainActor.assumeIsolated({
-                surface.owningWorkspace()
-            }) else {
-                finish(.failure(NSError(domain: "cmux.textbox.attachment", code: 3)))
-                return
-            }
-            workspace.uploadDroppedFilesForRemoteTerminal(
-                fileURLs,
-                operation: operation,
-                completion: finish
             )
-        case .detectedSSH(let session):
-            session.uploadDroppedFiles(
-                fileURLs,
-                operation: operation,
-                completion: finish
-            )
+            attachments = textView.inlineAttachments()
+            text = textView.plainText()
+            return true
+        case .reject:
+            return false
         }
     }
 

@@ -238,13 +238,7 @@ extension SidebarGitMetadataService {
             )
             return
         }
-        let shouldTrackPullRequests = sidebarPullRequestPollingEnabled
-        let resolvedPullRequest: SidebarPullRequestBadge? = {
-            guard shouldTrackPullRequests else { return nil }
-            guard case .resolved(let pullRequest) = snapshot.pullRequest else { return nil }
-            return pullRequest
-        }()
-        let shouldTrackGitDirectory = snapshot.isRepository || resolvedPullRequest != nil
+        let shouldTrackGitDirectory = snapshot.isRepository
         let shouldFinishProbe = shouldStopWorkspaceGitMetadataRefresh(snapshot) || isLastAttempt
         let shouldStopTrackingGitDirectory = shouldFinishProbe && !shouldTrackGitDirectory
         var didClearProbe = false
@@ -328,10 +322,6 @@ extension SidebarGitMetadataService {
             workspaceId: probeKey.workspaceId,
             panelId: probeKey.panelId
         )
-        let previousPullRequestBadge = host.panelPullRequestBadge(
-            workspaceId: probeKey.workspaceId,
-            panelId: probeKey.panelId
-        )
         var didApplyMaterialSidebarGitChange = false
         let nextBranch = snapshot.branch
         if let nextBranch {
@@ -386,82 +376,11 @@ extension SidebarGitMetadataService {
             host.clearPanelGitBranch(workspaceId: probeKey.workspaceId, panelId: probeKey.panelId)
         }
 
-        switch snapshot.pullRequest {
-        case .resolved(let pullRequest):
-            if shouldTrackPullRequests {
-                let nextBadge = SidebarPullRequestBadge(
-                    number: pullRequest.number,
-                    label: pullRequest.label,
-                    url: pullRequest.url,
-                    status: pullRequest.status,
-                    branch: pullRequest.branch,
-                    isStale: false
-                )
-                didApplyMaterialSidebarGitChange = didApplyMaterialSidebarGitChange
-                    || previousPullRequestBadge != nextBadge
-                host.updatePanelPullRequest(
-                    workspaceId: probeKey.workspaceId,
-                    panelId: probeKey.panelId,
-                    badge: nextBadge
-                )
-            } else if host.panelPullRequestBadge(
-                workspaceId: probeKey.workspaceId,
-                panelId: probeKey.panelId
-            ) != nil {
-                didApplyMaterialSidebarGitChange = true
-                host.clearPanelPullRequest(workspaceId: probeKey.workspaceId, panelId: probeKey.panelId)
-            }
-        case .notFound:
-            if host.panelPullRequestBadge(
-                workspaceId: probeKey.workspaceId,
-                panelId: probeKey.panelId
-            ) != nil {
-                didApplyMaterialSidebarGitChange = true
-                host.clearPanelPullRequest(workspaceId: probeKey.workspaceId, panelId: probeKey.panelId)
-            }
-        case .deferred, .unsupportedRepository, .transientFailure:
-            if !shouldTrackPullRequests,
-               host.panelPullRequestBadge(
-                   workspaceId: probeKey.workspaceId,
-                   panelId: probeKey.panelId
-               ) != nil {
-                didApplyMaterialSidebarGitChange = true
-                host.clearPanelPullRequest(workspaceId: probeKey.workspaceId, panelId: probeKey.panelId)
-            }
-        }
-        let isPullRequestRefreshTracked = pullRequestProbing
-            .workspacePullRequestTrackedPanelIds(workspaceId: probeKey.workspaceId)
-            .contains(probeKey.panelId)
-        if let nextBranch,
-           shouldTrackPullRequests,
-           previousBranchState?.branch != nextBranch || !isPullRequestRefreshTracked {
-            pullRequestProbing.scheduleWorkspacePullRequestRefresh(
-                workspaceId: probeKey.workspaceId,
-                panelId: probeKey.panelId,
-                reason: "localGitProbe"
-            )
-        }
-
 #if DEBUG
         let branchLabel = snapshot.branch ?? "none"
-        let prLabel: String = {
-            switch snapshot.pullRequest {
-            case .deferred:
-                return "deferred"
-            case .unsupportedRepository:
-                return "unsupported"
-            case .notFound:
-                return "none"
-            case .transientFailure:
-                return "transientFailure"
-            case .resolved(let pullRequest):
-                return "#\(pullRequest.number):\(pullRequest.status.rawValue)"
-            }
-        }()
         debugLog(
             "workspace.gitProbe.apply workspace=\(probeKey.workspaceId.uuidString.prefix(5)) " +
-            "panel=\(probeKey.panelId.uuidString.prefix(5)) branch=\(branchLabel) dirty=\(snapshot.isDirty ? 1 : 0) " +
-            "pr=\(prLabel)"
+            "panel=\(probeKey.panelId.uuidString.prefix(5)) branch=\(branchLabel) dirty=\(snapshot.isDirty ? 1 : 0)"
         )
 #endif
     }
@@ -469,14 +388,6 @@ extension SidebarGitMetadataService {
     private func shouldStopWorkspaceGitMetadataRefresh(
         _ snapshot: InitialWorkspaceGitMetadataSnapshot
     ) -> Bool {
-        if snapshot.isRepository {
-            return false
-        }
-        switch snapshot.pullRequest {
-        case .deferred, .transientFailure:
-            return false
-        case .unsupportedRepository, .notFound, .resolved:
-            return true
-        }
+        !snapshot.isRepository
     }
 }

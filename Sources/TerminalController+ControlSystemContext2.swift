@@ -32,7 +32,6 @@ extension TerminalController {
         routing: ControlRoutingSelectors,
         actionKey: String?,
         title: String?,
-        rawURL: String?,
         surfaceID: UUID?,
         requestedFocus: Bool,
         moveParams: [String: JSONValue]
@@ -55,10 +54,6 @@ extension TerminalController {
         let resolvedSurfaceId: UUID?
         if let surfaceID {
             resolvedSurfaceId = surfaceID
-        } else if resolvesMirroredTab,
-                  let paneID = routing.paneID,
-                  let location = workspace.remoteTmuxControlPane(paneID: paneID) {
-            resolvedSurfaceId = location.pane.panel.id
         } else if resolvesMirroredTab {
             resolvedSurfaceId = workspace.focusedPanelId.flatMap {
                 workspace.controlSurfaceProjection(forContainerPanelID: $0)?.surfaceID
@@ -191,30 +186,6 @@ extension TerminalController {
                 ))
             }
 
-        case "reload", "reload_tab":
-            guard let browserPanel = workspace.browserPanel(for: panelId) else {
-                return .reloadNotBrowser
-            }
-            browserPanel.reload()
-            return finish(.none)
-
-        case "duplicate", "duplicate_tab":
-            guard let browserPanel = workspace.browserPanel(for: panelId) else {
-                return .duplicateNotBrowser
-            }
-            guard BrowserAvailabilitySettings.isEnabled() else {
-                return .browserDisabled(tabActionBrowserDisabledOutcome(
-                    rawURL: nil,
-                    url: browserPanel.currentURLForTabDuplication,
-                    tabManager: tabManager
-                ))
-            }
-
-            guard let newPanel = workspace.duplicateBrowserToRight(panelId: panelId, focus: focus) else {
-                return .duplicateFailed
-            }
-            return finish(.created(newPanel.id))
-
         case "new_terminal_right", "new_terminal_to_right", "new_terminal_tab_to_right":
             guard let anchorTabId = workspace.surfaceIdFromPanelId(panelId),
                   let paneId = workspace.paneId(forPanelId: panelId) else {
@@ -233,42 +204,12 @@ extension TerminalController {
                 _ = workspace.reorderSurface(panelId: newPanel.id, toIndex: targetIndex, focus: focus)
                 return finish(.created(newPanel.id))
             case .routedToRemote:
-                // Routed to the remote tmux mirror as `new-window`; the tab arrives
-                // via %window-add and the mirror positions it, so no local reorder here.
+                // Routed to the terminal's remote owner; the tab arrives
+                // asynchronously, so no local reorder here.
                 return finish(.routedToRemote)
             case .failed:
                 return .createFailed
             }
-
-        case "new_browser_right", "new_browser_to_right", "new_browser_tab_to_right":
-            guard let anchorTabId = workspace.surfaceIdFromPanelId(panelId),
-                  let paneId = workspace.paneId(forPanelId: panelId) else {
-                return .tabPaneNotFound
-            }
-
-            let url = rawURL.flatMap { URL(string: $0) }
-            if let rawURL, url == nil {
-                return .invalidURL(rawURL: rawURL)
-            }
-            guard BrowserAvailabilitySettings.isEnabled() else {
-                return .browserDisabled(tabActionBrowserDisabledOutcome(
-                    rawURL: rawURL,
-                    url: url,
-                    tabManager: tabManager
-                ))
-            }
-
-            let targetIndex = insertionIndexToRight(anchorTabId: anchorTabId, inPane: paneId)
-            guard let newPanel = workspace.newBrowserSurface(
-                inPane: paneId,
-                url: url,
-                focus: focus,
-                creationPolicy: .automationPreload
-            ) else {
-                return .createFailed
-            }
-            _ = workspace.reorderSurface(panelId: newPanel.id, toIndex: targetIndex, focus: focus)
-            return finish(.created(newPanel.id))
 
         case "close_left", "close_to_left":
             guard let anchorTabId = workspace.surfaceIdFromPanelId(panelId),
@@ -313,8 +254,6 @@ extension TerminalController {
     }
 
     /// Preserves the legacy workspace resolver for non-rename tab actions.
-    /// Remote tmux projections are window-tab aliases only for rename;
-    /// unrelated actions retain their existing workspace-panel semantics.
     private func controlTabActionResolveWorkspace(
         routing: ControlRoutingSelectors,
         tabManager: TabManager
@@ -331,25 +270,5 @@ extension TerminalController {
         }
         guard let wsId = tabManager.selectedTabId else { return nil }
         return tabManager.tabs.first(where: { $0.id == wsId })
-    }
-
-    /// The byte-faithful twin of `v2BrowserDisabledExternalOpenResult`, mapped
-    /// onto the shared ``ControlSurfaceBrowserDisabledOutcome``.
-    private func tabActionBrowserDisabledOutcome(
-        rawURL: String?,
-        url: URL?,
-        tabManager: TabManager?
-    ) -> ControlSurfaceBrowserDisabledOutcome {
-        if let rawURL, url == nil {
-            return .invalidURL(rawURL: rawURL)
-        }
-        guard let url else {
-            return .noURL
-        }
-        guard NSWorkspace.shared.open(url) else {
-            return .externalOpenFailed(url: url.absoluteString)
-        }
-        let windowId = v2ResolveWindowId(tabManager: tabManager)
-        return .openedExternally(windowID: windowId, url: url.absoluteString)
     }
 }

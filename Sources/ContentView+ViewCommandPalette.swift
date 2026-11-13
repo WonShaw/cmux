@@ -37,9 +37,8 @@ extension ContentView {
             { _ in value }
         }
 
-        func browserOrTextPreview(_ context: CommandPaletteContextSnapshot) -> Bool {
-            context.bool(CommandPaletteContextKeys.panelIsBrowser)
-                || context.bool(CommandPaletteContextKeys.panelIsFilePreviewTextEditor)
+        func textPreview(_ context: CommandPaletteContextSnapshot) -> Bool {
+            context.bool(CommandPaletteContextKeys.panelIsFilePreviewTextEditor)
         }
 
         contributions.append(
@@ -47,8 +46,8 @@ extension ContentView {
                 commandId: "palette.browserZoomIn",
                 title: constant(String(localized: "command.browserZoomIn.title", defaultValue: "Zoom In")),
                 subtitle: panelSubtitle,
-                keywords: ["browser", "file", "text", "preview", "zoom", "font", "in"],
-                when: browserOrTextPreview
+                keywords: ["file", "text", "preview", "zoom", "font", "in"],
+                when: textPreview
             )
         )
         contributions.append(
@@ -56,8 +55,8 @@ extension ContentView {
                 commandId: "palette.browserZoomOut",
                 title: constant(String(localized: "command.browserZoomOut.title", defaultValue: "Zoom Out")),
                 subtitle: panelSubtitle,
-                keywords: ["browser", "file", "text", "preview", "zoom", "font", "out"],
-                when: browserOrTextPreview
+                keywords: ["file", "text", "preview", "zoom", "font", "out"],
+                when: textPreview
             )
         )
         contributions.append(
@@ -65,8 +64,8 @@ extension ContentView {
                 commandId: "palette.browserZoomReset",
                 title: constant(String(localized: "command.browserZoomReset.title", defaultValue: "Actual Size")),
                 subtitle: panelSubtitle,
-                keywords: ["browser", "file", "text", "preview", "zoom", "font", "reset", "actual size"],
-                when: browserOrTextPreview
+                keywords: ["file", "text", "preview", "zoom", "font", "reset", "actual size"],
+                when: textPreview
             )
         )
     }

@@ -104,84 +104,13 @@ final class SimulatorCameraFrameProducer {
         captureDelegate = nil
     }
 
-    private func startHostCamera(deviceIdentifier: String?) async throws {
-        let authorized: Bool
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized:
-            authorized = true
-        case .notDetermined:
-            authorized = await AVCaptureDevice.requestAccess(for: .video)
-        case .denied, .restricted:
-            authorized = false
-        @unknown default:
-            authorized = false
-        }
-        guard authorized else {
-            throw SimulatorWorkerFailure.privateAPIUnavailable(
-                "Camera access is required to mirror a host camera into Simulator."
-            )
-        }
-
-        let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera],
-            mediaType: .video,
-            position: .unspecified
+    /// The offline build never captures from a host camera: the app carries no
+    /// camera usage description or entitlement, so the source is rejected.
+    private func startHostCamera(deviceIdentifier _: String?) async throws {
+        throw SimulatorWorkerFailure.privateAPIUnavailable(
+            "Host-camera mirroring is not available in this build."
         )
-        let device: AVCaptureDevice?
-        if let deviceIdentifier {
-            device = discovery.devices.first { $0.uniqueID == deviceIdentifier }
-        } else {
-            device = discovery.devices.first
-        }
-        guard let device else {
-            throw SimulatorWorkerFailure.privateAPIUnavailable(
-                "The requested host camera is not available."
-            )
-        }
-
-        let session = AVCaptureSession()
-        session.beginConfiguration()
-        session.sessionPreset = .hd1280x720
-        let input = try AVCaptureDeviceInput(device: device)
-        guard session.canAddInput(input) else {
-            throw SimulatorWorkerFailure.privateAPIUnavailable(
-                "AVFoundation rejected the selected host camera input."
-            )
-        }
-        session.addInput(input)
-
-        let output = AVCaptureVideoDataOutput()
-        output.videoSettings = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-        ]
-        output.alwaysDiscardsLateVideoFrames = true
-        guard session.canAddOutput(output) else {
-            throw SimulatorWorkerFailure.privateAPIUnavailable(
-                "AVFoundation rejected host-camera frame output."
-            )
-        }
-        session.addOutput(output)
-        session.commitConfiguration()
-
-        let delegate = SimulatorCameraCaptureDelegate(surfaceRing: surfaceRing)
-        output.setSampleBufferDelegate(
-            delegate,
-            queue: captureQueue
-        )
-        captureDelegate = delegate
-        let sessionBox = SimulatorCameraCaptureSessionBox(session)
-        captureSession = sessionBox
-        await sessionRunner.start(sessionBox)
-        do {
-            try Task.checkCancellation()
-        } catch {
-            await sessionRunner.stop(sessionBox)
-            captureSession = nil
-            captureDelegate = nil
-            throw error
-        }
     }
-
 }
 
 private func unwrappedSimulatorCameraSource(
@@ -193,12 +122,7 @@ private func unwrappedSimulatorCameraSource(
     return configuration
 }
 
+/// No host cameras are offered: this build does not request camera access.
 func simulatorAvailableHostCameras() -> [SimulatorHostCameraDevice] {
-    AVCaptureDevice.DiscoverySession(
-        deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera],
-        mediaType: .video,
-        position: .unspecified
-    ).devices.map {
-        SimulatorHostCameraDevice(id: $0.uniqueID, name: $0.localizedName)
-    }
+    []
 }

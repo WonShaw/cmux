@@ -224,38 +224,6 @@ struct WorkspaceAdjacentPaneMoveTests {
         #expect((workspace.panels[movedPanelId] as? TerminalPanel) === terminal)
     }
 
-    @Test func browserAndWebViewKeepIdentityAcrossPaneTransfer() throws {
-        let workspace = Workspace()
-        let terminalPanelId = try #require(workspace.focusedPanelId)
-        let sourcePaneId = try #require(
-            workspace.paneId(forPanelId: terminalPanelId)
-        )
-        let browser = try #require(
-            workspace.newBrowserSurface(
-                inPane: sourcePaneId,
-                focus: false,
-                creationPolicy: .restoration
-            )
-        )
-        let webView = browser.webView
-        let destinationPanel = try #require(
-            workspace.newTerminalSplit(
-                from: terminalPanelId,
-                orientation: .horizontal,
-                focus: false
-            )
-        )
-        let destinationPaneId = try #require(
-            workspace.paneId(forPanelId: destinationPanel.id)
-        )
-        workspace.focusPanel(browser.id)
-
-        #expect(workspace.moveFocusedSurface(to: .right))
-        #expect(workspace.paneId(forPanelId: browser.id) == destinationPaneId)
-        #expect((workspace.panels[browser.id] as? BrowserPanel) === browser)
-        #expect(browser.webView === webView)
-    }
-
     @Test(arguments: [
         SurfacePaneMovement.left,
         .right,
@@ -373,40 +341,6 @@ struct WorkspaceAdjacentPaneMoveTests {
             paneId(in: sourceRegion.second) ==
                 (expectation.insertFirst ? sourcePaneId.id : destinationPaneId.id)
         )
-    }
-
-    @Test func missingDestinationPreservesBrowserAndWebViewIdentity() throws {
-        let workspace = Workspace()
-        let terminalPanelId = try #require(workspace.focusedPanelId)
-        let sourcePaneId = try #require(
-            workspace.paneId(forPanelId: terminalPanelId)
-        )
-        let browser = try #require(
-            workspace.newBrowserSurface(
-                inPane: sourcePaneId,
-                focus: true,
-                creationPolicy: .restoration
-            )
-        )
-        let webView = browser.webView
-        #expect(workspace.closePanel(terminalPanelId, force: true))
-
-        #expect(workspace.moveFocusedSurface(to: .right))
-        let destinationPaneId = try #require(
-            workspace.paneId(forPanelId: browser.id)
-        )
-
-        #expect(destinationPaneId != sourcePaneId)
-        #expect((workspace.panels[browser.id] as? BrowserPanel) === browser)
-        #expect(browser.webView === webView)
-        #expect(workspace.focusedPanelId == browser.id)
-        #expect(workspace.bonsplitController.focusedPaneId == destinationPaneId)
-
-        let replacementPanelIds = panelOrder(in: workspace, paneId: sourcePaneId)
-        #expect(replacementPanelIds.count == 1)
-        let replacementPanelId = try #require(replacementPanelIds.first)
-        #expect(replacementPanelId != browser.id)
-        #expect(workspace.panels[replacementPanelId] is TerminalPanel)
     }
 
     @Test func previousAndNextAreNoOpsWithASinglePane() throws {

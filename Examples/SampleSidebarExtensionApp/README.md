@@ -8,7 +8,7 @@ This is a standalone macOS app that embeds a CMUX sidebar ExtensionKit app exten
 2. Select the app and extension targets.
 3. Replace the Manaflow signing team with your own team.
 4. Replace the app and extension bundle identifiers with your own reverse-DNS identifiers.
-5. Keep the extension point identifier as `com.cmuxterm.app.cmux.sidebar`.
+5. Keep the extension point identifier as `com.comux.app.cmux.sidebar`.
 6. Keep App Sandbox enabled for the extension target. An unsandboxed appex can
    build, embed, and sign without registering with ExtensionKit.
 7. Build and launch the containing app once.
@@ -113,7 +113,7 @@ Extensions browser. You can also check system discovery directly:
 pluginkit -mAvvv
 ```
 
-The normal CMUX release uses `com.cmuxterm.app.cmux.sidebar`. Tagged development
+The normal CMUX release uses `com.comux.app.cmux.sidebar`. Tagged development
 builds use the point stored in the host's `CMUXSidebarExtensionPointIdentifier`
 Info.plist key (currently `<host-bundle-id>.cmux.sidebar`), so do not filter on
 the production point when diagnosing a tagged or custom host.

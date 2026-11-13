@@ -20,9 +20,6 @@ public enum ControlPaneResizeResolution: Sendable, Equatable {
     /// The pane id did not match any pane (legacy `not_found` / "Pane not
     /// found", `data: {"pane_id": …}`). Carries the unresolved pane id.
     case paneNotFound(UUID)
-    /// The pane resolved, but its remote layout owner could not accept the
-    /// resize. Carries the pane id and localized recovery message.
-    case remoteResizeUnavailable(paneID: UUID, message: String)
     /// The pane resolved locally, but a tmux-compatible request did not carry
     /// the native point fallback needed to mutate its Bonsplit layout.
     case localResizeUnavailable(paneID: UUID, message: String)
@@ -48,24 +45,6 @@ public enum ControlPaneResizeResolution: Sendable, Equatable {
     /// "Failed to set split divider position", `data: {"split_id": …}`). Carries
     /// the split id.
     case setDividerFailed(splitID: UUID)
-    /// A remote absolute resize was accepted by the control-mode writer. Tmux's
-    /// next layout publication remains authoritative for the applied geometry.
-    case remoteAbsoluteResizeRequested(
-        windowID: UUID?,
-        workspaceID: UUID,
-        paneID: UUID,
-        absoluteAxis: String,
-        targetPixels: Double?
-    )
-    /// A remote relative resize was accepted by the control-mode writer. Tmux's
-    /// next layout publication remains authoritative for the applied geometry.
-    case remoteRelativeResizeRequested(
-        windowID: UUID?,
-        workspaceID: UUID,
-        paneID: UUID,
-        direction: String,
-        amount: Int?
-    )
     /// The absolute resize succeeded. Carries the echoed identity plus the
     /// split, axis, target pixels, and old/new divider positions.
     case absoluteResized(

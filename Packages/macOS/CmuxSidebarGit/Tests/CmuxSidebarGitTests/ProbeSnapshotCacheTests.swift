@@ -13,7 +13,6 @@ import CmuxGit
         let service = SidebarGitMetadataService(
             workspaceGitMetadataReader: reader,
             gitMetadataService: GitMetadataService(),
-            pullRequestProbing: RecordingPullRequestProbing(),
             probeLimiter: WorkspaceGitMetadataProbeLimiter(limit: 2),
             clock: clock
         )

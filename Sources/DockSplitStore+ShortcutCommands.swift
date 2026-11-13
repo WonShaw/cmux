@@ -35,7 +35,6 @@ enum DockShortcutCommand {
     case findPrevious
     case hideFind
     case useSelectionForFind
-    case toggleReactGrab
     case reopenClosedPanel
 
     var isFocusHistoryNavigation: Bool {
@@ -147,8 +146,6 @@ extension DockSplitStore {
             return hideDockFind()
         case .useSelectionForFind:
             return useDockSelectionForFind()
-        case .toggleReactGrab:
-            return toggleDockReactGrab()
         case .reopenClosedPanel:
             return reopenMostRecentlyClosedPanel()
         }
@@ -195,11 +192,6 @@ extension DockSplitStore {
     private var focusedDockTerminalPanel: TerminalPanel? {
         guard let focusedPanelId else { return nil }
         return panels[focusedPanelId] as? TerminalPanel
-    }
-
-    private var focusedDockBrowserPanel: BrowserPanel? {
-        guard let focusedPanelId else { return nil }
-        return panels[focusedPanelId] as? BrowserPanel
     }
 
     private func promptRenameFocusedDockSurface(
@@ -483,13 +475,7 @@ extension DockSplitStore {
                 )
             }
         }
-        guard let browser = focusedDockBrowserPanel else {
-            return false
-        }
-        browser.startFind()
-        // A diff viewer page owns find in-page; the native bar stays hidden
-        // but the shortcut was handled.
-        return browser.searchState != nil || browser.isDiffViewerFindOwner
+        return false
     }
 
     private func performDockFindNavigation(
@@ -500,16 +486,7 @@ extension DockSplitStore {
                 terminal.performBindingAction($0)
             }
         }
-        guard let browser = focusedDockBrowserPanel else {
-            return false
-        }
-        switch navigation {
-        case .next:
-            browser.findNext()
-        case .previous:
-            browser.findPrevious()
-        }
-        return true
+        return false
     }
 
     private func hideDockFind() -> Bool {
@@ -517,11 +494,7 @@ extension DockSplitStore {
             terminal.surface.closeSearchFromExplicitInput()
             return true
         }
-        guard let browser = focusedDockBrowserPanel else {
-            return false
-        }
-        browser.hideFind()
-        return true
+        return false
     }
 
     private func useDockSelectionForFind() -> Bool {
@@ -537,111 +510,6 @@ extension DockSplitStore {
         )
         _ = terminal.performBindingAction("search_selection")
         return true
-    }
-
-    func toggleDockReactGrab(
-        targeting explicitBrowserPanelId: UUID? = nil,
-        returnTo explicitReturnTerminalPanelId: UUID? = nil
-    ) -> Bool {
-        let snapshots = panels.values.map {
-            ReactGrabShortcutPanelSnapshot(
-                id: $0.id,
-                panelType: $0.panelType,
-                isFocused: $0.id == focusedPanelId
-            )
-        }
-        let route = resolveReactGrabShortcutRoute(panels: snapshots)
-        let browserPanelId: UUID
-        let returnTerminalPanelId: UUID?
-        if let explicitBrowserPanelId {
-            guard panels[explicitBrowserPanelId] is BrowserPanel else {
-                return false
-            }
-            browserPanelId = explicitBrowserPanelId
-            if let explicitReturnTerminalPanelId {
-                guard panels[explicitReturnTerminalPanelId]
-                    is TerminalPanel else {
-                    return false
-                }
-                returnTerminalPanelId = explicitReturnTerminalPanelId
-            } else {
-                returnTerminalPanelId = nil
-            }
-        } else {
-            guard explicitReturnTerminalPanelId == nil else {
-                return false
-            }
-            guard let route else { return false }
-            browserPanelId = route.browserPanelId
-            returnTerminalPanelId = route.returnTerminalPanelId
-        }
-        guard let browser = panels[browserPanelId] as? BrowserPanel else {
-            return false
-        }
-
-        if let returnTerminalPanelId {
-            browser.armReactGrabRoundTrip(
-                returnTo: returnTerminalPanelId
-            )
-        } else {
-            browser.clearReactGrabRoundTrip(
-                reason: "shortcut.noReturnTarget"
-            )
-        }
-        if focusedPanelId != browser.id {
-            if let zoomedPaneId = bonsplitController.zoomedPaneId {
-                _ = toggleDockPaneZoom(inPane: zoomedPaneId)
-            }
-            focusPanelFromDockInteraction(browser.id, window: nil)
-        }
-
-        let didRequestExplicitWebViewFocus =
-            browser.requestExplicitWebViewFocus()
-        cancelDockReactGrabTask()
-        let taskID = UUID()
-        reactGrabTaskID = taskID
-        reactGrabTaskPanelId = browser.id
-        reactGrabTask = Task { @MainActor [weak self, weak browser] in
-            defer {
-                if self?.reactGrabTaskID == taskID {
-                    self?.reactGrabTask = nil
-                    self?.reactGrabTaskID = nil
-                    self?.reactGrabTaskPanelId = nil
-                }
-            }
-            guard !Task.isCancelled,
-                  self?.reactGrabTaskID == taskID,
-                  let browser else {
-                return
-            }
-            if returnTerminalPanelId != nil {
-                await browser.ensureReactGrabActive()
-            } else {
-                await browser.toggleOrInjectReactGrab()
-            }
-            guard !Task.isCancelled,
-                  self?.reactGrabTaskID == taskID else {
-                return
-            }
-            if !didRequestExplicitWebViewFocus {
-                _ = browser.requestExplicitWebViewFocus()
-            }
-        }
-        return true
-    }
-
-    /// Cancels pending Dock React Grab work when a newer command supersedes it
-    /// or its owning browser is torn down.
-    func cancelDockReactGrabTask(
-        targetingPanelId panelId: UUID? = nil
-    ) {
-        if let panelId, reactGrabTaskPanelId != panelId {
-            return
-        }
-        reactGrabTask?.cancel()
-        reactGrabTask = nil
-        reactGrabTaskID = nil
-        reactGrabTaskPanelId = nil
     }
 }
 

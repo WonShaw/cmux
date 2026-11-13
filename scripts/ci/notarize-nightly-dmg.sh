@@ -18,8 +18,6 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 SMOKE_TOOL="${CMUX_SMOKE_TOOL:-$ROOT_DIR/scripts/smoke-launch-macos-app.sh}"
 VERIFY_METADATA_TOOL="${CMUX_VERIFY_METADATA_TOOL:-$ROOT_DIR/scripts/verify-app-bundle-channel-metadata.sh}"
 VERIFY_LICENSES_TOOL="${CMUX_VERIFY_LICENSES_TOOL:-$ROOT_DIR/scripts/verify-app-bundle-licenses.sh}"
-NOTARIZE_COMPUTER_USE_HELPER_TOOL="${CMUX_NOTARIZE_COMPUTER_USE_HELPER_TOOL:-$ROOT_DIR/scripts/ci/notarize-computer-use-helper.sh}"
-COMPUTER_USE_NOTARY_SUBMISSION_FILE="${CMUX_COMPUTER_USE_NOTARY_SUBMISSION_FILE:-}"
 # Release channel of the app being packaged: `nightly` (default) or `rc`. It
 # selects the entitlements file and the bundle-metadata check; the packaging,
 # notarization, and stapling steps are identical for both.
@@ -61,19 +59,6 @@ cleanup() {
   rm -rf "$DMG_TMP_DIR"
 }
 trap cleanup EXIT
-
-if [ -n "$COMPUTER_USE_NOTARY_SUBMISSION_FILE" ]; then
-  "$NOTARIZE_COMPUTER_USE_HELPER_TOOL" \
-    --finish "$COMPUTER_USE_NOTARY_SUBMISSION_FILE" \
-    "$APP_PATH" \
-    "$APP_ENTITLEMENTS" \
-    "$APPLE_SIGNING_IDENTITY"
-else
-  "$NOTARIZE_COMPUTER_USE_HELPER_TOOL" \
-    "$APP_PATH" \
-    "$APP_ENTITLEMENTS" \
-    "$APPLE_SIGNING_IDENTITY"
-fi
 
 "$CREATE_DMG_TOOL" --no-code-sign "$APP_PATH" "$DMG_TMP_DIR"
 CREATED_DMG="$(find "$DMG_TMP_DIR" -maxdepth 1 -name '*.dmg' -print -quit)"

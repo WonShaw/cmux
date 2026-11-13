@@ -240,48 +240,6 @@ struct CMUXExtensionKitTests {
     }
 
     @Test
-    @MainActor
-    func testSidebarHostTypedHelpersSendExpectedActions() async throws {
-        var actions = [CmuxSidebarAction]()
-        var refreshCount = 0
-        let workspaceID = UUID(uuidString: "77777777-7777-7777-7777-777777777777")!
-        let url = URL(string: "https://example.com/pr/1")!
-        let host = CmuxSidebarHost(
-            performAction: { action, reply in
-                actions.append(action)
-                reply(CmuxSidebarActionResult(accepted: true))
-            },
-            refreshSnapshot: {
-                refreshCount += 1
-            }
-        )
-
-        host.refresh()
-        try await host.selectWorkspace(workspaceID)
-        try await host.closeWorkspace(workspaceID)
-        try await host.createWorkspace(title: "Scratch", select: false)
-        try await host.createWorkspace(title: "Path Scratch", at: "/tmp/scratch", select: false)
-        try await host.selectNextWorkspace()
-        try await host.selectPreviousWorkspace()
-        try await host.createTerminalSurface(in: workspaceID)
-        try await host.createBrowserSurface(in: workspaceID, url: url)
-        try await host.openURL(url)
-
-        #expect(refreshCount == 1)
-        #expect(actions == [
-            .selectWorkspace(workspaceID),
-            .closeWorkspace(workspaceID),
-            .createWorkspace(title: "Scratch", workingDirectory: nil, select: false),
-            .createWorkspace(title: "Path Scratch", workingDirectory: "/tmp/scratch", select: false),
-            .selectNextWorkspace,
-            .selectPreviousWorkspace,
-            .createTerminalSurface(workspaceID: workspaceID),
-            .createBrowserSurface(workspaceID: workspaceID, url: "https://example.com/pr/1"),
-            .openURL("https://example.com/pr/1"),
-        ])
-    }
-
-    @Test
     func testWorkspaceListScopeDoesNotExposeMetadata() throws {
         let workspaceID = UUID(uuidString: "99999999-9999-9999-9999-999999999999")!
         let snapshot = CmuxSidebarSnapshot(
@@ -325,17 +283,6 @@ struct CMUXExtensionKitTests {
         #expect(workspace.listeningPorts.isEmpty)
         #expect(workspace.pullRequestURLs.isEmpty)
         #expect(workspace.surfaces.isEmpty)
-    }
-
-    @Test
-    func testURLBearingBrowserActionsRequireOpenURLScope() {
-        let workspaceID = UUID(uuidString: "77777777-7777-7777-7777-777777777777")!
-        let surfaceID = UUID(uuidString: "88888888-8888-8888-8888-888888888888")!
-
-        #expect(CmuxSidebarAction.createBrowserSurface(workspaceID: workspaceID, url: nil).requiredScopes == [.createSurface])
-        #expect(CmuxSidebarAction.createBrowserSurface(workspaceID: workspaceID, url: "https://example.com").requiredScopes == [.createSurface, .openURL])
-        #expect(CmuxSidebarAction.splitBrowser(workspaceID: workspaceID, surfaceID: surfaceID, direction: .right, url: nil).requiredScopes == [.splitSurface])
-        #expect(CmuxSidebarAction.splitBrowser(workspaceID: workspaceID, surfaceID: surfaceID, direction: .right, url: "https://example.com").requiredScopes == [.splitSurface, .openURL])
     }
 
     @Test

@@ -123,7 +123,7 @@ final class KeyboardShortcutSettingsFileStoreMigrationTests: XCTestCase {
             """
             {
               "shortcuts": {
-                "openBrowser": "cmd+2"
+                "toggleSidebar": "cmd+2"
               }
             }
             """,

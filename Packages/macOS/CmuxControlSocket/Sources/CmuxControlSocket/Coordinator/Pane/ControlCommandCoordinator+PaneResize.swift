@@ -115,12 +115,6 @@ extension ControlCommandCoordinator {
             return .err(code: "not_found", message: "Pane not found", data: .object(["pane_id": .string(id.uuidString)]))
         case .paneNotFoundInTree(let id):
             return .err(code: "not_found", message: "Pane not found in split tree", data: .object(["pane_id": .string(id.uuidString)]))
-        case .remoteResizeUnavailable(let paneID, let message):
-            return .err(
-                code: "unavailable",
-                message: message,
-                data: .object(["pane_id": .string(paneID.uuidString)])
-            )
         case .localResizeUnavailable(let paneID, let message):
             return .err(
                 code: "unavailable",
@@ -151,36 +145,6 @@ extension ControlCommandCoordinator {
                 message: "Failed to set split divider position",
                 data: .object(["split_id": .string(splitID.uuidString)])
             )
-        case .remoteAbsoluteResizeRequested(let windowID, let workspaceID, let paneID, let axis, let targetPixels):
-            var payload: [String: JSONValue] = [
-                "window_id": orNull(windowID?.uuidString),
-                "window_ref": ref(.window, windowID),
-                "workspace_id": .string(workspaceID.uuidString),
-                "workspace_ref": ref(.workspace, workspaceID),
-                "pane_id": .string(paneID.uuidString),
-                "pane_ref": ref(.pane, paneID),
-                "absolute_axis": .string(axis),
-                "remote": .bool(true),
-            ]
-            if let targetPixels {
-                payload["target_pixels"] = .double(targetPixels)
-            }
-            return .ok(.object(payload))
-        case .remoteRelativeResizeRequested(let windowID, let workspaceID, let paneID, let direction, let amount):
-            var payload: [String: JSONValue] = [
-                "window_id": orNull(windowID?.uuidString),
-                "window_ref": ref(.window, windowID),
-                "workspace_id": .string(workspaceID.uuidString),
-                "workspace_ref": ref(.workspace, workspaceID),
-                "pane_id": .string(paneID.uuidString),
-                "pane_ref": ref(.pane, paneID),
-                "direction": .string(direction),
-                "remote": .bool(true),
-            ]
-            if let amount {
-                payload["amount"] = .int(Int64(amount))
-            }
-            return .ok(.object(payload))
         case .absoluteResized(let windowID, let workspaceID, let paneID, let splitID, let axis, let targetPixels, let old, let new):
             return .ok(.object([
                 "window_id": orNull(windowID?.uuidString),

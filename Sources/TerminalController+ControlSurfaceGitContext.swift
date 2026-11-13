@@ -18,7 +18,7 @@ extension TerminalController {
             requestedSurfaceId: requestedSurfaceID,
             validSurfaceIds: validSurfaceIDs
         ), validSurfaceIDs.contains(surfaceID) else {
-            return workspace.isRemoteWorkspace && validSurfaceIDs.isEmpty ? .pending : .surfaceNotFound
+            return .surfaceNotFound
         }
 
         let existing = workspace.reportedPanelGitBranch(panelId: surfaceID)
@@ -50,7 +50,7 @@ extension TerminalController {
             requestedSurfaceId: requestedSurfaceID,
             validSurfaceIds: validSurfaceIDs
         ), validSurfaceIDs.contains(surfaceID) else {
-            return workspace.isRemoteWorkspace && validSurfaceIDs.isEmpty ? .pending : .surfaceNotFound
+            return .surfaceNotFound
         }
 
         if let manager = AppDelegate.shared?.tabManagerFor(tabId: workspaceID) ?? tabManager {

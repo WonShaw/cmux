@@ -5,7 +5,7 @@ import Foundation
 /// notification when the checklist first becomes fully complete (n/n, n > 0).
 /// This reuses the same delivery path as the app's other workspace-level
 /// notifications (`AppDelegate.shared.notificationStore.addNotification`,
-/// `surfaceId: nil`), mirroring `Workspace.applyRemoteConnectionStateUpdate`.
+/// `surfaceId: nil`).
 ///
 /// The `Workspace+Todos` mutation entry points route their mutation through
 /// the wrapper below, which samples the before/after state and fires only on

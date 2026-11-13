@@ -3,10 +3,6 @@ import AppKit
 extension AppDelegate {
     func clearRecentlyClosedHistory(preferredTabManager: TabManager? = nil) {
         ClosedItemHistoryStore.shared.removeAll()
-
-        for manager in liveWorkspaceIdentityTabManagers(preferredTabManager: preferredTabManager) {
-            manager.clearRecentlyClosedBrowserPanelHistory()
-        }
     }
 
     @discardableResult
@@ -30,29 +26,7 @@ extension AppDelegate {
             )
         }
 
-        for manager in recentlyClosedLegacyBrowserManagers(preferredTabManager: preferredTabManager) {
-            guard let closedAt = manager.mostRecentLegacyClosedBrowserPanelClosedAt() else {
-                continue
-            }
-            if restoreStoreItem(closedAt) {
-                return true
-            }
-            if manager.reopenMostRecentlyClosedBrowserPanelFromLegacyStack() {
-                return true
-            }
-        }
-
         return restoreStoreItem(nil)
-    }
-
-    private func recentlyClosedLegacyBrowserManagers(preferredTabManager: TabManager?) -> [TabManager] {
-        let managers = liveWorkspaceIdentityTabManagers(preferredTabManager: preferredTabManager)
-            .filter { $0.mostRecentLegacyClosedBrowserPanelClosedAt() != nil }
-        return managers.sorted { lhs, rhs in
-            let lhsDate = lhs.mostRecentLegacyClosedBrowserPanelClosedAt() ?? .distantPast
-            let rhsDate = rhs.mostRecentLegacyClosedBrowserPanelClosedAt() ?? .distantPast
-            return lhsDate > rhsDate
-        }
     }
 
     @discardableResult

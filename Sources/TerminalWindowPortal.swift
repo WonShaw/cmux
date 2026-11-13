@@ -1037,9 +1037,6 @@ final class WindowTerminalPortal: NSObject {
         // runs pending inner layout before display on its own.
         let signature = externalGeometrySignature()
         if let last = lastHierarchySyncSignature, last == signature { return true }
-#if DEBUG
-        RemoteTmuxSizingDiagnostics.fullHierarchySyncCount += 1
-#endif
         installedContainerView?.layoutSubtreeIfNeeded()
         installedReferenceView?.layoutSubtreeIfNeeded()
         hostView.superview?.layoutSubtreeIfNeeded()
@@ -1104,9 +1101,6 @@ final class WindowTerminalPortal: NSObject {
             return
         }
         Self.currentlySynchronizingPortalId = ObjectIdentifier(self)
-#if DEBUG
-        RemoteTmuxSizingDiagnostics.externalGeometrySyncPassCount += 1
-#endif
         defer {
             Self.currentlySynchronizingPortalId = nil
             if resyncRequestedDuringPass {
@@ -1229,17 +1223,12 @@ final class WindowTerminalPortal: NSObject {
         guard let window else { return false }
         guard let (container, reference) = installedTargetIfStillValid(for: window) ?? installationTarget(for: window)
         else { return false }
-        let browserHost = preferredBrowserHost(in: container)
 
         if hostView.superview !== container ||
             installedContainerView !== container ||
             installedReferenceView !== reference {
             hostView.removeFromSuperview()
-            if let browserHost {
-                container.addSubview(hostView, positioned: .below, relativeTo: browserHost)
-            } else {
-                container.addSubview(hostView, positioned: .above, relativeTo: reference)
-            }
+            container.addSubview(hostView, positioned: .above, relativeTo: reference)
 
             // The portal owns hostView.frame — synchronizeHostFrameToReference
             // writes it from the reference's ACTUAL bounds on every sync pass,
@@ -1260,10 +1249,6 @@ final class WindowTerminalPortal: NSObject {
             installedContainerView = container
             installedReferenceView = reference
             installReferenceGeometryObservers(reference: reference)
-        } else if let browserHost {
-            if !Self.isView(browserHost, above: hostView, in: container) {
-                container.addSubview(hostView, positioned: .below, relativeTo: browserHost)
-            }
         } else if !Self.isView(hostView, above: reference, in: container) {
             container.addSubview(hostView, positioned: .above, relativeTo: reference)
         }
@@ -1349,10 +1334,6 @@ final class WindowTerminalPortal: NSObject {
             return false
         }
         return viewIndex > referenceIndex
-    }
-
-    private func preferredBrowserHost(in container: NSView) -> WindowBrowserHostView? {
-        container.subviews.last(where: { $0 is WindowBrowserHostView }) as? WindowBrowserHostView
     }
 
 #if DEBUG

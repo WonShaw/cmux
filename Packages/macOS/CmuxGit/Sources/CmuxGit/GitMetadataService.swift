@@ -232,21 +232,6 @@ public struct GitMetadataService: Sendable {
         }
     }
 
-    /// The GitHub repository slugs (`owner/name`) configured as remotes for the
-    /// repository enclosing `directory`.
-    ///
-    /// Reads remote URLs straight from `config`, following `include`/`includeIf`
-    /// with the same resolved branch context as Git. Orders the result
-    /// `upstream`, then `origin`, then the rest, de-duplicated.
-    ///
-    /// - Parameter directory: An absolute path to inspect.
-    /// - Returns: Ordered, de-duplicated GitHub slugs; empty when there is no
-    ///   repository or no GitHub remote.
-    @concurrent
-    public nonisolated func repositorySlugs(forDirectory directory: String) async -> [String] {
-        await repositoryDiscoverySnapshot(forDirectory: directory).repositorySlugs
-    }
-
     /// Reads the checked-out branch state for the repository enclosing
     /// `directory`.
     ///

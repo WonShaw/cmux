@@ -310,23 +310,17 @@ extension ControlCommandCoordinator {
         if let error = incompatibleTerminalCreationInputError(params) {
             return error
         }
+        if let error = unsupportedSurfaceTypeError(params) {
+            return error
+        }
         let routing = routingSelectors(params)
         guard context?.controlPaneRoutingResolvesTabManager(routing: routing) ?? false else {
             return .err(code: "unavailable", message: "TabManager not available", data: nil)
         }
-        let profileKeys = ["profile", "profile_id", "profile_name"]
 
         let inputs = ControlPaneCreateInputs(
             directionRaw: string(params, "direction"),
             typeRaw: string(params, "type"),
-            urlRaw: string(params, "url"),
-            profileRaw: string(params, "profile")
-                ?? string(params, "profile_id")
-                ?? string(params, "profile_name"),
-            hasInvalidProfileParam: profileKeys.contains {
-                hasNonNull(params, $0) && string(params, $0) == nil
-            },
-            hasMultipleProfileParams: profileKeys.filter { hasNonNull(params, $0) }.count > 1,
             workingDirectory: optionalTrimmedRawString(params, "working_directory"),
             initialCommand: optionalTrimmedRawString(params, "initial_command"),
             initialInput: nonBlankRawString(params, "initial_input"),
@@ -368,55 +362,12 @@ extension ControlCommandCoordinator {
             return .err(code: "invalid_params", message: message, data: .object(["type": .string(typeRawValue)]))
         case .dockUnavailable(let message): return .err(code: "invalid_params", message: message, data: .object(["placement": .string("dock")]))
         case .dockConflictingRoutingSelectors(let message): return .err(code: "invalid_params", message: message, data: nil)
-        case .browserDisabledInvalidURL(let rawURL):
-            return .err(code: "invalid_params", message: "Invalid URL", data: .object(["url": .string(rawURL)]))
-        case .browserDisabledNoURL:
-            return .err(code: "browser_disabled", message: "cmux browser is disabled", data: nil)
-        case .browserDisabledExternalOpenFailed(let url):
-            return .err(
-                code: "external_open_failed",
-                message: "Failed to open URL externally",
-                data: .object(["url": .string(url)])
-            )
-        case .browserDisabledOpenedExternally(let windowID, let url):
-            return .ok(.object([
-                "window_id": orNull(windowID?.uuidString),
-                "window_ref": ref(.window, windowID),
-                "workspace_id": .null,
-                "workspace_ref": .null,
-                "pane_id": .null,
-                "pane_ref": .null,
-                "surface_id": .null,
-                "surface_ref": .null,
-                "created_split": .bool(false),
-                "opened_externally": .bool(true),
-                "browser_disabled": .bool(true),
-                "placement_strategy": .string("external_browser_disabled"),
-                "url": .string(url),
-            ]))
-        case .invalidBrowserProfile(let selector, let message, let candidates):
-            var data: [String: JSONValue] = ["profile": .string(selector)]
-            if !candidates.isEmpty {
-                data["candidates"] = .array(candidates.map { candidate in
-                    .object([
-                        "id": .string(candidate.id.uuidString),
-                        "name": .string(candidate.displayName),
-                    ])
-                })
-            }
-            return .err(
-                code: "invalid_params",
-                message: message,
-                data: .object(data)
-            )
         case .workspaceNotFound:
             return .err(code: "not_found", message: "Workspace not found", data: nil)
         case .noSourceSurface:
             return .err(code: "not_found", message: "No source surface to split", data: nil)
         case .createFailed:
             return .err(code: "internal_error", message: "Failed to create pane", data: nil)
-        case .mirrorUnsupportedOptions(let unsupported):
-            return mirrorUnsupportedOptionsResult(unsupported)
         case .routedToRemote(let windowID, let workspaceID, let typeRawValue):
             return remoteRoutedCreationResult(
                 windowID: windowID,

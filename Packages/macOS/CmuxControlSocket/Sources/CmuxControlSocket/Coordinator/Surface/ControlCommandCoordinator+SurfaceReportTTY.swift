@@ -1,7 +1,6 @@
 internal import Foundation
 
-/// The authenticated `surface.report_tty` write path. Kept separate because
-/// remote reports carry terminal-runtime identity in addition to surface scope.
+/// The `surface.report_tty` write path.
 extension ControlCommandCoordinator {
     func surfaceReportTTY(_ params: [String: JSONValue]) -> ControlCallResult {
         guard let workspaceID = uuid(params, "workspace_id") else {
@@ -16,32 +15,10 @@ extension ControlCommandCoordinator {
             return .err(code: "invalid_params", message: "Missing tty_name", data: nil)
         }
 
-        let authenticatedRemoteWorkspaceID = string(
-            params,
-            "_cmux_remote_workspace_id"
-        ).flatMap(UUID.init(uuidString:))
-        let terminalLifecycleID = string(params, "terminal_lifecycle_id")
-            .flatMap(UUID.init(uuidString:))
-        let attemptID = string(params, "attempt_id").flatMap(UUID.init(uuidString:))
-        for (key, value) in [
-            ("_cmux_remote_workspace_id", authenticatedRemoteWorkspaceID),
-            ("terminal_lifecycle_id", terminalLifecycleID),
-            ("attempt_id", attemptID),
-        ] where hasNonNull(params, key) && value == nil {
-            return .err(
-                code: "invalid_params",
-                message: "Missing or invalid \(key)",
-                data: nil
-            )
-        }
-
         let resolution = context?.controlSurfaceReportTTY(
             workspaceID: workspaceID,
             requestedSurfaceID: requestedSurfaceID,
-            ttyName: ttyName,
-            authenticatedRemoteWorkspaceID: authenticatedRemoteWorkspaceID,
-            terminalLifecycleID: terminalLifecycleID,
-            attemptID: attemptID
+            ttyName: ttyName
         ) ?? .workspaceNotFound
         let requestedSurfaceData = surfaceReportSurfaceFields(
             workspaceID: workspaceID,

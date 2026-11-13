@@ -22,8 +22,7 @@ Plus button opens a worktree layout; right-click offers alternate starters. `wor
       "contextMenu": [
         { "action": "worktree-agents", "title": "Worktree Agents" },
         { "type": "separator" },
-        { "action": "cmux.newTerminal", "title": "New Terminal" },
-        { "action": "cmux.newBrowser", "title": "New Browser" }
+        { "action": "cmux.newTerminal", "title": "New Terminal" }
       ]
     }
   },
@@ -43,7 +42,7 @@ Plus button opens a worktree layout; right-click offers alternate starters. `wor
 
 ## Full-Stack Dev
 
-Terminals plus browser preview plus persistent Dock controls.
+Terminals plus persistent Dock controls.
 
 `.cmux/cmux.json`:
 
@@ -53,12 +52,9 @@ Terminals plus browser preview plus persistent Dock controls.
     "name": "Full-Stack Dev",
     "workspace": {
       "name": "Dev", "cwd": ".",
-      "layout": { "direction": "horizontal", "split": 0.55, "children": [
-        { "direction": "vertical", "children": [
-          { "pane": { "surfaces": [{ "type": "terminal", "name": "Web", "command": "bun dev" }] } },
-          { "pane": { "surfaces": [{ "type": "terminal", "name": "Tests", "command": "bun test --watch" }] } }
-        ]},
-        { "pane": { "surfaces": [{ "type": "browser", "name": "Preview", "url": "http://localhost:3000" }] } }
+      "layout": { "direction": "vertical", "children": [
+        { "pane": { "surfaces": [{ "type": "terminal", "name": "Web", "command": "bun dev" }] } },
+        { "pane": { "surfaces": [{ "type": "terminal", "name": "Tests", "command": "bun test --watch" }] } }
       ]}
     }
   }]
@@ -78,7 +74,7 @@ Terminals plus browser preview plus persistent Dock controls.
 
 ## SSH Devbox
 
-Remote shell beside a local preview.
+Remote shell beside a local shell.
 
 ```json
 {
@@ -89,7 +85,7 @@ Remote shell beside a local preview.
       "name": "Devbox", "cwd": ".",
       "layout": { "direction": "horizontal", "children": [
         { "pane": { "surfaces": [{ "type": "terminal", "name": "SSH", "command": "ssh devbox" }] } },
-        { "pane": { "surfaces": [{ "type": "browser", "name": "Preview", "url": "http://localhost:3000" }] } }
+        { "pane": { "surfaces": [{ "type": "terminal", "name": "Local" }] } }
       ]}
     }
   }]
@@ -98,7 +94,7 @@ Remote shell beside a local preview.
 
 ## Review PR
 
-One command for terminal plus browser PR review. Adjust the URL and command for the user's GitHub workflow.
+One command for terminal PR review. Adjust the commands for the user's GitHub workflow.
 
 ```json
 {
@@ -109,7 +105,7 @@ One command for terminal plus browser PR review. Adjust the URL and command for 
       "name": "PR Review", "cwd": ".",
       "layout": { "direction": "horizontal", "children": [
         { "pane": { "surfaces": [{ "type": "terminal", "name": "GitHub", "command": "gh pr status" }] } },
-        { "pane": { "surfaces": [{ "type": "browser", "name": "Pull Request", "url": "https://github.com/owner/repo/pulls" }] } }
+        { "pane": { "surfaces": [{ "type": "terminal", "name": "Diff", "command": "gh pr diff" }] } }
       ]}
     }
   }]
@@ -118,7 +114,7 @@ One command for terminal plus browser PR review. Adjust the URL and command for 
 
 ## Docs Workspace
 
-Docs server, markdown viewer, and browser preview. Adjust command, URL, and markdown path for the docs stack.
+Docs server and markdown viewer. Adjust command and markdown path for the docs stack.
 
 ```json
 {
@@ -127,12 +123,9 @@ Docs server, markdown viewer, and browser preview. Adjust command, URL, and mark
     "keywords": ["docs", "documentation", "preview"],
     "workspace": {
       "name": "Docs", "cwd": ".",
-      "layout": { "direction": "horizontal", "split": 0.45, "children": [
-        { "direction": "vertical", "children": [
-          { "pane": { "surfaces": [{ "type": "terminal", "name": "Docs Server", "command": "bun run docs:dev" }] } },
-          { "pane": { "surfaces": [{ "type": "terminal", "name": "Markdown", "command": "cmux markdown open docs/README.md --direction right --focus false; exec ${SHELL:-/bin/zsh} -l" }] } }
-        ]},
-        { "pane": { "surfaces": [{ "type": "browser", "name": "Docs Preview", "url": "http://localhost:3000/docs" }] } }
+      "layout": { "direction": "vertical", "children": [
+        { "pane": { "surfaces": [{ "type": "terminal", "name": "Docs Server", "command": "bun run docs:dev" }] } },
+        { "pane": { "surfaces": [{ "type": "terminal", "name": "Markdown", "command": "cmux markdown open docs/README.md --direction right --focus false; exec ${SHELL:-/bin/zsh} -l" }] } }
       ]}
     }
   }]
@@ -141,7 +134,7 @@ Docs server, markdown viewer, and browser preview. Adjust command, URL, and mark
 
 ## Quick Agent Buttons
 
-Agent buttons alongside the default terminal and browser buttons.
+Agent buttons alongside the default terminal button.
 
 ```json
 {
@@ -153,7 +146,6 @@ Agent buttons alongside the default terminal and browser buttons.
     "surfaceTabBar": {
       "buttons": [
         "cmux.newTerminal",
-        "cmux.newBrowser",
         { "action": "codex-new-tab", "title": "Codex" },
         { "action": "claude-new-tab", "title": "Claude" }
       ]

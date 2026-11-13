@@ -212,7 +212,7 @@ extension CMUXCLI {
         // process table could match an unrelated local process attached to
         // some other pane. Surface/workspace UUIDs are machine-independent,
         // so the legacy chain and the {surface_id} re-home probe still apply.
-        guard !client.isRelayBacked, let pid, pid > 0 else { return .notAttempted }
+        guard let pid, pid > 0 else { return .notAttempted }
         let payload: [String: Any]
         do {
             payload = try client.sendV2(

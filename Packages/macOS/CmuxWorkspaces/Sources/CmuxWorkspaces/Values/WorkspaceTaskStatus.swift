@@ -9,8 +9,7 @@ public enum WorkspaceTaskStatus: String, Codable, CaseIterable, Sendable {
     case done
 
     /// The status inferred from live workspace signals, first match wins:
-    /// an agent waiting on input beats a running agent, which beats an open
-    /// PR, which beats an all-merged/closed PR set, which beats a dirty
+    /// an agent waiting on input beats a running agent, which beats a dirty
     /// working tree; a workspace with none of these is plain `todo`.
     ///
     /// - Parameter signals: The live signals sampled from the workspace.
@@ -18,8 +17,6 @@ public enum WorkspaceTaskStatus: String, Codable, CaseIterable, Sendable {
     public static func inferred(from signals: WorkspaceTaskStatusSignals) -> WorkspaceTaskStatus {
         if signals.anyAgentNeedsInput { return .needsAttention }
         if signals.anyAgentRunning { return .working }
-        if signals.anyOpenPullRequest { return .review }
-        if signals.hasPullRequests && signals.allPullRequestsMergedOrClosed { return .done }
         if signals.isGitDirty { return .working }
         return .todo
     }

@@ -125,7 +125,7 @@ extension CMUXCLI {
             agentPid: agentPid,
             workspaceId: target?.workspaceId ?? fallbackWorkspaceId,
             surfaceId: target?.surfaceId,
-            maximumRequestCount: client.isRelayBacked ? 2 : nil
+            maximumRequestCount: nil
         ).acknowledgedBatchRequest(from: rawObject)
         guard let request else { throw piFeedAcknowledgmentError() }
 

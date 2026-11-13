@@ -14,11 +14,9 @@ import Foundation
 @MainActor
 struct TerminalLinkOpenCoordinator {
     private let defaults: UserDefaults
-    private let externalNavigationHandler: BrowserExternalNavigationHandler
     private let containerResolver: @MainActor (UUID?, UUID?) -> (any TerminalLinkOpenContainer)?
     private let externalOpen: @MainActor @Sendable (URL) -> Bool
     private let fileOpen: any FileOpening
-    private let deferOperation: @MainActor (@escaping @MainActor @Sendable () -> Void) -> Void
 
     /// Creates a coordinator using the supplied routing collaborators.
     ///
@@ -28,20 +26,12 @@ struct TerminalLinkOpenCoordinator {
         defaults: UserDefaults = .standard,
         containerResolver: (@MainActor (UUID?, UUID?) -> (any TerminalLinkOpenContainer)?)? = nil,
         externalOpen: @escaping @MainActor @Sendable (URL) -> Bool = { NSWorkspace.shared.open($0) },
-        fileOpen: (any FileOpening)? = nil,
-        deferOperation: @escaping @MainActor (@escaping @MainActor @Sendable () -> Void) -> Void = { operation in
-            Task { @MainActor in operation() }
-        }
+        fileOpen: (any FileOpening)? = nil
     ) {
         self.defaults = defaults
-        self.externalNavigationHandler = BrowserExternalNavigationHandler(
-            defaults: defaults,
-            openURL: externalOpen
-        )
         self.containerResolver = containerResolver ?? Self.resolveContainer
         self.externalOpen = externalOpen
         self.fileOpen = fileOpen ?? PreferredEditorService(defaults: defaults)
-        self.deferOperation = deferOperation
     }
 
     /// Opens a terminal link according to the source terminal and URL policy.
@@ -127,19 +117,8 @@ struct TerminalLinkOpenCoordinator {
             )
         }
 
-        let cloudURL = request.sourcePanelId.flatMap {
-            container?.cloudTerminalLinkTarget(url: target.url, sourcePanelId: $0)?.url
-        }
-        let destinationURL = cloudURL ?? target.url
-        guard BrowserLinkOpenSettings.openTerminalLinksInCmuxBrowser(defaults: defaults) else {
-            return openExternally(destinationURL, reason: "cmux browser disabled")
-        }
-        switch target {
-        case .external:
-            return openExternally(destinationURL, reason: "external target")
-        case .embeddedBrowser:
-            return openEmbeddedBrowserURL(destinationURL, request: request, container: container)
-        }
+        let destinationURL = target.url
+        return openExternally(destinationURL, reason: "external target")
     }
 
     private func routeLocalFile(
@@ -154,127 +133,12 @@ struct TerminalLinkOpenCoordinator {
             return openExternally(fileURL, reason: unavailableReason)
         }
 
-        if let browserURL = TerminalHTMLFileBrowserAction(defaults: defaults)
-            .browserURL(for: fileURL) {
-            return deferHTMLFileOpen(
-                fileURL,
-                browserURL: browserURL,
-                request: request,
-                sourcePanelId: sourcePanelId,
-                container: container
-            )
-        }
-
         guard container.deferTerminalFileLinkOpen(
             sourcePanelId: sourcePanelId,
             filePath: fileURL.path,
             fallback: { [self] in _ = openExternally(fileURL, reason: "cmux file route fallback") }
         ) else {
             return openExternally(fileURL, reason: unavailableReason)
-        }
-        return true
-    }
-
-    private func deferHTMLFileOpen(
-        _ fileURL: URL,
-        browserURL: URL,
-        request: TerminalLinkOpenRequest,
-        sourcePanelId: UUID,
-        container: any TerminalLinkOpenContainer
-    ) -> Bool {
-        log(
-            "link.openURL target=localHTML url=\(browserURL) " +
-            "container=\(container.terminalLinkContainerDebugName) surfaceId=\(sourcePanelId)"
-        )
-
-        deferOperation { [self] in
-            let currentContainer = self.containerResolver(
-                request.sourceWorkspaceId,
-                sourcePanelId
-            )
-            let externalFallback: @MainActor @Sendable () -> Void = { [self] in
-                _ = self.openExternally(fileURL, reason: "html route fallback")
-            }
-
-            guard let currentContainer,
-                  !currentContainer.terminalLinkIsRemoteTerminal(sourcePanelId),
-                  CommandClickFileOpenRouter.shouldRouteInCmux(
-                      path: fileURL.path,
-                      defaults: self.defaults
-                  ) else {
-                externalFallback()
-                return
-            }
-
-            if TerminalHTMLFileBrowserAction(defaults: self.defaults).open(
-                fileURL: fileURL,
-                sourcePanelId: sourcePanelId,
-                container: currentContainer
-            ) {
-                return
-            }
-
-            self.log(
-                "link.openURL local HTML browser open failed, using file fallback " +
-                "surfaceId=\(sourcePanelId) url=\(browserURL)"
-            )
-            if currentContainer.deferTerminalFileLinkOpen(
-                sourcePanelId: sourcePanelId,
-                filePath: fileURL.path,
-                fallback: externalFallback
-            ) {
-                return
-            }
-            externalFallback()
-        }
-        return true
-    }
-
-    private func openEmbeddedBrowserURL(
-        _ url: URL,
-        request: TerminalLinkOpenRequest,
-        container: (any TerminalLinkOpenContainer)?
-    ) -> Bool {
-        switch externalNavigationHandler.openConfiguredExternallyResult(url) {
-        case .opened:
-            log(
-                "link.openURL opening externally reason=external pattern " +
-                "opened=1 url=\(url)"
-            )
-            return true
-        case .failed:
-            log(
-                "link.openURL opening externally reason=external pattern " +
-                "opened=0 url=\(url)"
-            )
-            return false
-        case .notConfigured:
-            break
-        }
-        guard let host = BrowserInsecureHTTPSettings.normalizeHost(url.host ?? "") else {
-            return openExternally(url, reason: "invalid host")
-        }
-        guard BrowserLinkOpenSettings.hostMatchesWhitelist(host, defaults: defaults) else {
-            return openExternally(url, reason: "host whitelist miss")
-        }
-        guard BrowserAvailabilitySettings.isEnabled(defaults: defaults),
-              let sourcePanelId = request.sourcePanelId,
-              let container else {
-            return openExternally(url, reason: "source container unavailable")
-        }
-
-        log(
-            "link.openURL target=embedded host=\(host) url=\(url) " +
-            "container=\(container.terminalLinkContainerDebugName) surfaceId=\(sourcePanelId)"
-        )
-
-        deferOperation { [self] in
-            let currentContainer = self.containerResolver(request.sourceWorkspaceId, sourcePanelId)
-            let openedInBrowser = BrowserAvailabilitySettings.isEnabled(defaults: self.defaults)
-                && currentContainer?.openTerminalBrowserLink(url: url, sourcePanelId: sourcePanelId) == true
-            if openedInBrowser { return }
-            self.log("link.openURL embedded open failed, opening externally host=\(host) surfaceId=\(sourcePanelId) url=\(url)")
-            if !self.externalOpen(url) { NSSound.beep() }
         }
         return true
     }

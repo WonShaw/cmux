@@ -13,9 +13,6 @@ final class AutomationEngine {
     typealias RPCRunner = @Sendable (String, [String: Any], Bool, CmuxAutomationEventOrigin) async -> String
     typealias RecoverySleeper = @Sendable (Duration) async throws -> Void
     typealias ProcessRunner = @Sendable (String, [String: String]) async -> AutomationActionExecutionResult
-    typealias WebhookRunner = @Sendable (URL, [String: String], Data) async -> AutomationActionExecutionResult
-    /// `DisableAutomationWebhooks` (MDM), read per webhook action.
-    typealias PolicyCheck = @Sendable () -> Bool
     typealias WorkspaceTagsResolver = @MainActor (UUID) -> [String]
 
     private static let maximumLogRecords = 256
@@ -37,8 +34,6 @@ final class AutomationEngine {
     private let notificationHandler: NotificationHandler
     private let rpcRunner: RPCRunner
     private let processRunner: ProcessRunner?
-    private let webhookRunner: WebhookRunner?
-    private let isWebhookDisabledByPolicy: PolicyCheck
     private let workspaceTagsResolver: WorkspaceTagsResolver
     private let payloadRedactor = AutomationPayloadRedactor()
     private let recoverySleeper: RecoverySleeper
@@ -86,10 +81,6 @@ final class AutomationEngine {
             )
         },
         processRunner: ProcessRunner? = nil,
-        webhookRunner: WebhookRunner? = nil,
-        isWebhookDisabledByPolicy: @escaping PolicyCheck = {
-            ManagedDevicePolicy().isEnforced(.disableAutomationWebhooks)
-        },
         workspaceTagsResolver: @escaping WorkspaceTagsResolver = { _ in [] },
         recoverySleeper: @escaping RecoverySleeper = { duration in
             try await ContinuousClock().sleep(for: duration)
@@ -100,8 +91,6 @@ final class AutomationEngine {
         self.notificationHandler = notificationHandler
         self.rpcRunner = rpcRunner
         self.processRunner = processRunner
-        self.webhookRunner = webhookRunner
-        self.isWebhookDisabledByPolicy = isWebhookDisabledByPolicy
         self.workspaceTagsResolver = workspaceTagsResolver
         self.recoverySleeper = recoverySleeper
     }
@@ -289,7 +278,7 @@ final class AutomationEngine {
         fireDatesByRuleID.removeAll(keepingCapacity: true)
         // Keep the firing reservation count until canceled tasks run their
         // deferred release; resetting it here could admit new actions while
-        // old shells/webhooks are still unwinding.
+        // old shells are still unwinding.
         firingTasks.values.forEach { $0.cancel() }
         workspaceTagsCache.removeAll(keepingCapacity: true)
         pendingTagResolutions.removeAll(keepingCapacity: true)
@@ -631,8 +620,6 @@ final class AutomationEngine {
             return await executeRPC(action: action, rule: rule, event: event, chain: chain)
         case "run":
             return await executeRun(action: action, rule: rule, event: event, chain: chain)
-        case "webhook":
-            return await executeWebhook(action: action, rule: rule, event: event, chain: chain)
         default:
             return .failure("unknown automation action \(action.action)")
         }
@@ -737,39 +724,6 @@ final class AutomationEngine {
         )
     }
 
-    private func executeWebhook(
-        action: AutomationAction,
-        rule: AutomationRule,
-        event: [String: Any],
-        chain: [String]
-    ) async -> AutomationActionExecutionResult {
-        // `DisableAutomationWebhooks` (MDM): the action posts event payloads with
-        // caller-supplied headers to any http(s) host, so it fails closed before
-        // the URL is even parsed.
-        if isWebhookDisabledByPolicy() {
-            return .failure("webhook actions are disabled by your organization's device policy (DisableAutomationWebhooks)")
-        }
-        let configuredHeaders = action.object(for: "headers")?.reduce(into: [String: String]()) { result, entry in
-            if let value = entry.value.stringValue { result[entry.key] = value }
-        } ?? [:]
-        guard let rawURL = action.string(for: "url"),
-              let url = URL(string: rawURL),
-              AutomationWebhookPolicy().isValid(url: url, headers: configuredHeaders) else {
-            return .failure("webhook action requires an http(s) url")
-        }
-        guard let data = Self.eventJSONData(event) else {
-            return .failure("could not serialize automation event")
-        }
-        var headers: [String: String] = ["Content-Type": "application/json"]
-        for (key, value) in configuredHeaders.prefix(64) {
-            headers[String(key.prefix(256))] = String(value.prefix(8_192))
-        }
-        if let webhookRunner {
-            return await webhookRunner(url, headers, data)
-        }
-        return await runWebhook(url: url, headers: headers, data: data)
-    }
-
 #if compiler(>=6.2)
     @concurrent
 #else
@@ -789,62 +743,6 @@ final class AutomationEngine {
         }, onCancel: {
             session.cancel()
         })
-    }
-
-#if compiler(>=6.2)
-    @concurrent
-#else
-    @Sendable
-#endif
-    nonisolated private func runWebhook(
-        url: URL,
-        headers: [String: String],
-        data: Data
-    ) async -> AutomationActionExecutionResult {
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.httpBody = data
-        request.timeoutInterval = 15
-        for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
-        let webhookPolicy = AutomationWebhookPolicy()
-        let redirectDelegate = AutomationWebhookRedirectDelegate(
-            originalURL: url,
-            sensitiveHeaderNames: webhookPolicy.credentialHeaderNames(in: headers)
-        )
-        let sessionWithDelegate = URLSession(
-            configuration: {
-                let configuration = URLSessionConfiguration.ephemeral
-                configuration.timeoutIntervalForRequest = 15
-                configuration.timeoutIntervalForResource = 20
-                configuration.httpShouldSetCookies = false
-                configuration.httpCookieStorage = nil
-                configuration.urlCache = nil
-                configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-                return configuration
-            }(),
-            delegate: redirectDelegate,
-            delegateQueue: nil
-        )
-        defer { sessionWithDelegate.invalidateAndCancel() }
-        do {
-            let (bytes, response) = try await sessionWithDelegate.bytes(for: request)
-            guard let response = response as? HTTPURLResponse else {
-                return .failure("webhook returned a non-HTTP response")
-            }
-            guard (200..<300).contains(response.statusCode) else {
-                return .failure("webhook returned HTTP \(response.statusCode)")
-            }
-            var responseBytes = 0
-            for try await _ in bytes {
-                responseBytes += 1
-                if responseBytes > 64 * 1_024 {
-                    return .failure("webhook response exceeded 64 KiB")
-                }
-            }
-            return .success("webhook delivered")
-        } catch {
-            return .failure("webhook failed: \(error.localizedDescription)")
-        }
     }
 
     private func workspaceTags(

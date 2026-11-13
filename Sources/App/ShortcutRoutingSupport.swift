@@ -4,43 +4,6 @@ import CmuxCommandPalette
 import Foundation
 import CmuxTerminal
 
-func browserOmnibarSelectionDeltaForControlNavigation(
-    hasFocusedAddressBar: Bool,
-    flags: NSEvent.ModifierFlags,
-    chars: String
-) -> Int? {
-    guard hasFocusedAddressBar else { return nil }
-    let normalizedFlags = browserOmnibarNormalizedModifierFlags(flags)
-    guard normalizedFlags == [.control] else { return nil }
-    if chars == "n" { return 1 }
-    if chars == "p" { return -1 }
-    return nil
-}
-
-func browserOmnibarSelectionDeltaForArrowNavigation(
-    hasFocusedAddressBar: Bool,
-    flags: NSEvent.ModifierFlags,
-    keyCode: UInt16
-) -> Int? {
-    guard hasFocusedAddressBar else { return nil }
-    let normalizedFlags = browserOmnibarNormalizedModifierFlags(flags)
-    guard normalizedFlags == [] else { return nil }
-    switch keyCode {
-    case 125: return 1
-    case 126: return -1
-    default: return nil
-    }
-}
-
-func browserOmnibarShouldBypassShortcutRoutingForMarkedText(
-    hasFocusedAddressBar: Bool,
-    firstResponderHasMarkedText: Bool,
-    flags: NSEvent.ModifierFlags
-) -> Bool {
-    guard hasFocusedAddressBar, firstResponderHasMarkedText else { return false }
-    return !browserOmnibarNormalizedModifierFlags(flags).contains(.command)
-}
-
 func browserOmnibarNormalizedModifierFlags(_ flags: NSEvent.ModifierFlags) -> NSEvent.ModifierFlags {
     flags
         .intersection(.deviceIndependentFlagsMask)
@@ -84,15 +47,6 @@ private func shortcutRoutingTextIsPrintable(_ text: String?) -> Bool {
     }
 }
 
-func browserOmnibarShouldContinueControlNavigationRepeat(flags: NSEvent.ModifierFlags) -> Bool {
-    browserOmnibarNormalizedModifierFlags(flags) == [.control]
-}
-
-func browserOmnibarShouldSubmitOnReturn(flags: NSEvent.ModifierFlags) -> Bool {
-    let normalizedFlags = browserOmnibarNormalizedModifierFlags(flags)
-    return normalizedFlags == [] || normalizedFlags == [.shift]
-}
-
 func shortcutResponderHasMarkedText(_ responder: NSResponder?) -> Bool {
     guard let responder else { return false }
 
@@ -110,57 +64,6 @@ func shortcutResponderHasMarkedText(_ responder: NSResponder?) -> Bool {
     return false
 }
 
-func shouldDispatchBrowserReturnViaFirstResponderKeyDown(
-    keyCode: UInt16,
-    firstResponderIsBrowser: Bool,
-    firstResponderHasMarkedText: Bool = false,
-    flags: NSEvent.ModifierFlags
-) -> Bool {
-    guard firstResponderIsBrowser else { return false }
-    guard !firstResponderHasMarkedText else { return false }
-    guard keyCode == 36 || keyCode == 76 else { return false }
-    // Keep browser Return forwarding narrow: only plain/Shift Return is submit;
-    // Command-modified Return is reserved for app shortcuts like Toggle Pane Zoom.
-    return browserOmnibarShouldSubmitOnReturn(flags: flags)
-}
-
-func shouldDispatchBrowserArrowViaFirstResponderKeyDown(
-    keyCode: UInt16,
-    firstResponderIsBrowser: Bool,
-    firstResponderHasMarkedText: Bool = false,
-    flags: NSEvent.ModifierFlags
-) -> Bool {
-    guard firstResponderIsBrowser else { return false }
-    guard !firstResponderHasMarkedText else { return false }
-    guard (123...126).contains(keyCode) else { return false }
-
-    let normalizedFlags = browserOmnibarNormalizedModifierFlags(flags)
-    if normalizedFlags.isEmpty || normalizedFlags == [.shift] ||
-        normalizedFlags == [.option] || normalizedFlags == [.option, .shift] {
-        // Selection and word/paragraph navigation need WebKit's native defaults.
-        return true
-    }
-    // Cmd+Option+Arrow remains reserved for cmux pane-focus shortcuts.
-    if normalizedFlags == [.command] {
-        return keyCode == 125 || keyCode == 126
-    }
-    return normalizedFlags == [.command, .shift]
-}
-
-func shouldDispatchBrowserOmnibarArrowViaFirstResponderKeyDown(
-    keyCode: UInt16,
-    firstResponderIsBrowserOmnibar: Bool,
-    firstResponderHasMarkedText: Bool = false,
-    flags: NSEvent.ModifierFlags
-) -> Bool {
-    guard firstResponderIsBrowserOmnibar else { return false }
-    guard !firstResponderHasMarkedText else { return false }
-    guard (123...126).contains(keyCode) else { return false }
-
-    let normalizedFlags = browserOmnibarNormalizedModifierFlags(flags)
-    return normalizedFlags.isEmpty
-}
-
 /// Returns true when a terminal arrow key-equivalent should be sent through keyDown.
 func shouldDispatchTerminalArrowViaFirstResponderKeyDown(
     keyCode: UInt16,
@@ -170,31 +73,6 @@ func shouldDispatchTerminalArrowViaFirstResponderKeyDown(
 ) -> Bool {
     guard firstResponderIsTerminal, !firstResponderHasMarkedText, (123...126).contains(keyCode) else { return false }
     return !browserOmnibarNormalizedModifierFlags(flags).contains(.command)
-}
-
-struct BrowserAddressBarTrackingContext {
-    let trackedPanelMatchesWebView: Bool
-    let omnibarResponderActive: Bool
-    let preferredFocusIntentIsAddressBar: Bool
-    let suppressesWebViewFocus: Bool
-    let pointerInitiatedWebFocus: Bool
-    let liveOmnibarFieldExists: Bool
-}
-
-/// Decision order:
-/// 1. Reject WebView focus from another panel.
-/// 2. Preserve if an omnibar responder is already active.
-/// 3. Require address-bar focus intent.
-/// 4. Let pointer-initiated WebView focus clear tracking.
-/// 5. Preserve if WebView focus is suppressed or a live omnibar field exists.
-func shouldPreserveBrowserAddressBarTrackingDuringWebViewFocus(
-    _ context: BrowserAddressBarTrackingContext
-) -> Bool {
-    guard context.trackedPanelMatchesWebView else { return false }
-    if context.omnibarResponderActive { return true }
-    guard context.preferredFocusIntentIsAddressBar else { return false }
-    guard !context.pointerInitiatedWebFocus else { return false }
-    return context.suppressesWebViewFocus || context.liveOmnibarFieldExists
 }
 
 func shouldDispatchCommandPaletteHorizontalArrowViaFirstResponderKeyDown(
@@ -584,35 +462,6 @@ func shouldRouteCommandEquivalentDirectlyToMainMenu(_ event: NSEvent) -> Bool {
     return true
 }
 
-private enum BrowserFindCommandEquivalent: CaseIterable {
-    case find
-    case findInDirectory
-    case findNext
-    case findPrevious
-    case hideFind
-    case useSelection
-
-    var action: KeyboardShortcutSettings.Action {
-        switch self {
-        case .find: return .find
-        case .findInDirectory: return .findInDirectory
-        case .findNext: return .findNext
-        case .findPrevious: return .findPrevious
-        case .hideFind: return .hideFind
-        case .useSelection: return .useSelectionForFind
-        }
-    }
-
-    var keepsCmuxBrowserFindBarOwnershipWhenVisible: Bool {
-        switch self {
-        case .find, .findNext, .findPrevious, .hideFind:
-            return true
-        case .findInDirectory, .useSelection:
-            return false
-        }
-    }
-}
-
 func cmuxIsWebInspectorClassName(_ className: String) -> Bool {
     className.contains("WKInspector") || className.contains("WebInspector")
 }
@@ -620,58 +469,6 @@ func cmuxIsWebInspectorClassName(_ className: String) -> Bool {
 func cmuxIsWebInspectorObject(_ object: NSObject) -> Bool {
     cmuxIsWebInspectorClassName(String(describing: type(of: object))) ||
         cmuxIsWebInspectorClassName(NSStringFromClass(type(of: object)))
-}
-
-private enum BrowserDocumentEditingCommandEquivalent: CaseIterable {
-    case copy
-    case cut
-    case selectAll
-    case italic
-
-    var shortcut: StoredShortcut {
-        switch self {
-        case .copy:
-            return StoredShortcut(
-                key: "c",
-                command: true,
-                shift: false,
-                option: false,
-                control: false,
-                keyCode: 8
-            )
-        case .cut:
-            return StoredShortcut(
-                key: "x",
-                command: true,
-                shift: false,
-                option: false,
-                control: false,
-                keyCode: 7
-            )
-        case .selectAll:
-            return StoredShortcut(
-                key: "a",
-                command: true,
-                shift: false,
-                option: false,
-                control: false,
-                keyCode: 0
-            )
-        case .italic:
-            // Cmd+I is the universal italics command in web writing apps (Notion,
-            // Google Docs, …). Let the focused editor handle it before the app's
-            // menu/Show Notifications fallback, just like copy/cut/select-all
-            // (issue #6776).
-            return StoredShortcut(
-                key: "i",
-                command: true,
-                shift: false,
-                option: false,
-                control: false,
-                keyCode: 34
-            )
-        }
-    }
 }
 
 func cmuxIsLikelyWebInspectorResponder(_ responder: NSResponder?) -> Bool {
@@ -690,86 +487,6 @@ func cmuxIsLikelyWebInspectorResponder(_ responder: NSResponder?) -> Bool {
         hops += 1
     }
     return false
-}
-
-private func browserFindCommandEquivalent(
-    for event: NSEvent,
-    shortcutForAction: (KeyboardShortcutSettings.Action) -> StoredShortcut = KeyboardShortcutSettings.shortcut(for:)
-) -> BrowserFindCommandEquivalent? {
-    BrowserFindCommandEquivalent.allCases.first { command in
-        shortcutForAction(command.action).matches(event: event)
-    }
-}
-
-private func browserDocumentEditingCommandEquivalent(for event: NSEvent) -> BrowserDocumentEditingCommandEquivalent? {
-    BrowserDocumentEditingCommandEquivalent.allCases.first { command in
-        command.shortcut.matches(event: event)
-    }
-}
-
-/// For browser content, let the focused document/editor try native editing commands
-/// before cmux's menu fallback. Rich web apps often implement copy/cut/select-all
-/// in contentEditable handlers that AppKit's Edit menu path cannot reproduce.
-func shouldRouteBrowserDocumentEditingCommandEquivalentThroughWebContentFirst(
-    _ event: NSEvent,
-    responder: NSResponder? = nil
-) -> Bool {
-    guard browserDocumentEditingCommandEquivalent(for: event) != nil else {
-        return false
-    }
-
-    if cmuxIsLikelyWebInspectorResponder(responder) {
-        return false
-    }
-
-    return true
-}
-
-/// For browser content, let the page try browser-local Find-family commands before cmux's menu fallback.
-/// Cmd+F is excluded because cmux chooses terminal, browser, or right-sidebar
-/// find from the current focus owner.
-func shouldRouteBrowserFindCommandEquivalentThroughWebContentFirst(
-    _ event: NSEvent,
-    responder: NSResponder? = nil,
-    owningWebView: CmuxWebView? = nil
-) -> Bool {
-    guard let shortcut = browserFindCommandEquivalent(for: event) else {
-        return false
-    }
-
-    if case .find = shortcut {
-        return false
-    }
-
-    if case .findInDirectory = shortcut {
-        return false
-    }
-
-    if cmuxIsLikelyWebInspectorResponder(responder) {
-        return false
-    }
-
-    if shortcut.keepsCmuxBrowserFindBarOwnershipWhenVisible,
-       let owningWebView {
-        let browserFindBarIsVisible = MainActor.assumeIsolated {
-            AppDelegate.shared?.browserFindBarIsVisible(for: owningWebView) == true
-        }
-        if browserFindBarIsVisible {
-            return false
-        }
-    }
-
-    return true
-}
-
-func shouldRouteInlineVSCodeCommandPaletteShortcutThroughWebContentFirst(
-    _ event: NSEvent,
-    pageURL: URL?,
-    inlineVSCodeURLMatcher: (URL?) -> Bool = { VSCodeServeWebController.shared.isServeWebURL($0) },
-    shortcutForAction: (KeyboardShortcutSettings.Action) -> StoredShortcut = KeyboardShortcutSettings.shortcut(for:)
-) -> Bool {
-    guard inlineVSCodeURLMatcher(pageURL) else { return false }
-    return shortcutForAction(.commandPalette).matches(event: event)
 }
 
 extension NSResponder {
@@ -888,56 +605,6 @@ func cmuxFieldEditorOwnerView(_ editor: NSTextView) -> NSView? {
 
     return editor.superview
 }
-
-#if DEBUG
-func browserZoomShortcutTraceCandidate(
-    flags: NSEvent.ModifierFlags,
-    chars: String,
-    keyCode: UInt16,
-    literalChars: String? = nil
-) -> Bool {
-    let normalizedFlags = flags
-        .intersection(.deviceIndependentFlagsMask)
-        .subtracting([.numericPad, .function])
-    guard normalizedFlags.contains(.command) else { return false }
-
-    let keys = browserZoomShortcutKeyCandidates(
-        chars: chars,
-        literalChars: literalChars,
-        keyCode: keyCode
-    )
-    if keys.contains("=") || keys.contains("+") || keys.contains("-") || keys.contains("_") || keys.contains("0") {
-        return true
-    }
-    switch keyCode {
-    case 24, 27, 29, 69, 78, 82: // ANSI and keypad zoom keys
-        return true
-    default:
-        return false
-    }
-}
-
-func browserZoomShortcutTraceFlagsString(_ flags: NSEvent.ModifierFlags) -> String {
-    let normalizedFlags = flags
-        .intersection(.deviceIndependentFlagsMask)
-        .subtracting([.numericPad, .function])
-    var parts: [String] = []
-    if normalizedFlags.contains(.command) { parts.append("Cmd") }
-    if normalizedFlags.contains(.shift) { parts.append("Shift") }
-    if normalizedFlags.contains(.option) { parts.append("Opt") }
-    if normalizedFlags.contains(.control) { parts.append("Ctrl") }
-    return parts.isEmpty ? "none" : parts.joined(separator: "+")
-}
-
-func browserZoomShortcutTraceActionString(_ action: BrowserZoomShortcutAction?) -> String {
-    guard let action else { return "none" }
-    switch action {
-    case .zoomIn: return "zoomIn"
-    case .zoomOut: return "zoomOut"
-    case .reset: return "reset"
-    }
-}
-#endif
 
 func shouldSuppressWindowMoveForFolderDrag(hitView: NSView?) -> Bool {
     var candidate = hitView

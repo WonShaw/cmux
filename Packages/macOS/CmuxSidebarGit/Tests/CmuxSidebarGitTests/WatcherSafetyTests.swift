@@ -12,7 +12,6 @@ import CmuxGit
         let service = SidebarGitMetadataService(
             workspaceGitMetadataReader: GatedMetadataReader(metadata: .repository(branch: "main")),
             gitMetadataService: descriptorReader,
-            pullRequestProbing: RecordingPullRequestProbing(),
             probeLimiter: WorkspaceGitMetadataProbeLimiter(limit: 1),
             clock: ManualGitPollClock(),
             debugLog: debugLog

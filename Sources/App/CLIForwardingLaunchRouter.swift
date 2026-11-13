@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 import os
 
-nonisolated private let cliForwardingLogger = Logger(subsystem: "com.cmuxterm.app", category: "CLIForwarding")
+nonisolated private let cliForwardingLogger = Logger(subsystem: "com.comux.app", category: "CLIForwarding")
 
 enum CLIForwardingLaunchRouter {
     private static let guardKey = "CMUX_CLI_FORWARDED"

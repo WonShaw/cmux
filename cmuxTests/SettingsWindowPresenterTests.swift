@@ -265,10 +265,10 @@ extension SettingsWindowSharedStateSuites {
                 presenter.deliverPendingNavigationAfterContentAppears()
 
                 let recorder = SettingsNavigationRecorder()
-                #expect(presenter.show(navigationTarget: .browserImport) == .presented)
+                #expect(presenter.show(navigationTarget: .terminal) == .presented)
                 recorder.stopObserving()
 
-                #expect(recorder.receivedTargets == [.browserImport])
+                #expect(recorder.receivedTargets == [.terminal])
                 // Delivered immediately, so nothing stays pending.
                 #expect(presenter.consumePendingNavigationTarget() == nil)
             }
@@ -279,13 +279,13 @@ extension SettingsWindowSharedStateSuites {
                 let presenter = SettingsWindowPresenter(windowFactory: { _ in makeFactoryWindow() })
 
                 let recorder = SettingsNavigationRecorder()
-                #expect(presenter.show(navigationTarget: .browserImport) == .presented)
+                #expect(presenter.show(navigationTarget: .terminal) == .presented)
                 recorder.stopObserving()
 
                 // A fresh window's content is not listening yet; the host root
                 // consumes the pending target from its onAppear instead.
                 #expect(recorder.receivedTargets.isEmpty)
-                #expect(presenter.consumePendingNavigationTarget() == .browserImport)
+                #expect(presenter.consumePendingNavigationTarget() == .terminal)
                 #expect(presenter.consumePendingNavigationTarget() == nil)
             }
         }

@@ -18,8 +18,7 @@ extension Array where Element == CuratedSettingEntry {
     /// ``SettingsSearchIndex/init(catalog:curatedEntries:)``.
     public static var cmuxDefault: [CuratedSettingEntry] {
         [
-            // Account / integrations
-            .init(section: .account, id: "account", title: String(localized: "settings.section.account", defaultValue: "Account"), synonyms: "Account auth authentication login logout signin sign-in signout sign-out email user profile stack team"),
+            // Integrations
             .init(section: .automation, id: "claude-code", title: String(localized: "settings.automation.claudeCode", defaultValue: "Claude Code Integration"), synonyms: "Claude Code Integration automation.claudeCodeIntegration claude code hooks agent integration status notifications"),
             .init(section: .automation, id: "claude-path", title: String(localized: "settings.automation.claudeCode.customPath", defaultValue: "Claude Binary Path"), synonyms: "Claude Binary Path automation.claudeBinaryPath claude binary executable path cli command custom"),
             .init(section: .automation, id: "ripgrep-path", title: String(localized: "settings.automation.ripgrep.customPath", defaultValue: "Ripgrep Binary Path"), synonyms: "Ripgrep Binary Path automation.ripgrepBinaryPath ripgrep rg binary executable path search find nix custom"),
@@ -83,7 +82,6 @@ extension Array where Element == CuratedSettingEntry {
             .init(section: .app, id: "imessage-mode", title: String(localized: "settings.app.iMessageMode", defaultValue: "iMessage Mode"), synonyms: "iMessage Mode app.iMessageMode imessage message messages chat prompt prompts submitted texting reorder move workspace top agent send"),
             .init(section: .app, id: "reorder-notification", title: String(localized: "settings.app.reorderOnNotification", defaultValue: "Reorder on Notification"), synonyms: "Reorder on Notification app.reorderOnNotification notification reorder move workspace top unread sort"),
             .init(section: .app, id: "menu-bar-only", title: String(localized: "settings.app.menuBarOnly", defaultValue: "Menu Bar Only"), synonyms: "Menu Bar Only app.menuBarOnly menubar menu bar dockless hide dock app switcher cmd-tab command-tab"),
-            .init(section: .app, id: "telemetry", title: String(localized: "settings.app.telemetry", defaultValue: "Send anonymous telemetry"), synonyms: "Send anonymous telemetry app.sendAnonymousTelemetry analytics crash reports sentry posthog usage anonymous privacy"),
             .init(section: .app, id: "warn-before-quit", title: String(localized: "settings.app.warnBeforeQuit", defaultValue: "Warn Before Quit"), synonyms: "Warn Before Quit app.confirmQuit quit confirmation command-q cmd-q exit close app"),
             .init(section: .app, id: "warn-before-closing-tab", title: String(localized: "settings.app.warnBeforeClosingTab", defaultValue: "Warn Before Closing Tab"), synonyms: "Warn Before Closing Tab app.warnBeforeClosingTab close tab confirmation command-w cmd-w terminal surface"),
             .init(section: .app, id: "warn-before-closing-tab-x-button", title: String(localized: "settings.app.warnBeforeClosingTabXButton", defaultValue: "Warn Before Tab Close Button"), synonyms: "Warn Before Tab Close Button app.warnBeforeClosingTabXButton x button close tab confirmation terminal surface"),
@@ -225,12 +223,7 @@ extension Array where Element == CuratedSettingEntry {
             .init(section: .sidebarAppearance, id: "show-notification-message", title: String(localized: "settings.app.showNotificationMessage", defaultValue: "Show Notification Message in Sidebar"), synonyms: "Show Notification Message in Sidebar sidebar.showNotificationMessage latest message unread notification text sidebar"),
             .init(section: .sidebarAppearance, id: "notification-message-line-limit", title: String(localized: "settings.app.notificationMessageLineLimit", defaultValue: "Notification Preview Lines"), synonyms: "sidebar.notificationMessageLineLimit notification message preview lines limit sidebar"),
             .init(section: .sidebarAppearance, id: "show-branch-directory", title: String(localized: "settings.app.showBranchDirectory", defaultValue: "Show Branch + Directory in Sidebar"), synonyms: "Show Branch + Directory in Sidebar sidebar.showBranchDirectory git branch cwd path directory folder repo sidebar"),
-            .init(section: .sidebarAppearance, id: "show-pull-requests", title: String(localized: "settings.app.showPullRequests", defaultValue: "Show Pull Requests in Sidebar"), synonyms: "Show Pull Requests in Sidebar sidebar.showPullRequests pr mr review github gitlab bitbucket pull request merge request"),
             .init(section: .sidebarAppearance, id: "watch-git-status", title: String(localized: "settings.app.watchGitStatus", defaultValue: "Watch Git Status in Sidebar"), synonyms: "Watch Git Status in Sidebar sidebar.watchGitStatus git status branch watcher index lock"),
-            .init(section: .sidebarAppearance, id: "make-pr-clickable", title: String(localized: "settings.app.makeSidebarPullRequestClickable", defaultValue: "Make Sidebar PR Clickable"), synonyms: "Make Sidebar PR Clickable sidebar.makePullRequestsClickable clickable pull requests pr mr reviews links select workspace row"),
-            .init(section: .sidebarAppearance, id: "open-pr-links", title: String(localized: "settings.app.openSidebarPRLinks", defaultValue: "Open Sidebar PR Links in cmux Browser"), synonyms: "Open Sidebar PR Links in cmux Browser sidebar.openPullRequestLinksInCmuxBrowser pr links github browser default external embedded"),
-            .init(section: .sidebarAppearance, id: "open-port-links", title: String(localized: "settings.app.openSidebarPortLinks", defaultValue: "Open Sidebar Port Links in cmux Browser"), synonyms: "Open Sidebar Port Links in cmux Browser sidebar.openPortLinksInCmuxBrowser ports localhost links browser default external embedded"),
-            .init(section: .sidebarAppearance, id: "show-ssh", title: String(localized: "settings.app.showSSH", defaultValue: "Show SSH in Sidebar"), synonyms: "Show SSH in Sidebar sidebar.showSSH remote host target ssh server"),
             .init(section: .sidebarAppearance, id: "show-ports", title: String(localized: "settings.app.showPorts", defaultValue: "Show Listening Ports in Sidebar"), synonyms: "Show Listening Ports in Sidebar sidebar.showPorts localhost port listener dev server url"),
             .init(section: .sidebarAppearance, id: "show-log", title: String(localized: "settings.app.showLog", defaultValue: "Show Latest Log in Sidebar"), synonyms: "Show Latest Log in Sidebar sidebar.showLog log status latest message imperative"),
             .init(section: .sidebarAppearance, id: "show-progress", title: String(localized: "settings.app.showProgress", defaultValue: "Show Progress in Sidebar"), synonyms: "Show Progress in Sidebar sidebar.showProgress progress bar percent status set_progress"),
@@ -261,73 +254,6 @@ extension Array where Element == CuratedSettingEntry {
             .init(section: .sidebarAppearance, id: "show-metadata", title: String(localized: "settings.app.showMetadata", defaultValue: "Show Custom Metadata in Sidebar"), synonyms: "Show Custom Metadata in Sidebar sidebar.showCustomMetadata metadata meta report_meta status custom block"),
             .init(section: .sidebarAppearance, id: "right-max-width", title: String(localized: "settings.sidebar.rightMaxWidth", defaultValue: "Dock Max Width"), synonyms: "Dock Max Width sidebar.rightMaxWidth dock right sidebar max width terminal reservation cap logs lazygit"),
 
-            // Mobile
-            .init(
-                section: .mobile,
-                id: "pairDevice",
-                title: String(localized: "settings.mobile.pairDevice", defaultValue: "Mobile Pairing"),
-                synonyms: """
-                pair pairing add device qr qr code scan iphone ipad ios mobile \
-                tailscale iroh connect onboarding sign in
-                """
-            ),
-            .init(
-                section: .mobile,
-                id: "phone-push-forwarding",
-                title: String(
-                    localized: "settings.mobile.phonePush.forwarding",
-                    defaultValue: "Forward Notifications to iPhone"
-                ),
-                detailText: [
-                    String(
-                        localized: "settings.mobile.phonePush.forwarding.subtitleOn",
-                        defaultValue: "Sends local agent alerts from this Mac to cmux on your iPhone and iPad."
-                    ),
-                    String(
-                        localized: "settings.mobile.phonePush.forwarding.subtitleOff",
-                        defaultValue: "Stops this Mac from sending local agent alerts to mobile devices."
-                    ),
-                ].joined(separator: " "),
-                synonyms: "push notifications iphone ipad mobile forwarding agent alerts forwardNotificationsToPhone"
-            ),
-            .init(
-                section: .mobile,
-                id: "phone-push-mode",
-                title: String(
-                    localized: "settings.mobile.phonePush.mode",
-                    defaultValue: "When to Send"
-                ),
-                detailText: String(
-                    localized: "settings.mobile.phonePush.mode.subtitle",
-                    defaultValue: "Always sends every local agent alert. Away mode waits until this Mac is locked, asleep, or idle."
-                ),
-                synonyms: "push notification forwarding always only when away locked asleep idle forwardNotificationsToPhoneMode"
-            ),
-            .init(
-                section: .mobile,
-                id: "phone-push-hide-content",
-                title: String(
-                    localized: "settings.mobile.phonePush.hideContent",
-                    defaultValue: "Hide Notification Content"
-                ),
-                detailText: String(
-                    localized: "settings.mobile.phonePush.hideContent.subtitle",
-                    defaultValue: "Sends a generic message instead of agent and terminal text."
-                ),
-                synonyms: "push notification privacy hide content generic message terminal text forwardNotificationsHideContent"
-            ),
-            .init(section: .mobile, id: "iOSPairingHost", title: String(localized: "settings.mobile.iOSPairingHost", defaultValue: "iOS Pairing"), synonyms: "iOS Pairing ios iphone ipad mobile pairing local network permission sync"),
-            .init(section: .mobile, id: "iOSPairingPort", title: String(localized: "settings.mobile.port", defaultValue: "Pairing Port"), synonyms: "mobile.iOSPairingHost.port ios iphone mobile pairing port tcp listener firewall conflict"),
-            .init(section: .mobile, id: "iOSPairingDisplayName", title: String(localized: "settings.mobile.displayName", defaultValue: "Display Name"), synonyms: "mobile.iOSPairingHost.displayName ios iphone mobile pairing display name mac hostname device label"),
-            .init(
-                section: .mobile,
-                id: "artifactFolderAccess",
-                title: String(localized: "settings.mobile.artifactFolderAccess", defaultValue: "Folder Access"),
-                detailText: String(localized: "settings.mobile.artifactFolderAccess.subtitleSubtree", defaultValue: "Lets iOS browse any item inside a folder referenced by chat or visible in a terminal."),
-                paths: ["mobile.artifactFolderAccess"],
-                synonyms: "ios iphone ipad mobile files folders directory subtree one level authorization security"
-            ),
-
             // Custom Sidebars
             .init(section: .customSidebars, id: "enabled", title: String(localized: "settings.customSidebars.enabled", defaultValue: "Show Custom Sidebars"), synonyms: "custom sidebars enable show vibe swift json interpreted picker beta"),
             .init(section: .customSidebars, id: "renderer", title: String(localized: "settings.customSidebars.renderer", defaultValue: "Renderer"), synonyms: "customSidebars.renderer renderer in-process in app remote worker isolated process hover focus typing input"),
@@ -335,19 +261,7 @@ extension Array where Element == CuratedSettingEntry {
             // Beta
             .init(section: .betaFeatures, id: "feed", title: String(localized: "settings.betaFeatures.feed", defaultValue: "Feed"), synonyms: "Feed feed right sidebar agent decisions permissions questions approval beta unstable"),
             .init(section: .betaFeatures, id: "dock", title: String(localized: "settings.betaFeatures.dock", defaultValue: "Dock"), synonyms: "Dock dock right sidebar terminal controls tui beta unstable"),
-            .init(
-                section: .betaFeatures,
-                id: "cloudMachines",
-                title: String(localized: "settings.betaFeatures.cloudMachines", defaultValue: "Cloud Machines"),
-                detailText: [
-                    String(localized: "settings.betaFeatures.cloudMachines.subtitleOn", defaultValue: "Shows Cloud in the right sidebar plus the Cloud Machines settings, palette commands, and new-workspace entries."),
-                    String(localized: "settings.betaFeatures.cloudMachines.subtitleOff", defaultValue: "Hides every Cloud Machines surface unless remote rollout enables it."),
-                ].joined(separator: " "),
-                paths: ["cloud.beta.machines.enabled"],
-                synonyms: "cloud machines vm virtual machine right sidebar persistent computer beta unstable"
-            ),
             .init(section: .betaFeatures, id: "customSidebars", title: String(localized: "settings.betaFeatures.customSidebars", defaultValue: "Custom Sidebars"), synonyms: "Custom Sidebars custom sidebars swift json interpreted vibe beta unstable"),
-            .init(section: .betaFeatures, id: "remoteTmux", title: String(localized: "settings.betaFeatures.remoteTmux", defaultValue: "Remote tmux"), synonyms: "Remote tmux remote tmux ssh control mode -CC mirror session window pane sidebar workspace beta unstable"),
             .init(
                 section: .betaFeatures,
                 id: "workspace-todo-controls",
@@ -396,59 +310,6 @@ extension Array where Element == CuratedSettingEntry {
             .init(section: .automation, id: "port-base", title: String(localized: "settings.automation.portBase", defaultValue: "Port Base"), synonyms: "Port Base automation.portBase cmux_port start first base env environment variable"),
             .init(section: .automation, id: "port-range", title: String(localized: "settings.automation.portRange", defaultValue: "Port Range Size"), synonyms: "Port Range Size automation.portRange cmux_port_end range size count env ports"),
 
-            // Computer Use
-            .init(
-                section: .computerUse,
-                id: "enabled",
-                title: String(localized: "settings.computerUse.enabled", defaultValue: "Enable Computer Use"),
-                paths: ["computerUse.enabled"],
-                synonyms: String(localized: "settings.search.alias.setting.computerUse.enabled", defaultValue: "computerUse.enabled enable disable computer use cua mcp agent sessions")
-            ),
-            .init(
-                section: .computerUse,
-                id: "permissions",
-                title: String(localized: "settings.computerUse.permissions", defaultValue: "Permissions"),
-                synonyms: String(localized: "settings.search.alias.setting.computerUse.permissions", defaultValue: "accessibility screen recording capture permissions privacy system settings grant")
-            ),
-            .init(
-                section: .computerUse,
-                id: "show-in-menu-bar",
-                title: String(localized: "settings.computerUse.showInMenuBar", defaultValue: "Show Computer Use in Menu Bar"),
-                paths: ["computerUse.showInMenuBar"],
-                synonyms: String(localized: "settings.search.alias.setting.computerUse.showInMenuBar", defaultValue: "computerUse.showInMenuBar menu bar menubar status item cursor agents")
-            ),
-            // Browser
-            .init(section: .browser, id: "enable-browser", title: String(localized: "settings.browser.enabled", defaultValue: "Enable cmux Browser"), synonyms: "Enable cmux Browser browser.disabled enable disable webview embedded browser tabs links"),
-            .init(section: .browser, id: "search-engine", title: String(localized: "settings.browser.searchEngine", defaultValue: "Default Search Engine"), synonyms: "Default Search Engine browser.defaultSearchEngine omnibar address bar google duckduckgo bing kagi brave startpage perplexity exa yahoo ecosia qwant mojeek wikipedia github baidu yandex custom search provider engine name url template"),
-            .init(section: .browser, id: "search-suggestions", title: String(localized: "settings.browser.searchSuggestions", defaultValue: "Show Search Suggestions"), synonyms: "Show Search Suggestions browser.showSearchSuggestions suggest autocomplete address bar search suggestions"),
-            .init(section: .browser, id: "theme", title: String(localized: "settings.browser.theme", defaultValue: "Browser Theme"), synonyms: "Browser Theme browser.theme web page theme color scheme light dark system"),
-            .init(section: .browser, id: "hidden-webview-discard", title: String(localized: "settings.browser.hiddenWebViewDiscard", defaultValue: "Browser Memory Saver"), synonyms: "Browser Memory Saver browser.discardHiddenWebViews memory hidden tabs webview discard unload reclaim"),
-            .init(section: .browser, id: "hidden-webview-discard-delay", title: String(localized: "settings.browser.hiddenWebViewDiscardDelay", defaultValue: "Memory Saver Delay"), synonyms: "Memory Saver Delay browser.hiddenWebViewDiscardDelaySeconds memory hidden tabs delay seconds discard unload"),
-            .init(
-                section: .browser,
-                id: "ask-where-to-save-downloads",
-                title: String(localized: "settings.browser.askWhereToSaveDownloads", defaultValue: "Ask Where to Save Downloads"),
-                detailText: String(localized: "settings.browser.askWhereToSaveDownloads.subtitle", defaultValue: "When off, browser downloads save directly to Downloads without a save panel."),
-                synonyms: String(localized: "settings.search.alias.setting.browser.ask-where-to-save-downloads", defaultValue: "browser.askWhereToSaveDownloads downloads save panel folder attachments files pdf gmail")
-            ),
-            .init(section: .browser, id: "terminal-links", title: String(localized: "settings.browser.openTerminalLinks", defaultValue: "Open Terminal Links in cmux Browser"), synonyms: "Open Terminal Links in cmux Browser browser.openTerminalLinksInCmuxBrowser click url terminal links open in browser href"),
-            .init(section: .browser, id: "intercept-open", title: String(localized: "settings.browser.interceptOpen", defaultValue: "Intercept open http(s) in Terminal"), synonyms: "Intercept open http(s) in Terminal browser.interceptTerminalOpenCommandInCmuxBrowser open command http https url terminal intercept"),
-            .init(section: .browser, id: "host-whitelist", title: String(localized: "settings.browser.hostWhitelist", defaultValue: "Hosts to Open in Embedded Browser"), synonyms: "Hosts to Open in Embedded Browser browser.hostsToOpenInEmbeddedBrowser allowlist whitelist host wildcard domain embedded browser"),
-            .init(section: .browser, id: "external-patterns", title: String(localized: "settings.browser.externalPatterns", defaultValue: "URLs to Always Open Externally"), synonyms: "URLs to Always Open Externally browser.urlsToAlwaysOpenExternally denylist blocklist regex rules external default browser"),
-            .init(section: .browser, id: "http-allowlist", title: String(localized: "settings.browser.httpAllowlist", defaultValue: "HTTP Hosts Allowed in Embedded Browser"), synonyms: "HTTP Hosts Allowed in Embedded Browser browser.insecureHttpHostsAllowedInEmbeddedBrowser insecure http allowlist localhost localtest non-https warning"),
-            .init(
-                section: .browser,
-                id: "url-allowlist",
-                title: String(localized: "settings.browser.urlAllowlist", defaultValue: "Embedded Browser URL Allowlist"),
-                synonyms: String(localized: "settings.search.alias.setting.browser.url-allowlist", defaultValue: "browser.urlAllowlist URL allowlist localhost wildcard scheme port organization policy")
-            ),
-            .init(section: .browser, id: "react-grab", title: String(localized: "settings.browser.reactGrabVersion", defaultValue: "React Grab Version"), synonyms: "React Grab Version browser.reactGrabVersion react grab npm version toolbar cmd-shift-g inspect component"),
-            .init(section: .browser, id: "history", title: String(localized: "settings.browser.history", defaultValue: "Browsing History"), synonyms: "Browsing History browsing history clear visited pages omnibar suggestions delete"),
-
-            // Browser import
-            .init(section: .browserImport, id: "import-data", title: String(localized: "settings.browser.import", defaultValue: "Import Browser Data"), synonyms: "Import Browser Data chrome safari firefox brave edge arc bookmarks history cookies profiles migration"),
-            .init(section: .browserImport, id: "import-hint", title: String(localized: "settings.browser.import.hint.show", defaultValue: "Show import hint on blank browser tabs"), synonyms: "Show import hint on blank browser tabs browser.showImportHintOnBlankTabs blank tab onboarding hint import prompt dismiss"),
-
             // Global hotkey
             .init(section: .globalHotkey, id: "enable-hotkey", title: String(localized: "settings.globalHotkey.enable", defaultValue: "Enable System-Wide Hotkey"), synonyms: "Enable System-Wide Hotkey app.systemWideHotkeyEnabled global hotkey enable system wide show hide all windows"),
             .init(section: .globalHotkey, id: "shortcut", title: String(localized: "settings.globalHotkey.shortcut", defaultValue: "Show/Hide All Windows"), synonyms: "Show/Hide All Windows global hotkey shortcut recorder key command option control"),
@@ -459,7 +320,7 @@ extension Array where Element == CuratedSettingEntry {
                 id: "shortcuts",
                 title: String(localized: "settings.section.keyboardShortcuts", defaultValue: "Keyboard Shortcuts"),
                 synonyms: [
-                    "shortcuts.bindings hotkeys keybindings key bindings commands keyboard accelerators chords cmux json open diff viewer changes review git unstaged split left split right split up split down new pane new split move surface move tab focus pane resize pane close tab close workspace next previous select workspace",
+                    "shortcuts.bindings hotkeys keybindings key bindings commands keyboard accelerators chords cmux json split left split right split up split down new pane new split move surface move tab focus pane resize pane close tab close workspace next previous select workspace",
                     Self.keyboardShortcutActionSynonyms,
                 ].joined(separator: " ")
             ),

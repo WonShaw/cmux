@@ -4,18 +4,8 @@ import Foundation
 
 /// Applies MDM managed-policy transitions to a running app.
 ///
-/// When the embedded-browser policy activates it runs the injected browser
-/// enforcement (closing live browser panes) and posts
-/// `BrowserAvailabilitySettings.didChangeNotification` so gated UI refreshes;
-/// when the remote-control policy flips either way it runs the injected
-/// mobile enforcement (`MobileHostService.syncToSettings()`, which tears the
-/// host down or re-arms it); when the Cloud policy flips either way it runs
-/// the injected Cloud enforcement (teardown of Cloud workspaces, providers,
-/// and the managed VPN on activation; discovery restart on lift), and also at
-/// construction when the policy is already forced; when the remote-connections
-/// policy activates it runs the injected remote-connections enforcement
-/// (disconnecting live remote workspaces and remote tmux mirrors), also at
-/// construction. Every transition also posts
+/// No remaining policy has live resources to tear down, so every transition
+/// only posts
 /// `ManagedDevicePolicy.didChangeNotification` so Settings UI re-reads the
 /// resolver.
 ///
@@ -32,94 +22,24 @@ final class ManagedPolicyEnforcementObserver {
     /// deadline is the intended behavior (matches MDM check-in semantics).
     static let recheckInterval: Duration = .seconds(60)
     private let notificationCenter: NotificationCenter
-    private let isBrowserDisabledByPolicy: () -> Bool
-    private let browserURLAllowlistPolicy: () -> BrowserURLAllowlistPolicy
-    private let isRemoteControlDisabledByPolicy: () -> Bool
-    private let isCloudDisabledByPolicy: () -> Bool
-    private let isIrohDisabledByPolicy: () -> Bool
     private let capabilityPolicy: ManagedDevicePolicy
-    private let enforceBrowserPolicy: () -> Void
-    private let enforceBrowserURLAllowlistPolicy: () -> Void
-    private let enforceRemoteControlPolicy: () -> Void
-    private let enforceCloudPolicy: () -> Void
-    private let enforceRemoteConnectionsPolicy: () -> Void
-    private let enforceComputerUsePolicy: () -> Void
     /// Keys whose runtime effect is a per-call read, a launch-time read, or a
-    /// Settings lock: a transition only needs the change signal — except
-    /// Computer Use, whose helper is re-applied on both directions.
+    /// Settings lock: a transition only needs the change signal.
     private static let settingsVisibleKeys: [ManagedDevicePolicyKey] = [
-        .disableTelemetry, .disableAutoUpdate, .disableAutomationWebhooks,
-        .disableTLSTrustBypass, .disableComputerUse, .disableCustomSidebars,
-        .disableAICredentialUpload,
+        .disableCustomSidebars,
     ]
     private var settingsVisiblePolicyStates: [ManagedDevicePolicyKey: Bool]
-    private var browserPolicyActive: Bool
-    private var observedBrowserURLAllowlistPolicy: BrowserURLAllowlistPolicy
-    private var remoteControlPolicyActive: Bool
-    private var cloudPolicyActive: Bool
-    private var irohPolicyActive: Bool
-    private var remoteConnectionsPolicyActive: Bool
     private var fileTransferPolicyActive: Bool
     private var observationTasks: [Task<Void, Never>] = []
 
     init(
         notificationCenter: NotificationCenter = .default,
-        isBrowserDisabledByPolicy: @escaping () -> Bool = {
-            BrowserAvailabilitySettings.isManagedByPolicy
-        },
-        browserURLAllowlistPolicy: @escaping () -> BrowserURLAllowlistPolicy = {
-            BrowserURLAllowlistPolicy(defaults: .standard)
-        },
-        isRemoteControlDisabledByPolicy: @escaping () -> Bool = {
-            MobileRemoteControlPolicy.isDisabled
-        },
-        isCloudDisabledByPolicy: @escaping () -> Bool = {
-            ManagedDevicePolicy().isEnforced(.disableCloud)
-        },
-        isIrohDisabledByPolicy: @escaping () -> Bool = { ManagedIrohNetworkingPolicy.isDisabled },
-        capabilityPolicy: ManagedDevicePolicy = ManagedDevicePolicy(),
-        enforceBrowserPolicy: @escaping () -> Void,
-        enforceBrowserURLAllowlistPolicy: @escaping () -> Void,
-        enforceRemoteControlPolicy: @escaping () -> Void,
-        enforceCloudPolicy: @escaping () -> Void = {},
-        enforceRemoteConnectionsPolicy: @escaping () -> Void = {},
-        enforceComputerUsePolicy: @escaping () -> Void = {}
+        capabilityPolicy: ManagedDevicePolicy = ManagedDevicePolicy()
     ) {
         self.notificationCenter = notificationCenter
-        self.isBrowserDisabledByPolicy = isBrowserDisabledByPolicy
-        self.browserURLAllowlistPolicy = browserURLAllowlistPolicy
-        self.isRemoteControlDisabledByPolicy = isRemoteControlDisabledByPolicy
-        self.isCloudDisabledByPolicy = isCloudDisabledByPolicy
-        self.isIrohDisabledByPolicy = isIrohDisabledByPolicy
         self.capabilityPolicy = capabilityPolicy
-        self.enforceBrowserPolicy = enforceBrowserPolicy
-        self.enforceBrowserURLAllowlistPolicy = enforceBrowserURLAllowlistPolicy
-        self.enforceRemoteControlPolicy = enforceRemoteControlPolicy
-        self.enforceCloudPolicy = enforceCloudPolicy
-        self.enforceRemoteConnectionsPolicy = enforceRemoteConnectionsPolicy
-        self.enforceComputerUsePolicy = enforceComputerUsePolicy
         settingsVisiblePolicyStates = Self.settingsVisibleStates(capabilityPolicy)
-        browserPolicyActive = isBrowserDisabledByPolicy()
-        observedBrowserURLAllowlistPolicy = browserURLAllowlistPolicy()
-        remoteControlPolicyActive = isRemoteControlDisabledByPolicy()
-        cloudPolicyActive = isCloudDisabledByPolicy()
-        irohPolicyActive = isIrohDisabledByPolicy()
-        remoteConnectionsPolicyActive = capabilityPolicy.isEnforced(.disableRemoteConnections)
         fileTransferPolicyActive = capabilityPolicy.isEnforced(.disableFileTransfer)
-        if irohPolicyActive { enforceRemoteControlPolicy() }
-        if cloudPolicyActive {
-            // A profile may already be installed before launch. Enforce it at
-            // startup so restored Cloud workspaces and providers are removed.
-            enforceCloudPolicy()
-        }
-        if remoteConnectionsPolicyActive {
-            // Same for remote connections: nothing cmux created may stay dialed.
-            enforceRemoteConnectionsPolicy()
-        }
-        if settingsVisiblePolicyStates[.disableComputerUse] == true {
-            // A profile installed before launch: stop the helper right away.
-            enforceComputerUsePolicy()
-        }
         observe(UserDefaults.didChangeNotification)
         observe(NSApplication.didBecomeActiveNotification)
         observationTasks.append(Task { @MainActor [weak self] in
@@ -153,58 +73,11 @@ final class ManagedPolicyEnforcementObserver {
         })
     }
 
-    /// Compares the current policy state to the last-seen state and runs the
-    /// matching enforcement on a transition. Exposed for tests and for the
+    /// Compares the current policy state to the last-seen state and posts the
+    /// change signal on a transition. Exposed for tests and for the
     /// startup call after construction.
     func reevaluate() {
         var anyTransition = false
-        let browserNow = isBrowserDisabledByPolicy()
-        if browserNow != browserPolicyActive {
-            browserPolicyActive = browserNow
-            anyTransition = true
-            if browserNow {
-                enforceBrowserPolicy()
-            }
-            // Both directions change the effective availability of gated UI.
-            notificationCenter.post(
-                name: BrowserAvailabilitySettings.didChangeNotification,
-                object: nil
-            )
-        }
-        let browserURLAllowlistNow = browserURLAllowlistPolicy()
-        if browserURLAllowlistNow != observedBrowserURLAllowlistPolicy {
-            observedBrowserURLAllowlistPolicy = browserURLAllowlistNow
-            anyTransition = true
-            enforceBrowserURLAllowlistPolicy()
-        }
-        let remoteNow = isRemoteControlDisabledByPolicy()
-        if remoteNow != remoteControlPolicyActive {
-            remoteControlPolicyActive = remoteNow
-            anyTransition = true
-            // syncToSettings() handles both teardown and re-arming.
-            enforceRemoteControlPolicy()
-        }
-        let cloudNow = isCloudDisabledByPolicy()
-        if cloudNow != cloudPolicyActive {
-            cloudPolicyActive = cloudNow
-            anyTransition = true
-            enforceCloudPolicy()
-        }
-        let irohNow = isIrohDisabledByPolicy()
-        if irohNow != irohPolicyActive {
-            irohPolicyActive = irohNow
-            anyTransition = true
-            enforceRemoteControlPolicy()
-        }
-        let remoteConnectionsNow = capabilityPolicy.isEnforced(.disableRemoteConnections)
-        if remoteConnectionsNow != remoteConnectionsPolicyActive {
-            remoteConnectionsPolicyActive = remoteConnectionsNow
-            anyTransition = true
-            // Activation ends every live cmux-created remote connection; a
-            // lift needs no enforcement because the per-call gates read the
-            // resolver on the next connect.
-            if remoteConnectionsNow { enforceRemoteConnectionsPolicy() }
-        }
         let fileTransferNow = capabilityPolicy.isEnforced(.disableFileTransfer)
         if fileTransferNow != fileTransferPolicyActive {
             // Transfers are momentary: nothing live to tear down, the next
@@ -214,11 +87,8 @@ final class ManagedPolicyEnforcementObserver {
         }
         let settingsVisibleNow = Self.settingsVisibleStates(capabilityPolicy)
         if settingsVisibleNow != settingsVisiblePolicyStates {
-            let computerUseChanged =
-                settingsVisibleNow[.disableComputerUse] != settingsVisiblePolicyStates[.disableComputerUse]
             settingsVisiblePolicyStates = settingsVisibleNow
             anyTransition = true
-            if computerUseChanged { enforceComputerUsePolicy() }
         }
         if anyTransition {
             // Settings UI re-reads the resolver on this signal.

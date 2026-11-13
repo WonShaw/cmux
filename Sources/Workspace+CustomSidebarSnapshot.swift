@@ -14,13 +14,6 @@ extension Workspace {
         let progress = self.progress.map {
             CustomSidebarWorkspaceSnapshot.Progress(value: $0.value, label: $0.label)
         }
-        let remote = remoteDisplayTarget.map { target in
-            CustomSidebarWorkspaceSnapshot.Remote(
-                target: target,
-                stateRawValue: remoteConnectionState.rawValue,
-                isConnected: remoteConnectionState == .connected
-            )
-        }
         return CustomSidebarWorkspaceSnapshot(
             id: id,
             title: customTitle ?? title,
@@ -38,12 +31,10 @@ extension Workspace {
             customColor: customColor,
             gitBranch: firstBranch?.branch,
             gitIsDirty: firstBranch?.isDirty ?? false,
-            pullRequestValues: customSidebarPullRequestValues(),
             progress: progress,
             latestConversationMessage: latestConversationMessage,
             latestSubmittedMessage: latestSubmittedMessage,
             latestSubmittedAt: latestSubmittedAt,
-            remote: remote,
             agents: customSidebarAgentSnapshots(),
             groupId: groupId
         )

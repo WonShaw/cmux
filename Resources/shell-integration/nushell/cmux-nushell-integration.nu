@@ -5,7 +5,7 @@
 # (Resources/shell-integration/fish/config.fish): socket reporting of tty,
 # shell activity state, pwd changes, and port-scan kicks, plus the claude/grok
 # CLI wrappers, scrollback restore, and the keyboard-protocol reset. The
-# zsh-only extras (git-branch probes, PR polling, Ghostty job-table patching)
+# zsh-only extras (git-branch probes, Ghostty job-table patching)
 # are intentionally not replicated here.
 #
 # State lives in _CMUX_* environment variables because nushell hook closures
@@ -43,22 +43,6 @@ def --env _cmux_socket_is_unix [] {
     let live = ((^/bin/test -S $sock | complete | get exit_code) == 0)
     if $live { $env._CMUX_SOCKET_IS_UNIX = $"yes:($sock)" }
     $live
-}
-
-# Resolves the cmux CLI used for remote-relay RPCs, preferring the bundled binary.
-def _cmux_relay_cli_path [] {
-    let bundled = ($env.CMUX_BUNDLED_CLI_PATH? | default "")
-    if ($bundled != "") and ($bundled | path exists) { return $bundled }
-    which cmux | get -o 0.path | default ""
-}
-
-# Whether CMUX_SOCKET_PATH is a host:port relay address reachable through the cmux CLI.
-def _cmux_socket_uses_remote_relay [] {
-    let sock = ($env.CMUX_SOCKET_PATH? | default "")
-    if ($sock | is-empty) { return false }
-    if ($sock | str starts-with "/") { return false }
-    if not ($sock | str contains ":") { return false }
-    (_cmux_relay_cli_path) != ""
 }
 
 # Sends one payload line to the cmux socket, synchronously.
@@ -102,61 +86,6 @@ def _cmux_json_escape [value: string] {
     | str replace -a "\t" "\\t"
 }
 
-# Workspace id for relay RPC params, falling back to the tab id.
-def _cmux_relay_workspace_id [] {
-    let workspace = ($env.CMUX_WORKSPACE_ID? | default "")
-    if $workspace != "" { return $workspace }
-    $env.CMUX_TAB_ID? | default ""
-}
-
-# Fires a cmux relay RPC without blocking the prompt.
-def _cmux_relay_rpc_bg [method: string, params: string] {
-    let cli = (_cmux_relay_cli_path)
-    if ($cli | is-empty) { return }
-    if ($env.CMUX_TEST_SYNC_SEND? | default "") == "1" {
-        ^$cli rpc $method $params | complete | ignore
-        return
-    }
-    job spawn { ^$cli rpc $method $params | complete | ignore } | ignore
-}
-
-# Reports the tty name through the remote relay.
-def _cmux_report_tty_via_relay [] {
-    if not (_cmux_socket_uses_remote_relay) { return }
-    let name = ($env._CMUX_TTY_NAME? | default "")
-    if ($name | is-empty) { return }
-    let workspace = (_cmux_relay_workspace_id)
-    if ($workspace | is-empty) { return }
-    mut payload = {workspace_id: $workspace, tty_name: $name}
-    let panel = ($env.CMUX_PANEL_ID? | default "")
-    if $panel != "" { $payload = ($payload | insert surface_id $panel) }
-    _cmux_relay_rpc_bg surface.report_tty ($payload | to json --raw)
-}
-
-# Reports a cwd change through the remote relay; returns true when dispatched.
-def _cmux_report_pwd_via_relay [pwd: string] {
-    if not (_cmux_socket_uses_remote_relay) { return false }
-    if ($pwd | is-empty) { return false }
-    let workspace = (_cmux_relay_workspace_id)
-    if ($workspace | is-empty) { return false }
-    mut payload = {workspace_id: $workspace, path: $pwd}
-    let panel = ($env.CMUX_PANEL_ID? | default "")
-    if $panel != "" { $payload = ($payload | insert surface_id $panel) }
-    _cmux_relay_rpc_bg surface.report_pwd ($payload | to json --raw)
-    true
-}
-
-# Requests a port scan through the remote relay.
-def _cmux_ports_kick_via_relay [reason: string] {
-    if not (_cmux_socket_uses_remote_relay) { return }
-    let workspace = (_cmux_relay_workspace_id)
-    if ($workspace | is-empty) { return }
-    mut payload = {workspace_id: $workspace, reason: $reason}
-    let panel = ($env.CMUX_PANEL_ID? | default "")
-    if $panel != "" { $payload = ($payload | insert surface_id $panel) }
-    _cmux_relay_rpc_bg surface.ports_kick ($payload | to json --raw)
-}
-
 # Reports the surface tty once per session so cmux can map this shell to its
 # panel. Honors a preset _CMUX_TTY_NAME (tests have no tty to probe).
 def --env _cmux_report_tty_once [] {
@@ -177,9 +106,6 @@ def --env _cmux_report_tty_once [] {
         if ($panel | is-empty) { return }
         $env._CMUX_TTY_REPORTED = "1"
         _cmux_send_bg $"report_tty ($name) --tab=($tab) --panel=($panel)"
-    } else if (_cmux_socket_uses_remote_relay) {
-        $env._CMUX_TTY_REPORTED = "1"
-        _cmux_report_tty_via_relay
     }
 }
 
@@ -211,8 +137,6 @@ def --env _cmux_report_pwd_if_changed [] {
         let qpwd = (_cmux_json_escape $pwd)
         _cmux_send_bg $"report_pwd \"($qpwd)\" --tab=($tab) --panel=($panel)"
         $env._CMUX_PWD_LAST_PWD = $pwd
-    } else if (_cmux_report_pwd_via_relay $pwd) {
-        $env._CMUX_PWD_LAST_PWD = $pwd
     }
 }
 
@@ -227,8 +151,6 @@ def --env _cmux_ports_kick [reason: string] {
         let panel = ($env.CMUX_PANEL_ID? | default "")
         if ($panel | is-empty) { return }
         _cmux_send_bg $"ports_kick --tab=($tab) --panel=($panel) --reason=($why)"
-    } else {
-        _cmux_ports_kick_via_relay $why
     }
 }
 

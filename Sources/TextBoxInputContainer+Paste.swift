@@ -122,17 +122,7 @@ extension TextBoxInputContainer {
                 return
             }
             publishComposerContent(from: textView)
-        case .uploadFiles(let uploadURLs, let remoteTarget):
-            uploadFileAttachments(
-                uploadURLs,
-                remoteTarget: remoteTarget,
-                focusing: textView,
-                replacingPlaceholderID: placeholderID,
-                validationToken: validationToken,
-                preparedAttachments: preparedAttachments,
-                preparationService: preparationService
-            )
-        case .reject, .pasteCloudImages:
+        case .reject:
             _ = textView.removePendingAttachmentUploadPlaceholder(
                 id: placeholderID
             )
@@ -141,7 +131,6 @@ extension TextBoxInputContainer {
                 using: preparationService
             )
             publishComposerContent(from: textView)
-            if case .pasteCloudImages = plan { refuseCloudComposerImage() }
         }
     }
 

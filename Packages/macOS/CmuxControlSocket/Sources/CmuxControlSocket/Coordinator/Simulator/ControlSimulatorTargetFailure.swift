@@ -6,8 +6,6 @@ public enum ControlSimulatorTargetFailure: Sendable, Equatable {
     case tabManagerUnavailable
     /// The selected workspace does not exist.
     case workspaceNotFound
-    /// The selected workspace mirrors a remote tmux session.
-    case remoteWorkspace
     /// The selected surface does not exist.
     case surfaceNotFound(UUID?)
     /// The selected surface exists but is not a Simulator surface.

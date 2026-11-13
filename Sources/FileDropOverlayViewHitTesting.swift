@@ -243,13 +243,8 @@ extension FileDropOverlayView {
         )
     }
 
-    /// Hit-tests the window to find a WKWebView (browser panel) under the cursor.
+    /// Hit-tests the window to find a WKWebView under the cursor.
     func webViewUnderPoint(_ windowPoint: NSPoint) -> WKWebView? {
-        if let window,
-           let portalWebView = BrowserWindowPortalRegistry.webViewAtWindowPoint(windowPoint, in: window) {
-            return portalWebView
-        }
-
         var current = viewUnderPoint(windowPoint)
         while let view = current {
             if let webView = view as? WKWebView { return webView }
@@ -415,7 +410,7 @@ extension FileDropOverlayView {
         if let terminalPaneTarget = TerminalWindowPortalRegistry.terminalPaneDropTargetAtWindowPoint(windowPoint, in: window) {
             return terminalPaneTarget
         }
-        return BrowserWindowPortalRegistry.browserPaneDropTargetAtWindowPoint(windowPoint, in: window)
+        return nil
     }
 
     func paneDropTargetForTextDrop(at windowPoint: NSPoint) -> (any FileDropPaneTarget)? {

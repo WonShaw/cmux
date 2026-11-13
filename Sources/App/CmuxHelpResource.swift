@@ -8,9 +8,7 @@ enum CmuxHelpResource {
     case dock
     case keyboardShortcuts
     case apiReference
-    case browserAutomation
     case notifications
-    case ssh
     case skills
     case claudeCodeTeams
     case ohMyOpenCode
@@ -36,12 +34,8 @@ enum CmuxHelpResource {
             return String(localized: "settings.section.keyboardShortcuts", defaultValue: "Keyboard Shortcuts")
         case .apiReference:
             return String(localized: "menu.help.apiReference", defaultValue: "API Reference")
-        case .browserAutomation:
-            return String(localized: "menu.help.browserAutomation", defaultValue: "Browser Automation")
         case .notifications:
             return String(localized: "menu.help.notifications", defaultValue: "Notifications")
-        case .ssh:
-            return String(localized: "menu.help.ssh", defaultValue: "SSH")
         case .skills:
             return String(localized: "menu.help.skills", defaultValue: "Skills")
         case .claudeCodeTeams:
@@ -77,12 +71,8 @@ enum CmuxHelpResource {
             return URL(string: "https://cmux.com/docs/keyboard-shortcuts")!
         case .apiReference:
             return URL(string: "https://cmux.com/docs/api")!
-        case .browserAutomation:
-            return URL(string: "https://cmux.com/docs/browser-automation")!
         case .notifications:
             return URL(string: "https://cmux.com/docs/notifications")!
-        case .ssh:
-            return URL(string: "https://cmux.com/docs/ssh")!
         case .skills:
             return URL(string: "https://cmux.com/docs/skills")!
         case .claudeCodeTeams:

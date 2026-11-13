@@ -22,11 +22,9 @@ struct SettingsRowAnchorResolutionTests {
     /// rendered* settings row. Excludes rows that aren't standalone search
     /// results: `workspaceColors.colors` (repeated per-palette rows) and
     /// the conditional sub-fields that are hidden in the default state —
-    /// `automation.socketPassword` (only in password mode),
-    /// `browser.customSearchEngineName` / `customSearchEngineURLTemplate`
-    /// (only when the engine is Custom). Those would be dead search hits
-    /// when hidden, so their search terms fold into the always-visible
-    /// parent (Socket Control Mode / Default Search Engine) instead.
+    /// `automation.socketPassword` (only in password mode). Those would be
+    /// dead search hits when hidden, so their search terms fold into the
+    /// always-visible parent (Socket Control Mode) instead.
     ///
     /// This is a deliberately hand-maintained contract list: the rows live
     /// in SwiftUI view bodies (`Sections/*.swift`) that can't be reflected
@@ -53,7 +51,6 @@ struct SettingsRowAnchorResolutionTests {
         "app.preferredEditor",
         "app.renameSelectsExistingName",
         "app.reorderOnNotification",
-        "app.sendAnonymousTelemetry",
         "app.warnBeforeClosingTab",
         "app.warnBeforeClosingTabXButton",
         "app.workspaceInheritWorkingDirectory",
@@ -67,22 +64,8 @@ struct SettingsRowAnchorResolutionTests {
         "automation.socketControlMode",
         "automation.suppressSubagentNotifications",
         "automation.workspaceAutoNaming",
-        "computerUse.enabled",
-        "computerUse.showInMenuBar",
-        "browser.defaultSearchEngine",
-        "browser.discardHiddenWebViews",
-        "browser.hiddenWebViewDiscardDelaySeconds",
-        "browser.askWhereToSaveDownloads",
-        "browser.hostsToOpenInEmbeddedBrowser",
-        "browser.interceptTerminalOpenCommandInCmuxBrowser",
-        "browser.openTerminalLinksInCmuxBrowser",
-        "browser.reactGrabVersion",
-        "browser.showSearchSuggestions",
-        "browser.theme",
-        "browser.urlsToAlwaysOpenExternally",
         "canvas.paneGap",
         "canvas.snappingEnabled",
-        "cloud.beta.machines.enabled",
         "customSidebars.renderer",
         "fileEditor.currentLineHighlight",
         "fileEditor.indentGuides",
@@ -104,9 +87,6 @@ struct SettingsRowAnchorResolutionTests {
         "notifications.unreadPaneRing",
         "sidebar.branchLayout",
         "sidebar.hideAllDetails",
-        "sidebar.makePullRequestsClickable",
-        "sidebar.openPortLinksInCmuxBrowser",
-        "sidebar.openPullRequestLinksInCmuxBrowser",
         "sidebar.pathLastSegmentOnly",
         "sidebar.rightMaxWidth",
         "sidebar.showBranchDirectory",
@@ -119,7 +99,6 @@ struct SettingsRowAnchorResolutionTests {
         "sidebar.notificationBadgePosition",
         "sidebar.showPorts",
         "sidebar.showProgress",
-        "sidebar.showPullRequests",
         "sidebar.showSSH",
         "sidebar.showWorkspaceDescription",
         "sidebar.stackBranchDirectory",
@@ -172,18 +151,10 @@ struct SettingsRowAnchorResolutionTests {
         "setting:mobile:iOSPairingDisplayName",
         "setting:betaFeatures:feed",
         "setting:betaFeatures:dock",
-        "setting:betaFeatures:cloudMachines",
         "setting:betaFeatures:customSidebars",
         "setting:betaFeatures:remoteTmux",
         "setting:customSidebars:enabled",
-        "setting:computerUse:permissions",
-        "setting:browser:history",
-        "setting:browser:http-allowlist",
-        "setting:browser:url-allowlist",
         "setting:workspaceColors:palette",
-        "setting:browser:enable-browser",
-        "setting:browserImport:import-data",
-        "setting:browserImport:import-hint",
         "setting:globalHotkey:enable-hotkey",
         "setting:globalHotkey:shortcut",
         "setting:keyboardShortcuts:shortcuts",

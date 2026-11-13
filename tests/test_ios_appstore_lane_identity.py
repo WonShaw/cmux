@@ -454,8 +454,8 @@ from pathlib import Path
 {common}
 LEGACY_PROFILE = copy.deepcopy(APPSTORE_PROFILE)
 LEGACY_PROFILE["Entitlements"] = dict(APPSTORE_PROFILE["Entitlements"])
-LEGACY_PROFILE["Entitlements"]["application-identifier"] = f"{{TEAM_ID}}.com.cmuxterm.app"
-LEGACY_PROFILE["Entitlements"]["keychain-access-groups"] = [f"{{TEAM_ID}}.com.cmuxterm.app"]
+LEGACY_PROFILE["Entitlements"]["application-identifier"] = f"{{TEAM_ID}}.com.comux.app"
+LEGACY_PROFILE["Entitlements"]["keychain-access-groups"] = [f"{{TEAM_ID}}.com.comux.app"]
 
 args = sys.argv[1:]
 if args[:3] == ["find-identity", "-v", "-p"]:
@@ -1107,8 +1107,8 @@ def test_upload_appstore_lane_uses_production_bundle_id(tmp: Path, fakebin: Path
     for build_arg in PRODUCTION_RUNTIME_BUILD_ARGS:
         _check(build_arg in archive_call, f"App Store archive stamps {build_arg.split('=', 1)[0]}")
     _check(
-        all("PRODUCT_BUNDLE_IDENTIFIER=com.cmuxterm.app" not in call for call in archive_call),
-        "archive command does not stamp the retired com.cmuxterm.app id",
+        all("PRODUCT_BUNDLE_IDENTIFIER=com.comux.app" not in call for call in archive_call),
+        "archive command does not stamp the retired com.comux.app id",
     )
 
     export_options = plistlib.loads((tmp / "ExportOptions.plist").read_bytes())
@@ -1117,7 +1117,7 @@ def test_upload_appstore_lane_uses_production_bundle_id(tmp: Path, fakebin: Path
         profiles.get(APPSTORE_BUNDLE_ID) == "cmux App Store Distribution",
         "export options map the App Store profile to com.cmux.app",
     )
-    _check("com.cmuxterm.app" not in profiles, "export options do not include the retired app id")
+    _check("com.comux.app" not in profiles, "export options do not include the retired app id")
 
     ipa_line = next(line for line in result.stdout.splitlines() if line.startswith("IPA_PATH="))
     ipa_path = Path(ipa_line.removeprefix("IPA_PATH="))

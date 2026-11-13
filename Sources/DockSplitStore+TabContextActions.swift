@@ -85,18 +85,9 @@ extension DockSplitStore {
                 anchorTabId: tab.id,
                 paneId: pane
             )
-        case .newBrowserToRight:
-            createDockContextSurfaceToRight(
-                kind: .browser,
-                anchorTabId: tab.id,
-                paneId: pane
-            )
-        case .reload:
-            browserPanel(for: panelId)?.reload()
-        case .toggleAudioMute:
-            toggleDockBrowserMute(panelId: panelId, tabId: tab.id)
-        case .duplicate:
-            _ = duplicateBrowserToRight(panelId: panelId)
+        case .newBrowserToRight, .reload, .toggleAudioMute, .duplicate:
+            // Browser-only actions of the vendored Bonsplit menu; inert here.
+            break
         case .togglePin:
             setDockTabPinned(tabId: tab.id, pinned: !tab.isPinned)
         case .markAsRead:
@@ -277,18 +268,12 @@ extension DockSplitStore {
             return
         }
         let sourcePanelId = surfaceIdToPanelId[anchorTabId]
-        let sourceBrowser = sourcePanelId.flatMap {
-            browserPanel(for: $0)
-        }
         noteKeyboardFocusIntent(window: dockContextMenuWindow)
         guard let panelId = newSurface(
             kind: kind,
             inPane: paneId,
             sourcePanelId: sourcePanelId,
-            focus: false,
-            preferredProfileID: sourceBrowser?.profileID,
-            websiteDataStore:
-                sourceBrowser?.explicitEphemeralWebsiteDataStoreForSibling
+            focus: false
         ),
         let newTabId = surfaceId(forPanelId: panelId) else {
             return
@@ -300,24 +285,6 @@ extension DockSplitStore {
         focusPanelFromDockInteraction(
             panelId,
             window: dockContextMenuWindow
-        )
-        if let browser = browserPanel(for: panelId) {
-            _ = AppDelegate.shared?.focusBrowserAddressBar(in: browser)
-        }
-    }
-
-    private func toggleDockBrowserMute(
-        panelId: UUID,
-        tabId: TabID
-    ) {
-        guard let browser = browserPanel(for: panelId),
-              browser.toggleMute() else {
-            NSSound.beep()
-            return
-        }
-        bonsplitController.updateTab(
-            tabId,
-            isAudioMuted: browser.isMuted
         )
     }
 

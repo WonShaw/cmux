@@ -15,13 +15,11 @@ public enum CmuxSidebarAction: Codable, Equatable, Sendable {
     case selectNextWorkspace
     case selectPreviousWorkspace
     case createTerminalSurface(workspaceID: UUID?)
-    case createBrowserSurface(workspaceID: UUID?, url: String?)
     case selectSurface(workspaceID: UUID, surfaceID: UUID)
     case selectNextSurface
     case selectPreviousSurface
     case closeSurface(workspaceID: UUID, surfaceID: UUID)
     case splitTerminal(workspaceID: UUID, surfaceID: UUID, direction: CmuxSidebarSplitDirection)
-    case splitBrowser(workspaceID: UUID, surfaceID: UUID, direction: CmuxSidebarSplitDirection, url: String?)
     case toggleSurfaceZoom(workspaceID: UUID, surfaceID: UUID)
     case openURL(String)
 
@@ -37,8 +35,6 @@ public enum CmuxSidebarAction: Codable, Equatable, Sendable {
             return [.navigateWorkspace]
         case .createTerminalSurface:
             return [.createSurface]
-        case .createBrowserSurface(_, let url):
-            return url == nil ? [.createSurface] : [.createSurface, .openURL]
         case .selectSurface:
             return [.selectSurface]
         case .selectNextSurface, .selectPreviousSurface:
@@ -47,8 +43,6 @@ public enum CmuxSidebarAction: Codable, Equatable, Sendable {
             return [.closeSurface]
         case .splitTerminal:
             return [.splitSurface]
-        case .splitBrowser(_, _, _, let url):
-            return url == nil ? [.splitSurface] : [.splitSurface, .openURL]
         case .toggleSurfaceZoom:
             return [.zoomSurface]
         case .openURL:

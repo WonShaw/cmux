@@ -479,54 +479,6 @@ final class SessionPersistenceTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(object["height"]), 704.5, accuracy: 0.001)
     }
 
-    func testSessionBrowserPanelSnapshotHistoryRoundTrip() throws {
-        let profileID = try XCTUnwrap(UUID(uuidString: "8F03A658-5A84-428B-AD03-5A6D04692F64"))
-        let source = SessionBrowserPanelSnapshot(
-            urlString: "https://example.com/current",
-            profileID: profileID,
-            shouldRenderWebView: true,
-            pageZoom: 1.2,
-            developerToolsVisible: true,
-            isMuted: true,
-            omnibarVisible: false,
-            backHistoryURLStrings: [
-                "https://example.com/a",
-                "https://example.com/b"
-            ],
-            forwardHistoryURLStrings: [
-                "https://example.com/d"
-            ]
-        )
-
-        let data = try JSONEncoder().encode(source)
-        let decoded = try JSONDecoder().decode(SessionBrowserPanelSnapshot.self, from: data)
-        XCTAssertEqual(decoded.urlString, source.urlString)
-        XCTAssertEqual(decoded.profileID, source.profileID)
-        XCTAssertEqual(decoded.isMuted, source.isMuted)
-        XCTAssertEqual(decoded.omnibarVisible, false)
-        XCTAssertEqual(decoded.backHistoryURLStrings, source.backHistoryURLStrings)
-        XCTAssertEqual(decoded.forwardHistoryURLStrings, source.forwardHistoryURLStrings)
-    }
-
-    func testSessionBrowserPanelSnapshotHistoryDecodesWhenKeysAreMissing() throws {
-        let json = """
-        {
-          "urlString": "https://example.com/current",
-          "shouldRenderWebView": true,
-          "pageZoom": 1.0,
-          "developerToolsVisible": false
-        }
-        """.data(using: .utf8)!
-
-        let decoded = try JSONDecoder().decode(SessionBrowserPanelSnapshot.self, from: json)
-        XCTAssertEqual(decoded.urlString, "https://example.com/current")
-        XCTAssertNil(decoded.profileID)
-        XCTAssertFalse(decoded.isMuted)
-        XCTAssertNil(decoded.omnibarVisible)
-        XCTAssertNil(decoded.backHistoryURLStrings)
-        XCTAssertNil(decoded.forwardHistoryURLStrings)
-    }
-
     func testScrollbackReplayEnvironmentWritesReplayFile() {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("cmux-scrollback-replay-\(UUID().uuidString)", isDirectory: true)

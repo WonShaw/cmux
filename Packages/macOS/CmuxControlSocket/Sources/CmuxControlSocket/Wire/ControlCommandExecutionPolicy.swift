@@ -16,30 +16,19 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
     /// from the main thread.
     case socketWorker(mainThreadCallable: Bool)
 
-    /// Classifies a method: every `vm.`-, `remotes.`-, `aiAccounts.`-, and
+    /// Classifies a method: every
     /// `coderouter.`-prefixed method and the fixed socket-worker set run on the
     /// worker; everything else runs on the main actor.
     ///
-    /// `remotes.*` (the `cmux remotes` device-registry verbs), `aiAccounts.*`
-    /// (the team's subrouter AI-account verbs), and `coderouter.*` (the team's
+    /// `coderouter.*` (the team's
     /// coderouter Claude upstream and per-machine usage) make blocking,
-    /// authenticated web API calls just like `vm.*`, so they must stay off the
+    /// authenticated web API calls, so they must stay off the
     /// main actor; prefix matches keep each verb family in lockstep without
     /// listing each method.
     ///
     /// - Parameter method: The trimmed method name.
     public init(forMethod method: String) {
-#if DEBUG
-        if method == "remote.tmux.test_exec" || method == "remote.tmux.test_set_frame"
-            || method == "remote.tmux.test_perturb_divider"
-            || method == "remote.tmux.root_frames"
-            || method == "remote.tmux.window" {
-            self = .socketWorker(mainThreadCallable: false)
-            return
-        }
-#endif
-        if method.hasPrefix("vm.") || method.hasPrefix("remotes.") || method.hasPrefix("aiAccounts.")
-            || method.hasPrefix("coderouter.") || Self.socketWorkerMethods.contains(method) {
+        if method.hasPrefix("coderouter.") || Self.socketWorkerMethods.contains(method) {
             self = .socketWorker(
                 mainThreadCallable: Self.mainThreadCallableSocketWorkerMethods.contains(method)
             )
@@ -52,7 +41,7 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
     /// runs on the socket-worker thread; everything else runs on the main
     /// actor.
     ///
-    /// The v2 namespace prefix rules (`vm.`, `remotes.`) deliberately do not
+    /// The v2 namespace prefix rules (`coderouter.`) deliberately do not
     /// apply here — they are v2 method namespaces, and a v1 token that happens
     /// to contain a dot must not be routed off the main lane by accident.
     ///
@@ -79,11 +68,6 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
     static let socketWorkerMethods: Set<String> = Set([
         "system.ping",
         "system.capabilities",
-        "auth.status",
-        "auth.sign_in_url",
-        "auth.begin_sign_in",
-        "auth.sign_out",
-        "feedback.submit",
         // `feed.jump` awaits its actor-owned hook-session lookup while the
         // socket worker waits for the response.
         "feed.jump",
@@ -100,34 +84,6 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
         "agent.restore.admit",
         // Releases only the tokenized claim owned by a failed restore exec.
         "agent.restore.release",
-        "browser.download.list", "browser.download.wait",
-        "browser.profiles.list",
-        "browser.profiles.create",
-        "browser.profiles.rename",
-        "browser.profiles.clear",
-        "browser.profiles.delete",
-        "browser.import.cookies",
-        "mobile.attach_ticket.create",
-        // Provider discovery may read configuration or run `opencode models`;
-        // it must never hold the main actor while waiting for process I/O.
-        "mobile.task.models.list",
-        // `mobile.terminal.set_font` only validates params and emits a push
-        // event via thread-safe MobileHostService statics, so it runs on the worker
-        // like the other mobile data-plane verbs. Without this entry the policy
-        // routes it to the main-actor processV2Command switch, which lacks the
-        // case, and the control socket returns method_not_found.
-        "mobile.terminal.set_font",
-        // Same profile as set_font: UserDefaults reads/writes plus a push
-        // event through thread-safe MobileHostService statics.
-        "mobile.compatible_tags.get",
-        "mobile.compatible_tags.set",
-        // Panel artifact reads are mobile data-plane file IO for non-terminal
-        // surfaces. Keep them on the worker lane so markdown/file-preview panes
-        // reach TerminalController's mobile.panel.artifact.* dispatcher instead
-        // of the main-actor switch returning method_not_found.
-        "mobile.panel.artifact.stat",
-        "mobile.panel.artifact.fetch",
-        "mobile.panel.artifact.thumbnail",
         "system.top",
         "system.memory",
         // vault.* scans agent transcript stores on disk (~/.claude/projects,
@@ -149,8 +105,8 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
         // the worker lane: only the routing resolution and the Ghostty FFI
         // capture take a minimal `v2MainSync` hop while the formatting stays
         // off the main actor. The @MainActor ControlCommandCoordinator seam
-        // cannot host that split, so the method stays app-side like the
-        // browser.* lane (`TerminalController.v2SurfaceReadText`). NOT
+        // cannot host that split, so the method stays app-side
+        // (`TerminalController.v2SurfaceReadText`). NOT
         // mainThreadCallable: the whole point is that the multi-MB formatting
         // never runs inline on the main thread, and no in-process main-thread
         // caller needs it.
@@ -159,37 +115,10 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
         // return one immutable snapshot for response shaping on this worker.
         // The async bridge must never be entered inline by a main-thread caller.
         "surface.read_selection",
-        // The surface catalog verbs await main-actor catalog work that can sit on the
-        // network (a cloud provider materializing a pane); like `vm.*` they park the
-        // worker instead of holding the main actor.
-        "surface.catalog",
-        "surface.project",
-        "surface.new_terminal",
-        // SSH-session attach resolves ownership and reads the remote PTY
-        // registry before any surface mutation; keep the bounded remote query
-        // off the main actor.
-        "surface.ssh_session_attach.resolve",
         // `workspace.env` is a read that resolves a workspace and copies its
         // env dictionary behind a `v2MainSync` hop, so it runs on the worker
         // lane like the other workspace reads below.
         "workspace.env",
-        "workspace.remote.pty_sessions",
-        "workspace.remote.pty_close",
-        "workspace.remote.pty_detach",
-        "workspace.remote.pty_bridge",
-        "workspace.remote.pty_resize",
-        // Persistent readiness authenticates against broker-owned lifecycle
-        // state. The broker serializes that state on its own queue, so this
-        // command must never make the main actor wait behind tunnel work.
-        // Parsing and authentication run here; the final workspace/Dock
-        // mutation takes one synchronous controlResolveOnMain hop.
-        "workspace.remote.terminal_session_launching",
-        "workspace.remote.terminal_session_connected",
-        "remote.tmux.sessions",
-        "remote.tmux.attach",
-        "remote.tmux.detach",
-        "remote.tmux.state",
-        "remote.tmux.mirror", "remote.tmux.pane_grids", "remote.tmux.pane_surfaces",
         "sidebar.custom.validate",
         "sidebar.custom.reload",
         "sidebar.custom.select",
@@ -204,81 +133,6 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
         // v2MainSync). Running on .mainActor would deadlock the UI for the
         // entire simulation, defeating the profiling workload.
         "debug.sidebar.simulate_drag",
-        // DEBUG builds close the selected mobile transport through its normal
-        // connection-owned shutdown path, which awaits asynchronous writers.
-        // Keep that wait off the main actor.
-        "debug.mobile.transport.disconnect",
-        "debug.mobile.transport.reconnect_loop",
-        // Presents the Cloud tree style gallery window: one v2MainSync hop for
-        // the presentation, like debug.window.screenshot's capture wait.
-        "debug.cloudtree.gallery",
-        // Browser automation methods that wait on page JavaScript, WebKit
-        // cookies, or capture callbacks run on the socket worker: on the main
-        // actor they block SwiftUI updates for their full duration, and on a
-        // not-yet-mounted webview that is a starvation deadlock (the JS can't
-        // run until SwiftUI mounts the webview, which can't happen while the
-        // handler holds the main thread). UI/model access inside the handlers
-        // stays on main via v2MainSync.
-        "browser.navigate",
-        "browser.back",
-        "browser.forward",
-        "browser.reload",
-        "browser.snapshot",
-        "browser.eval",
-        "browser.wait",
-        "browser.click",
-        "browser.dblclick",
-        "browser.hover",
-        "browser.focus",
-        "browser.type",
-        "browser.fill",
-        "browser.press",
-        "browser.keydown",
-        "browser.keyup",
-        "browser.check",
-        "browser.uncheck",
-        "browser.select",
-        "browser.scroll",
-        "browser.scroll_into_view",
-        "browser.get.text",
-        "browser.get.html",
-        "browser.get.value",
-        "browser.get.attr",
-        "browser.get.count",
-        "browser.get.box",
-        "browser.get.styles",
-        "browser.is.visible",
-        "browser.is.enabled",
-        "browser.is.checked",
-        "browser.find.role",
-        "browser.find.text",
-        "browser.find.label",
-        "browser.find.placeholder",
-        "browser.find.alt",
-        "browser.find.title",
-        "browser.find.testid",
-        "browser.find.first",
-        "browser.find.last",
-        "browser.find.nth",
-        "browser.highlight",
-        "browser.screenshot",
-        "browser.frame.select",
-        "browser.dialog.accept",
-        "browser.dialog.dismiss",
-        "browser.cookies.get",
-        "browser.cookies.set",
-        "browser.cookies.clear",
-        "browser.storage.get",
-        "browser.storage.set",
-        "browser.storage.clear",
-        "browser.console.list",
-        "browser.console.clear",
-        "browser.errors.list",
-        "browser.state.save",
-        "browser.state.load",
-        "browser.addinitscript",
-        "browser.addscript",
-        "browser.addstyle", "browser.design_mode.set", "browser.design_mode.status",
         // The v2 surface-telemetry twins of the v1 report family. Parse and
         // response encoding run on the worker; each body crosses to the main
         // actor exactly once (the resolution + write + ref minting hop), so
@@ -380,7 +234,7 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
         "pane.list",
         "pane.surfaces",
         "system.identify",
-        "system.tree", "browser.download.list",
+        "system.tree",
         // The v2 send lane (tranche E): one narrow, non-blocking hop each
         // (resolve target + inject input + forceRefresh), so an inline
         // main-thread run is exactly the legacy main-lane dispatch.
@@ -421,13 +275,9 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
         "list_log",
         "set_progress",
         "clear_progress",
-        // Reports (git branch / PR / ports / pwd / shell state / tty / kick).
+        // Reports (git branch / ports / pwd / shell state / tty / kick).
         "report_git_branch",
         "clear_git_branch",
-        "report_pr",
-        "report_review",
-        "clear_pr",
-        "report_pr_action",
         "report_ports",
         "clear_ports",
         "report_pwd",
@@ -470,13 +320,6 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
     /// tests can pin the exact set.
     static let terminalReadV1Commands: Set<String> = [
         "read_screen",
-    ]
-
-    /// The v1 diagnostic-read family. These commands await actor-owned
-    /// diagnostic snapshots, so they run on the socket worker and are not
-    /// callable from the main thread.
-    static let diagnosticReadV1Commands: Set<String> = [
-        "iroh_diag",
     ]
 
     /// The v1 resolution-read family (tranche D): the v1 twins of the v2
@@ -525,7 +368,6 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
             .union(notificationV1Commands)
             .union(agentJournalV1Commands)
             .union(terminalReadV1Commands)
-            .union(diagnosticReadV1Commands)
             .union(resolutionReadV1Commands)
             .union(terminalSendV1Commands)
             .union(configurationMutationV1Commands)
@@ -573,10 +415,6 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
         "clear_progress",
         "report_git_branch",
         "clear_git_branch",
-        "report_pr",
-        "report_review",
-        "clear_pr",
-        "report_pr_action",
         "report_ports",
         "clear_ports",
         "report_pwd",

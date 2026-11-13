@@ -87,7 +87,7 @@ extension DockSplitStore {
             noteKeyboardFocusIntent(window: window ?? NSApp.keyWindow ?? NSApp.mainWindow)
         }
         // Prime the target before Bonsplit emits its synchronous focus/selection
-        // callbacks.  This keeps terminal/browser focus intent ahead of the
+        // callbacks.  This keeps terminal focus intent ahead of the
         // portal reparenting those callbacks can trigger.
         let activationIntent = panel.preferredFocusIntentForActivation()
         panel.prepareFocusIntentForActivation(activationIntent)
@@ -107,13 +107,6 @@ extension DockSplitStore {
     func focusPanelFromDockInteraction(_ panelId: UUID, window: NSWindow?) {
         noteKeyboardFocusIntent(window: window)
         focusPanel(panelId, window: window, claimKeyboardFocus: false)
-        if panels[panelId] is DeferredBrowserPanel {
-            _ = requestDeferredBrowserMaterialization(
-                panelId: panelId,
-                isVisibleInUI: true,
-                reason: "dock.explicitFocus"
-            )
-        }
         _ = reassertDockPanelInputFocus(panelId)
         scheduleDockPortalReconcile(reason: "dock.explicitFocus")
         guard let appDelegate = AppDelegate.shared,
@@ -187,24 +180,6 @@ extension DockSplitStore {
               panels[panelId] != nil else { return false }
         focusPanelFromDockInteraction(panelId, window: nil)
         return true
-    }
-
-    func browserPanel(owning responder: NSResponder?, in window: NSWindow?) -> BrowserPanel? {
-        guard let responder, let window else { return nil }
-        if let focused = focusedPanelId,
-           let browser = panels[focused] as? BrowserPanel,
-           browser.ownedFocusIntent(for: responder, in: window) != nil {
-            return browser
-        }
-        for (panelId, panel) in panels {
-            guard panelId != focusedPanelId,
-                  let browser = panel as? BrowserPanel,
-                  browser.ownedFocusIntent(for: responder, in: window) != nil else {
-                continue
-            }
-            return browser
-        }
-        return nil
     }
 
     func focusedDockPaneSelection() -> (pane: PaneID?, tab: TabID?) {
@@ -330,19 +305,7 @@ extension DockSplitStore {
                 panel.unfocus()
             }
         }
-        if selectedPanel is DeferredBrowserPanel {
-            _ = requestDeferredBrowserMaterialization(
-                panelId: selectedPanel.id,
-                isVisibleInUI: true,
-                reason: "dock.selection"
-            )
-            return
-        }
-        if let browser = selectedPanel as? BrowserPanel {
-            _ = browser.restoreFocusIntent(activationIntent)
-        } else {
-            selectedPanel.focus()
-        }
+        selectedPanel.focus()
     }
 
     func splitTabBarDividerDragDidBegin(_ controller: BonsplitController) {
@@ -463,25 +426,6 @@ extension DockSplitStore {
                 terminal.unfocus()
                 terminal.hostedView.setVisibleInUI(false)
                 TerminalWindowPortalRegistry.hideHostedView(terminal.hostedView)
-            }
-        } else if let browser = panel as? BrowserPanel {
-            if shouldBeVisible {
-                browser.noteWebViewVisibility(
-                    true,
-                    reason: "portal.dockVisible",
-                    recordIfUnchanged: true
-                )
-                BrowserWindowPortalRegistry.updateEntryVisibility(
-                    for: browser.webView,
-                    visibleInUI: true,
-                    zPriority: 1
-                )
-                if dockBrowserPortalNeedsReconcile(browser) {
-                    scheduleDockPortalReconcile(reason: "dock.browserVisible")
-                }
-            } else {
-                browser.unfocus()
-                browser.hideBrowserPortalView(source: "dockHidden")
             }
         }
     }

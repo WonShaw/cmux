@@ -97,7 +97,7 @@ function makeBundle(root, appName, output) {
   fs.mkdirSync(path.dirname(cli), { recursive: true });
   fs.writeFileSync(
     path.join(app, "Contents", "Info.plist"),
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>com.cmuxterm.app.debug.test</string></dict></plist>",
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>com.comux.app.debug.test</string></dict></plist>",
   );
   writeExecutable(cli, `#!/bin/sh\nprintf '%s\\n' '${output}'\n`);
   return cli;

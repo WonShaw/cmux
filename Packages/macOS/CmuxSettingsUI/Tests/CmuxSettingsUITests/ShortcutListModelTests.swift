@@ -363,40 +363,6 @@ import CmuxSettings
         #expect(model.conflictRejections[targetAction.rawValue] == secondConflict)
     }
 
-    @Test func whenOverrideChangePrunesResolvedConflictRejection() async throws {
-        // WHY: shortcuts.when edits can make a rejected shortcut non-conflicting
-        // without changing any binding, so the when observer must prune banners too.
-        let (store, catalog, errorLog) = makeStore()
-        let conflictAction = ShortcutAction.browserBack
-        let targetAction = ShortcutAction.openSettings
-        let stroke = ShortcutStroke(key: "y", command: true, shift: true, option: true, control: true)
-
-        try await store.set(
-            [conflictAction.rawValue: StoredShortcut(first: stroke)],
-            for: catalog.shortcuts.bindings
-        )
-        try await store.set(
-            [conflictAction.rawValue: "", targetAction.rawValue: ""],
-            for: catalog.shortcuts.when
-        )
-
-        let model = ShortcutListModel(jsonStore: store, catalog: catalog, errorLog: errorLog)
-        model.startObserving()
-        await spin(until: { model.whenOverrideClauses[targetAction.rawValue] == .always })
-        await spin(until: { model.bindings[conflictAction.rawValue] != nil })
-
-        await model.assign(stroke: stroke, to: targetAction)
-        #expect(model.conflictRejections[targetAction.rawValue] == conflictAction)
-
-        try await store.set(
-            [conflictAction.rawValue: "browserFocus", targetAction.rawValue: "!browserFocus"],
-            for: catalog.shortcuts.when
-        )
-        await spin(until: { model.conflictRejections[targetAction.rawValue] == nil })
-
-        #expect(model.conflictRejections[targetAction.rawValue] == nil)
-    }
-
     @Test func markBareKeyRejectedInserts() {
         // WHY: markBareKeyRejected is the onBareKeyRejected callback path for
         // ShortcutListRowView; it must insert the action id into bareKeyRejections

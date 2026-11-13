@@ -21,7 +21,6 @@ extension TabManager {
         guard let workspace = tabs.first(where: { $0.id == tabId }),
               workspace.panels[surfaceId] != nil else { return .failed }
         workspace.clearSplitZoom()
-        sentryBreadcrumb("split.create", data: ["direction": String(describing: direction)])
         return workspace.newTerminalSplitOutcome(
             from: surfaceId,
             orientation: direction.orientation,

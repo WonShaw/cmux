@@ -124,11 +124,6 @@ extension ControlCommandCoordinator {
                 localized: "cli.simulator.error.workspaceNotFound",
                 defaultValue: "Workspace not found"
             ), data: nil)
-        case .remoteWorkspace:
-            return .err(code: "unsupported", message: String(
-                localized: "cli.simulator.error.remoteWorkspace",
-                defaultValue: "Simulator control is unavailable in remote workspaces"
-            ), data: nil)
         case let .surfaceNotFound(surfaceID):
             return .err(
                 code: "not_found",

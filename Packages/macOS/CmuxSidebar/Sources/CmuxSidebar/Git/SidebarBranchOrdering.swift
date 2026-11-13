@@ -1,6 +1,6 @@
 public import Foundation
 
-/// Pure derivations of the sidebar's branch / pull-request / directory rows
+/// Pure derivations of the sidebar's branch / directory rows
 /// from per-panel state, in spatial panel order. Stateless by design: a
 /// throwaway value, mirroring `WorkspaceReorderPlanner`.
 public struct SidebarBranchOrdering: Sendable {
@@ -229,74 +229,6 @@ public struct SidebarBranchOrdering: Sendable {
         return orderedNames.map { name in
             BranchEntry(name: name, isDirty: branchDirty[name] ?? false)
         }
-    }
-
-    /// Unique pull requests in first-seen panel order, deduplicated by
-    /// normalized review URL; fresher then higher-status states win.
-    public func orderedUniquePullRequests(
-        orderedPanelIds: [UUID],
-        panelPullRequests: [UUID: SidebarPullRequestState],
-        fallbackPullRequest: SidebarPullRequestState?
-    ) -> [SidebarPullRequestState] {
-        func statusPriority(_ status: SidebarPullRequestStatus) -> Int {
-            switch status {
-            case .merged: return 3
-            case .open: return 2
-            case .closed: return 1
-            }
-        }
-
-        func freshnessPriority(_ isStale: Bool) -> Int {
-            isStale ? 0 : 1
-        }
-
-        func normalizedReviewURLKey(for url: URL) -> String {
-            guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-                return url.absoluteString
-            }
-
-            // Treat URL variants that differ only by query/fragment as the same review item.
-            components.query = nil
-            components.fragment = nil
-            let scheme = components.scheme?.lowercased() ?? ""
-            let host = components.host?.lowercased() ?? ""
-            let port = components.port.map { ":\($0)" } ?? ""
-            var path = components.path
-            if path.hasSuffix("/"), path.count > 1 {
-                path.removeLast()
-            }
-            return "\(scheme)://\(host)\(port)\(path)"
-        }
-
-        func reviewKey(for state: SidebarPullRequestState) -> String {
-            "\(state.label.lowercased())#\(state.number)|\(normalizedReviewURLKey(for: state.url))"
-        }
-
-        var orderedKeys: [String] = []
-        var pullRequestsByKey: [String: SidebarPullRequestState] = [:]
-
-        for panelId in orderedPanelIds {
-            guard let state = panelPullRequests[panelId] else { continue }
-            let key = reviewKey(for: state)
-            if pullRequestsByKey[key] == nil {
-                orderedKeys.append(key)
-                pullRequestsByKey[key] = state
-                continue
-            }
-            guard let existing = pullRequestsByKey[key] else { continue }
-            if freshnessPriority(state.isStale) > freshnessPriority(existing.isStale) {
-                pullRequestsByKey[key] = state
-            } else if freshnessPriority(state.isStale) == freshnessPriority(existing.isStale),
-                      statusPriority(state.status) > statusPriority(existing.status) {
-                pullRequestsByKey[key] = state
-            }
-        }
-
-        if orderedKeys.isEmpty, let fallbackPullRequest {
-            return [fallbackPullRequest]
-        }
-
-        return orderedKeys.compactMap { pullRequestsByKey[$0] }
     }
 
     /// Unique branch+directory rows in first-seen panel order, one row per

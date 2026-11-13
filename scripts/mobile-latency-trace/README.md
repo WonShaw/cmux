@@ -4,7 +4,7 @@ Tracing is DEBUG-only and off by default. For a tagged Mac build, enable it for
 that bundle and relaunch:
 
 ```bash
-defaults write com.cmuxterm.app.debug.slat cmux.debug.latency-trace -bool true
+defaults write com.comux.app.debug.slat cmux.debug.latency-trace -bool true
 ./scripts/reload.sh --tag slat --launch
 ```
 

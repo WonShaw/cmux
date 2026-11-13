@@ -207,9 +207,6 @@ extension AppDelegate {
             )
         }
         destinationWorkspace.scheduleTerminalGeometryReconcile()
-        destinationWorkspace.reconcileBrowserPortalVisibilityForCurrentRenderedLayout(
-            reason: "dock.moveSurfaceToWorkspace"
-        )
         sourceDock.scheduleDockPortalReconcile(reason: "dock.moveSurfaceToWorkspace.source")
 
         if focus {
@@ -247,9 +244,6 @@ extension AppDelegate {
             return false
         }
         destinationWorkspace.scheduleTerminalGeometryReconcile()
-        destinationWorkspace.reconcileBrowserPortalVisibilityForCurrentRenderedLayout(
-            reason: "dock.moveSurfaceToNewWorkspace"
-        )
         sourceDock.scheduleDockPortalReconcile(reason: "dock.moveSurfaceToNewWorkspace.source")
 
         if focus, focusWindow, let destinationWindowId = windowId(for: manager) {
@@ -277,11 +271,7 @@ extension AppDelegate {
                 // Dock has an equivalent owner, keep the live panel with that owner.
                 return false
             }
-            guard workspace.isRemoteTmuxMirror else { return true }
-            // Remote tmux mirror panes are manually driven by the mirror
-            // workspace. Dock has no mirror-owned I/O routing yet, so moving one
-            // would leave the Dock panel detached from its remote owner.
-            return false
+            return true
         case .dock(let dock, let panelId):
             return dock.panels[panelId]?.panelType != .simulator
         }
@@ -358,7 +348,6 @@ extension AppDelegate {
 
     private func preserveEmptySourceWorkspaceAfterSurfaceMove(sourceWorkspace: Workspace) {
         guard sourceWorkspace.panels.isEmpty else { return }
-        sourceWorkspace.detachRemoteTmuxMirrorKeptOpenLocallyIfNeeded()
         _ = sourceWorkspace.createReplacementTerminalPanel()
         sourceWorkspace.scheduleTerminalGeometryReconcile()
     }

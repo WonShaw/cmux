@@ -17,13 +17,6 @@ import Testing
             #expect(level.rawValue == raw)
         }
     }
-
-    @Test func pullRequestStatusRawValuesRoundTrip() {
-        for (raw, status) in [("open", SidebarPullRequestStatus.open), ("merged", .merged), ("closed", .closed)] {
-            #expect(SidebarPullRequestStatus(rawValue: raw) == status)
-            #expect(status.rawValue == raw)
-        }
-    }
 }
 
 @Suite struct SidebarBranchNameNormalizationTests {
@@ -35,13 +28,5 @@ import Testing
         #expect("".normalizedSidebarBranchName == nil)
         let none: String? = nil
         #expect(none?.normalizedSidebarBranchName == nil)
-    }
-
-    /// `SidebarPullRequestState.init` normalizes the branch like the legacy init.
-    @Test func pullRequestStateNormalizesBranch() throws {
-        let url = try #require(URL(string: "https://github.com/o/r/pull/1"))
-        #expect(SidebarPullRequestState(number: 1, label: "o/r", url: url, status: .open, branch: " b ").branch == "b")
-        #expect(SidebarPullRequestState(number: 1, label: "o/r", url: url, status: .open, branch: "  ").branch == nil)
-        #expect(SidebarPullRequestState(number: 1, label: "o/r", url: url, status: .open).branch == nil)
     }
 }

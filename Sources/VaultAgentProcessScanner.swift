@@ -680,25 +680,13 @@ extension SurfaceResumeBindingIndex {
                   let processArguments = processArgumentsProvider(process.pid) else {
                 continue
             }
-            let binding: SurfaceResumeBindingSnapshot?
-            if let tmuxBinding = TmuxResumeParser.binding(
+            guard let binding = TmuxResumeParser.binding(
                 processName: process.name,
                 processPath: process.path,
                 arguments: processArguments.arguments,
                 environment: processArguments.environment,
                 capturedAt: capturedAt
-            ) {
-                binding = tmuxBinding
-            } else {
-                binding = TerminalSSHSessionDetector.resumeBinding(
-                    processName: process.name,
-                    processPath: process.path,
-                    arguments: processArguments.arguments,
-                    environment: processArguments.environment,
-                    capturedAt: capturedAt
-                )
-            }
-            guard let binding else { continue }
+            ) else { continue }
             guard process.pid > (selectedPIDByPanel[panelKey] ?? Int.min) else {
                 continue
             }

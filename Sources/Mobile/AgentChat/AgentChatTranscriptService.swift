@@ -26,16 +26,6 @@ private final class AgentChatProseStreamWakeDriver {
     func start() {
         guard observers.isEmpty else { return }
         observers.append(NotificationCenter.default.addObserver(
-            forName: .mobileHostEventSubscriptionsDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.streamer.subscribersDidChange()
-                self?.refreshDemand(kickIfRetained: true)
-            }
-        })
-        observers.append(NotificationCenter.default.addObserver(
             forName: .ghosttyDidRenderFrame,
             object: nil,
             queue: .main
@@ -154,12 +144,8 @@ final class AgentChatTranscriptService {
     init(
         registry: AgentChatSessionRegistry,
         resolver: AgentChatTranscriptResolver = AgentChatTranscriptResolver(),
-        hasEventSubscribers: @escaping @MainActor () -> Bool = {
-            MobileHostService.hasEventSubscribers(topic: AgentChatTranscriptService.eventTopic)
-        },
-        emitEventPayload: @escaping @MainActor ([String: Any]) -> Void = { payload in
-            MobileHostService.emitEvent(topic: AgentChatTranscriptService.eventTopic, payload: payload)
-        },
+        hasEventSubscribers: @escaping @MainActor () -> Bool = { false },
+        emitEventPayload: @escaping @MainActor ([String: Any]) -> Void = { _ in },
         now: @escaping () -> Date = { Date() },
         fallbackTranscriptPathResolver: AgentChatFallbackTranscriptResolutionCoordinator.Resolver? = nil,
         fallbackResolutionTimeout: Duration = .seconds(3)

@@ -104,7 +104,7 @@ struct SudoPolicyRegressionTests {
                 applicationSupportDirectory: applicationSupport,
                 bundleIdentifier: identifier
             )
-            #expect(paths.base.lastPathComponent == "com.cmuxterm.app")
+            #expect(paths.base.lastPathComponent == "com.comux.app")
             #expect(paths.base.deletingLastPathComponent().lastPathComponent == "sudo")
         }
     }

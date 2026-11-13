@@ -16,8 +16,6 @@ extension ClosedItemHistoryStore {
         switch snapshot.type {
         case .terminal:
             return String(localized: "menu.history.recentlyClosed.panel.terminal", defaultValue: "Terminal")
-        case .browser:
-            return String(localized: "menu.history.recentlyClosed.panel.browser", defaultValue: "Browser")
         case .markdown:
             return String(localized: "menu.history.recentlyClosed.panel.markdown", defaultValue: "Markdown")
         case .filePreview:
@@ -33,18 +31,10 @@ extension ClosedItemHistoryStore {
             return String(localized: "menu.history.recentlyClosed.panel.agentSession", defaultValue: "Agent")
         case .project:
             return String(localized: "menu.history.recentlyClosed.panel.project", defaultValue: "Project")
-        case .extensionBrowser:
-            return String(localized: "sidebar.extensions.browser.title", defaultValue: "Sidebar Extensions")
         case .workspaceTodo:
             return String(localized: "workspaceTodoPane.title", defaultValue: "Todos")
         case .notifications:
             return String(localized: "notifications.title", defaultValue: "Notifications")
-        case .cloudVMLoading:
-            return String(localized: "menu.history.recentlyClosed.panel.cloudVM", defaultValue: "Cloud VM")
-        case .mobilePairing:
-            return String(localized: "mobile.pairing.window.title", defaultValue: "Mobile Pairing")
-        case .accountSignIn:
-            return String(localized: "account.signIn.workspace.title", defaultValue: "Sign In")
         }
     }
 }

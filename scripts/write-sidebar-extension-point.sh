@@ -4,9 +4,9 @@ set -euo pipefail
 # Emits the host's Sidebar ExtensionKit point declaration for Xcode 14-era
 # ExtensionKit. The point id may be scoped per tagged dev build.
 
-POINT_ID="${CMUX_SIDEBAR_EXTENSION_POINT_ID:-com.cmuxterm.app.cmux.sidebar}"
+POINT_ID="${CMUX_SIDEBAR_EXTENSION_POINT_ID:-com.comux.app.cmux.sidebar}"
 if [[ -z "$POINT_ID" ]]; then
-  POINT_ID="com.cmuxterm.app.cmux.sidebar"
+  POINT_ID="com.comux.app.cmux.sidebar"
 fi
 
 EXTENSIONS_DIR="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Extensions"

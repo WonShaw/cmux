@@ -342,31 +342,6 @@ create_persistent_display() {
   cat "$PERSISTENT_LOG"
 }
 
-run_browser_find_focus() {
-  local persistent_display_id
-  if [ -n "${PERSISTENT_PID:-}" ] && ! kill -0 "$PERSISTENT_PID" 2>/dev/null; then
-    echo "Persistent virtual display exited before browser find UI regression" >&2
-    cat "${PERSISTENT_LOG:-/dev/null}" >&2 || true
-    exit 1
-  fi
-  if [ ! -s "${PERSISTENT_ID_PATH:-}" ]; then
-    echo "Persistent virtual display ID missing before browser find UI regression" >&2
-    exit 1
-  fi
-  persistent_display_id="$(tr -d '\n' < "$PERSISTENT_ID_PATH")"
-
-  CMUX_UI_TEST_TARGET_DISPLAY_ID="$persistent_display_id" \
-    xcodebuild -project cmux.xcodeproj -scheme cmux -configuration Debug \
-    -derivedDataPath "$CMUX_DERIVED_DATA_PATH" \
-    -clonedSourcePackagesDirPath "$SOURCE_PACKAGES_DIR" \
-    -disableAutomaticPackageResolution \
-    -destination "platform=macOS" \
-    -maximum-test-execution-time-allowance 180 \
-    -only-testing:cmuxUITests/BrowserPaneNavigationKeybindUITests/testCmdFOpensBrowserFindAfterCmdDCmdLNavigation \
-    test-without-building
-}
-
 enable_xctest_automation_mode
 run_display_resolution_churn
 create_persistent_display
-run_browser_find_focus

@@ -3,7 +3,7 @@ import Foundation
 import OSLog
 
 nonisolated private let agentHookDeliveryProcessLogger = Logger(
-    subsystem: "com.cmuxterm.app",
+    subsystem: "com.comux.app",
     category: "AgentHookDelivery"
 )
 
@@ -100,8 +100,7 @@ struct AgentHookDeliveryProcess: Sendable {
         process.executableURL = executableURL
         process.arguments = ["--socket", event.socketPath] + event.deliveryArguments
         process.environment = deliveryEnvironment(event: event, executableURL: executableURL)
-        if !event.relayBacked,
-           let workingDirectory = event.environment["PWD"],
+        if let workingDirectory = event.environment["PWD"],
            FileManager.default.fileExists(atPath: workingDirectory) {
             process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory, isDirectory: true)
         }
@@ -187,87 +186,19 @@ struct AgentHookDeliveryProcess: Sendable {
         let ambientEnvironment = ProcessInfo.processInfo.environment
         let ambientKeys = [
             "HOME", "LANG", "LC_ALL", "LC_CTYPE", "LOGNAME", "PATH", "SHELL", "TMPDIR", "USER",
-            "CMUX_BUNDLE_ID", "CMUX_CLI_SENTRY_DISABLED", "CMUX_SOCKET_PASSWORD", "CMUX_TAG",
+            "CMUX_BUNDLE_ID", "CMUX_SOCKET_PASSWORD", "CMUX_TAG",
         ]
         var environment: [String: String] = [:]
         for key in ambientKeys {
             environment[key] = ambientEnvironment[key]
         }
-        let deliveredEventEnvironment: [String: String]
-        if event.relayBacked {
-            // Remote paths, launch argv, proxy configuration, and PIDs describe
-            // the remote host. Replaying them through the local Mac CLI can
-            // probe an unrelated local process, write a same-named local path,
-            // or persist an unlaunchable local resume command. Preserve only
-            // routing that the relay has alias-rewritten plus explicit
-            // notification/subagent policy bits.
-            let relayDeliveryKeys: Set<String> = [
-                "CMUX_AGENT_HOOK_SUPPRESS_VISIBLE_MUTATIONS",
-                "CMUX_AGENT_MANAGED_SUBAGENT",
-                "CMUX_SUPPRESS_SUBAGENT_NOTIFICATIONS",
-                "CMUX_SURFACE_ID",
-                "CMUX_WORKSPACE_ID",
-            ]
-            deliveredEventEnvironment = event.environment.filter { relayDeliveryKeys.contains($0.key) }
-        } else {
-            deliveredEventEnvironment = event.environment
-        }
-        environment.merge(deliveredEventEnvironment, uniquingKeysWith: { _, eventValue in eventValue })
+        environment.merge(event.environment, uniquingKeysWith: { _, eventValue in eventValue })
         environment["CMUX_SOCKET_PATH"] = event.socketPath
         environment["CMUX_BUNDLED_CLI_PATH"] = executableURL.path
         environment["CMUX_AGENT_HOOK_DELIVERY_PROCESS_GROUP"] = "1"
-        if event.relayBacked {
-            environment["CMUX_AGENT_HOOK_RELAY_ORIGIN"] = "1"
-            environment["CMUX_AGENT_HOOK_STATE_DIR"] = relayStateDirectory(
-                event: event,
-                ambientEnvironment: ambientEnvironment
-            )
-        } else {
-            environment.removeValue(forKey: "CMUX_AGENT_HOOK_RELAY_ORIGIN")
-        }
+        environment.removeValue(forKey: "CMUX_AGENT_HOOK_RELAY_ORIGIN")
         environment["CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC"] = "12"
         return environment
-    }
-
-    /// Remote hooks keep enough local state to order their own lifecycle, but
-    /// that state must never merge with host-local sessions that happen to use
-    /// the same agent session identifier. Scope it by app and rewritten local
-    /// route so separate remote workspaces cannot collide with each other.
-    private func relayStateDirectory(
-        event: AgentHookDeliveryEvent,
-        ambientEnvironment: [String: String]
-    ) -> String {
-        let homePath = ambientEnvironment["HOME"]
-            ?? FileManager.default.homeDirectoryForCurrentUser.path
-        let appScope = Self.safePathComponent(
-            ambientEnvironment["CMUX_BUNDLE_ID"]
-                ?? Bundle.main.bundleIdentifier
-                ?? "com.cmuxterm.app"
-        )
-        let routeScope = Self.safePathComponent(
-            event.environment["CMUX_WORKSPACE_ID"]
-                ?? event.environment["CMUX_SURFACE_ID"]
-                ?? "unrouted"
-        )
-        return URL(fileURLWithPath: homePath, isDirectory: true)
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
-            .appendingPathComponent("relay-hook-state", isDirectory: true)
-            .appendingPathComponent(appScope, isDirectory: true)
-            .appendingPathComponent(routeScope, isDirectory: true)
-            .path
-    }
-
-    private static func safePathComponent(_ rawValue: String) -> String {
-        let sanitized = rawValue.replacingOccurrences(
-            of: "[^A-Za-z0-9._-]",
-            with: "_",
-            options: .regularExpression
-        )
-        let bounded = String(sanitized.prefix(128))
-        guard !bounded.isEmpty, bounded != ".", bounded != ".." else {
-            return "unknown"
-        }
-        return bounded
     }
 
     private func awaitCompletion(

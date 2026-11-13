@@ -374,8 +374,6 @@ extension Workspace {
     func recomputeListeningPorts() {
         let unique = Set(surfaceListeningPorts.values.flatMap { $0 })
             .union(agentListeningPorts)
-            .union(remoteDetectedPorts)
-            .union(remoteForwardedPorts)
         let next = unique.sorted()
         if listeningPorts != next {
             listeningPorts = next
@@ -429,7 +427,6 @@ extension Workspace {
 
     /// Discard every Workspace-owned contribution for a surface whose tab,
     /// pane, or workspace has already been accepted for closure.
-    @discardableResult
     func discardClosedPanelLifecycleState(
         panelId: UUID,
         tabId: TabID? = nil,
@@ -439,27 +436,19 @@ extension Workspace {
         closePanel: Bool,
         publishSurfaceClosedEvent: Bool,
         clearSurfaceNotifications: Bool,
-        requestTransferredRemoteCleanup: Bool,
         discardAgentHibernationTracking: Bool = true,
         cleanupControllerSurfaceState: Bool = false,
-        preservesTerminalForTransfer: Bool = false,
-        preservesRemoteTerminalTracking: Bool = false
-    ) -> WorkspaceRemoteConfiguration? {
-        clearCloudMaterializationFailure(surfaceID: panelId)
-        cancelReservedCloudTerminalPane(panelID: panelId)
-        appLinkHandoffCoordinator.cancel(sourcePanelID: panelId)
+        preservesTerminalForTransfer: Bool = false
+    ) {
         if publishSurfaceClosedEvent {
             publishCmuxSurfaceClosed(panelId, paneId: paneId, panel: panel, origin: origin)
         }
 
         let closedAgentRuntimeState = agentRuntimeState(forPanelId: panelId)
         removePendingTerminalInputObservers(forPanelId: panelId)
-        let transferredRemoteCleanupConfiguration = transferredRemoteCleanupConfigurationsByPanelId.removeValue(forKey: panelId)
         panelSubscriptions.removeValue(forKey: panelId)?.cancel()
         (panel as? FilePreviewPanel)?.unbindTabMetadata()
         discardAgentSessionPanelSubscription(panelId: panelId, panel: panel)
-        discardBrowserPanelSubscription(panelId: panelId, panel: panel)
-        removeBrowserOpenTabSuggestionIfNeeded(panel: panel, panelId: panelId)
         if cleanupControllerSurfaceState {
             TerminalController.shared.cleanupSurfaceState(
                 surfaceIds: [panelId, tabId?.uuid].compactMap { $0 }
@@ -473,26 +462,6 @@ extension Workspace {
         }
         if closePanel {
             panel?.close()
-        }
-
-        let shouldPreserveRemoteDisconnectOnClose =
-            origin == "tab_close" ||
-            origin == "pane_close"
-        if shouldPreserveRemoteDisconnectOnClose,
-           panel is TerminalPanel {
-            markRemoteTerminalSessionClosingIfLast(surfaceId: panelId)
-        }
-        let shouldRefreshRemoteDisconnectPlaceholder =
-            shouldPreserveRemoteDisconnectOnClose &&
-            remoteDisconnectPlaceholderPanelIds.remove(panelId) != nil &&
-            panels.count == 1
-        cancelPendingRemoteDisconnectReplacement(surfaceId: panelId)
-        if shouldRefreshRemoteDisconnectPlaceholder,
-           let remoteConfiguration {
-            rememberPendingRemoteDisconnectReplacement(
-                surfaceId: panelId,
-                configuration: remoteConfiguration
-            )
         }
 
         let removedPanel = panels.removeValue(forKey: panelId)
@@ -512,17 +481,11 @@ extension Workspace {
                         preservesTerminalForTransfer
                 )
         }
-        retireRemoteTerminalLifecycle(
-            panelId: panelId,
-            preservesRemoteTerminalTracking: preservesRemoteTerminalTracking,
-            closesPanel: closePanel
-        )
         removeSurfaceMappings(forPanelId: panelId)
 
         panelDirectories.removeValue(forKey: panelId)
         panelDirectoryDisplayLabels.removeValue(forKey: panelId)
         panelGitBranches.removeValue(forKey: panelId)
-        panelPullRequests.removeValue(forKey: panelId)
         panelTitles.removeValue(forKey: panelId)
         panelCustomTitles.removeValue(forKey: panelId)
         panelCustomTitleSources.removeValue(forKey: panelId)
@@ -534,12 +497,8 @@ extension Workspace {
         restoredPanelTitleBoundariesByPanelId.removeValue(forKey: panelId)
         clearAgentLifecycleStates(panelId: panelId)
         surfaceTTYNames.removeValue(forKey: panelId)
-        discardRemotePTYSessionID(panelId: panelId)
         surfaceResumeBindingsByPanelId.removeValue(forKey: panelId)
         surfaceResumeRestoreClaimsByPanelId.removeValue(forKey: panelId)
-        pendingPlainSSHRestorePanelIds.remove(panelId)
-        observedPlainSSHPanelIds.remove(panelId)
-        plainSSHDetectionMissesByPanelId.removeValue(forKey: panelId)
         surfaceListeningPorts.removeValue(forKey: panelId)
         restoredTerminalScrollbackByPanelId.removeValue(forKey: panelId)
 #if DEBUG
@@ -554,10 +513,5 @@ extension Workspace {
         if clearSurfaceNotifications {
             AppDelegate.shared?.notificationStore?.clearNotifications(forTabId: id, surfaceId: panelId)
         }
-
-        if requestTransferredRemoteCleanup, let transferredRemoteCleanupConfiguration {
-            requestSSHControlMasterCleanupIfNeeded(configuration: transferredRemoteCleanupConfiguration)
-        }
-        return transferredRemoteCleanupConfiguration
     }
 }

@@ -20,7 +20,6 @@ final class AutomationConfigStore {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let mutationCoordinator: AutomationConfigMutationCoordinator
-    private let webhookPolicy = AutomationWebhookPolicy()
 
     init(
         fileURL: URL = AutomationConfigStore.defaultFileURL(),
@@ -230,15 +229,6 @@ final class AutomationConfigStore {
                     guard let command = action.string(for: "command") ?? action.string(for: "cmd"),
                           !command.isEmpty else {
                         throw AutomationConfigStoreError.invalidRule("rule \(rule.id) has a run action without command")
-                    }
-                case "webhook":
-                    let headers = action.object(for: "headers")?.reduce(into: [String: String]()) { result, entry in
-                        if let value = entry.value.stringValue { result[entry.key] = value }
-                    } ?? [:]
-                    guard let rawURL = action.string(for: "url"),
-                          let url = URL(string: rawURL),
-                          webhookPolicy.isValid(url: url, headers: headers) else {
-                        throw AutomationConfigStoreError.invalidRule("rule \(rule.id) has an invalid webhook url")
                     }
                 default:
                     throw AutomationConfigStoreError.invalidRule("rule \(rule.id) has unknown action \(action.action)")

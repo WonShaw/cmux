@@ -42,10 +42,8 @@ struct SidebarAppKitRowCellTests {
             compactBranchDirectoryCandidates: [],
             branchDirectoryLines: [],
             branchLinesContainBranch: false,
-            pullRequestRows: [],
             listeningPorts: [],
             finderDirectoryPath: nil,
-            mediaActivity: BrowserMediaActivity(),
             taskStatus: nil,
             todoStatusMenuModel: nil,
             hasManualTaskStatus: false,
@@ -197,7 +195,6 @@ struct SidebarAppKitRowCellTests {
             commands: commands,
             onOpenStatusURL: onOpenStatusURL,
             onOpenWorkspaceDescriptionURL: onOpenWorkspaceDescriptionURL,
-            onOpenPullRequest: { _ in },
             onOpenPort: { _ in },
             onToggleChecklistExpansion: {},
             onToggleMetadataExpansion: {},
@@ -1995,7 +1992,6 @@ struct SidebarAppKitRowCellTests {
         let appKitDetails = Self.makeModel(settings: settings).settings.details
         let keys: [KeyPath<SidebarWorkspaceDetailSettings, Bool>] = [
             \.showBranchDirectory,
-            \.showPullRequests,
             \.watchGitStatus,
             \.showSSH,
             \.showPorts,
@@ -2016,7 +2012,6 @@ struct SidebarAppKitRowCellTests {
     func everyStoredWorkspaceDetailPreferenceIsHonoredInBothRows() {
         let cases: [(String, KeyPath<SidebarWorkspaceDetailSettings, Bool>)] = [
             ("sidebarShowBranchDirectory", \.showBranchDirectory),
-            ("sidebarShowPullRequest", \.showPullRequests),
             ("sidebarWatchGitStatus", \.watchGitStatus),
             ("sidebarShowSSH", \.showSSH),
             ("sidebarShowPorts", \.showPorts),

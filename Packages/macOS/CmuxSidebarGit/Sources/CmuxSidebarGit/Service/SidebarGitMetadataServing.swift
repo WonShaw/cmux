@@ -23,13 +23,13 @@ public protocol SidebarGitMetadataServing: AnyObject {
     /// effective probe directory changed. `displayLabel` optionally carries a
     /// human-friendly sidebar label reported alongside the real path.
     func updateSurfaceDirectory(workspaceId: UUID, panelId: UUID, directory: String, displayLabel: String?)
-    /// Records a trusted remote panel directory and clears stale branch/PR
+    /// Records a trusted remote panel directory and clears the stale branch
     /// projection before rescheduling probes for the remote path.
     func updateRemoteSurfaceDirectory(workspaceId: UUID, panelId: UUID, directory: String, displayLabel: String?)
     /// Applies an externally reported branch (e.g. OSC sequence) and
-    /// reschedules probes and PR refresh.
+    /// reschedules probes.
     func updateSurfaceGitBranch(workspaceId: UUID, panelId: UUID, branch: String, isDirty: Bool?)
-    /// Clears a panel's branch/badge state and re-probes the directory.
+    /// Clears a panel's branch state and re-probes the directory.
     func clearSurfaceGitBranch(workspaceId: UUID, panelId: UUID)
     /// Explicitly re-probes every tracked candidate panel (diagnostic/test seam).
     func refreshTrackedWorkspaceGitMetadata(reason: String)

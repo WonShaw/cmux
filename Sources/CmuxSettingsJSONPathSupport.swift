@@ -9,9 +9,7 @@ enum SidebarWorkspaceDetailDefaults {
     private static let sidebar = SidebarCatalogSection()
 
     static let showBranchDirectoryKey = sidebar.showBranchDirectory.userDefaultsKey
-    static let showPullRequestsKey = sidebar.showPullRequests.userDefaultsKey
     static let watchGitStatusKey = sidebar.watchGitStatus.userDefaultsKey
-    static let showSSHKey = sidebar.showSSH.userDefaultsKey
     static let showPortsKey = sidebar.showPorts.userDefaultsKey
     static let showLogKey = sidebar.showLog.userDefaultsKey
     static let showProgressKey = sidebar.showProgress.userDefaultsKey
@@ -19,9 +17,7 @@ enum SidebarWorkspaceDetailDefaults {
     static let showCustomMetadataKey = sidebar.showCustomMetadata.userDefaultsKey
 
     static let showBranchDirectory = sidebar.showBranchDirectory.defaultValue
-    static let showPullRequests = sidebar.showPullRequests.defaultValue
     static let watchGitStatus = sidebar.watchGitStatus.defaultValue
-    static let showSSH = sidebar.showSSH.defaultValue
     static let showPorts = sidebar.showPorts.defaultValue
     static let showLog = sidebar.showLog.defaultValue
     static let showProgress = sidebar.showProgress.defaultValue
@@ -47,10 +43,6 @@ extension SidebarWorkspaceDetailDefaults {
         return defaults.bool(forKey: key)
     }
 
-    static func showPullRequestsValue(defaults: UserDefaults) -> Bool {
-        UserDefaultsSettingsClient(defaults: defaults).value(for: SidebarCatalogSection().showPullRequests)
-    }
-
     static func showBranchDirectoryValue(defaults: UserDefaults) -> Bool {
         UserDefaultsSettingsClient(defaults: defaults).value(for: SidebarCatalogSection().showBranchDirectory)
     }
@@ -68,7 +60,6 @@ extension SidebarWorkspaceDetailDefaults {
             showLog: details.showLog,
             showProgress: details.showProgress,
             showBranchDirectory: details.showBranchDirectory,
-            showPullRequests: details.showPullRequests,
             showPorts: details.showPorts,
             hideAllDetails: settings.value(for: sidebar.hideAllDetails)
         )
@@ -83,15 +74,6 @@ extension SidebarWorkspaceDetailDefaults {
             return .disabled
         }
         return auxiliaryDetailVisibility(defaults: defaults).requiresGitMetadata
-            ? .activePolling
-            : .passiveReportsOnly
-    }
-
-    static func pullRequestActivity(defaults: UserDefaults) -> SidebarGitMetadataActivity {
-        guard watchGitStatusValue(defaults: defaults) else {
-            return .disabled
-        }
-        return auxiliaryDetailVisibility(defaults: defaults).requiresPullRequestPolling
             ? .activePolling
             : .passiveReportsOnly
     }
@@ -121,12 +103,6 @@ struct SettingsFileStringMapping {
     let defaultsKey: String
 }
 
-struct SettingsFileStringArrayMapping {
-    let jsonKey: String
-    let defaultsKey: String
-    let invalidPath: String
-}
-
 enum AppSettingsFileMapping {
     private static let app = AppCatalogSection()
 
@@ -151,10 +127,6 @@ enum AppSettingsFileMapping {
         ),
         .init(jsonKey: "reorderOnNotification", defaultsKey: app.reorderOnNotification.userDefaultsKey),
         .init(jsonKey: "iMessageMode", defaultsKey: IMessageModeSettings.key),
-        .init(
-            jsonKey: "sendAnonymousTelemetry",
-            defaultsKey: app.sendAnonymousTelemetry.userDefaultsKey
-        ),
         .init(
             jsonKey: "warnBeforeClosingTab",
             defaultsKey: app.warnBeforeClosingTab.userDefaultsKey
@@ -277,26 +249,9 @@ enum SidebarSettingsFileMapping {
             defaultsKey: SidebarWorkspaceDetailDefaults.showBranchDirectoryKey
         ),
         .init(
-            jsonKey: "showPullRequests",
-            defaultsKey: SidebarWorkspaceDetailDefaults.showPullRequestsKey
-        ),
-        .init(
             jsonKey: "watchGitStatus",
             defaultsKey: SidebarWorkspaceDetailDefaults.watchGitStatusKey
         ),
-        .init(
-            jsonKey: "makePullRequestsClickable",
-            defaultsKey: sidebar.makePullRequestsClickable.userDefaultsKey
-        ),
-        .init(
-            jsonKey: "openPullRequestLinksInCmuxBrowser",
-            defaultsKey: BrowserLinkOpenSettings.openSidebarPullRequestLinksInCmuxBrowserKey
-        ),
-        .init(
-            jsonKey: "openPortLinksInCmuxBrowser",
-            defaultsKey: BrowserLinkOpenSettings.openSidebarPortLinksInCmuxBrowserKey
-        ),
-        .init(jsonKey: "showSSH", defaultsKey: SidebarWorkspaceDetailDefaults.showSSHKey),
         .init(jsonKey: "showPorts", defaultsKey: SidebarWorkspaceDetailDefaults.showPortsKey),
         .init(jsonKey: "showLog", defaultsKey: SidebarWorkspaceDetailDefaults.showLogKey),
         .init(
@@ -345,52 +300,5 @@ enum AutomationSettingsFileMapping {
         .init(jsonKey: "claudeBinaryPath", defaultsKey: automation.claudeBinaryPath.userDefaultsKey),
         .init(jsonKey: "ripgrepBinaryPath", defaultsKey: automation.ripgrepBinaryPath.userDefaultsKey),
         .init(jsonKey: "autoNamingAgent", defaultsKey: automation.autoNamingAgent.userDefaultsKey),
-    ]
-}
-
-enum BrowserSettingsFileMapping {
-    static let booleanSettings: [SettingsFileBooleanMapping] = [
-        .init(jsonKey: "showSearchSuggestions", defaultsKey: BrowserSearchSettingsStore.searchSuggestionsEnabledKey),
-        .init(jsonKey: "discardHiddenWebViews", defaultsKey: BrowserHiddenWebViewDiscardPolicy.enabledKey),
-        .init(
-            jsonKey: "askWhereToSaveDownloads",
-            defaultsKey: SettingCatalog().browser.askWhereToSaveDownloads.userDefaultsKey
-        ),
-        .init(
-            jsonKey: "openTerminalLinksInCmuxBrowser",
-            defaultsKey: BrowserLinkOpenSettings.openTerminalLinksInCmuxBrowserKey
-        ),
-        .init(
-            jsonKey: "interceptTerminalOpenCommandInCmuxBrowser",
-            defaultsKey: BrowserLinkOpenSettings.interceptTerminalOpenCommandInCmuxBrowserKey
-        ),
-        .init(jsonKey: "showImportHintOnBlankTabs", defaultsKey: BrowserImportHintSettings.showOnBlankTabsKey),
-    ]
-
-    static let stringSettings: [SettingsFileStringMapping] = [
-        .init(jsonKey: "reactGrabVersion", defaultsKey: ReactGrabSettings.versionKey),
-    ]
-
-    static let stringArraySettings: [SettingsFileStringArrayMapping] = [
-        .init(
-            jsonKey: "hostsToOpenInEmbeddedBrowser",
-            defaultsKey: BrowserLinkOpenSettings.browserHostWhitelistKey,
-            invalidPath: "browser.hostsToOpenInEmbeddedBrowser"
-        ),
-        .init(
-            jsonKey: "urlsToAlwaysOpenExternally",
-            defaultsKey: BrowserExternalURLPolicy.userDefaultsKey,
-            invalidPath: "browser.urlsToAlwaysOpenExternally"
-        ),
-        .init(
-            jsonKey: "insecureHttpHostsAllowedInEmbeddedBrowser",
-            defaultsKey: BrowserInsecureHTTPSettings.allowlistKey,
-            invalidPath: "browser.insecureHttpHostsAllowedInEmbeddedBrowser"
-        ),
-        .init(
-            jsonKey: "urlAllowlist",
-            defaultsKey: BrowserURLAllowlistPolicy.userDefaultsKey,
-            invalidPath: "browser.urlAllowlist"
-        ),
     ]
 }

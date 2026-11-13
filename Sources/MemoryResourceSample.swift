@@ -3,7 +3,7 @@ import CmuxTerminal
 import Darwin
 import Foundation
 
-/// One resource sample shared by local diagnostics and opt-in Sentry reporting.
+/// One resource sample used by local diagnostics.
 struct MemoryResourceSample: Sendable {
     private let appPID: Int
     private let appProcess: CmuxTopProcessInfo?

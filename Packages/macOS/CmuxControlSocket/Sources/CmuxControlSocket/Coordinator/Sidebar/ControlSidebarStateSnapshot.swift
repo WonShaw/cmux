@@ -13,8 +13,6 @@ public struct ControlSidebarStateSnapshot: Sendable, Equatable {
     public let focusedPanel: ControlSidebarFocusedPanelInfo?
     /// The reported git branch state, if any.
     public let gitBranch: ControlSidebarGitBranchInfo?
-    /// The first pull request in display order, if any.
-    public let firstPullRequest: ControlSidebarPullRequestInfo?
     /// The aggregated listening ports.
     public let listeningPorts: [Int]
     /// The progress state, if any.
@@ -36,7 +34,6 @@ public struct ControlSidebarStateSnapshot: Sendable, Equatable {
     ///   - currentDirectory: The workspace-level working directory.
     ///   - focusedPanel: The focused panel and its directory, when both known.
     ///   - gitBranch: The reported git branch state, if any.
-    ///   - firstPullRequest: The first pull request in display order, if any.
     ///   - listeningPorts: The aggregated listening ports.
     ///   - progress: The progress state, if any.
     ///   - statusEntries: Status entries in display order.
@@ -49,7 +46,6 @@ public struct ControlSidebarStateSnapshot: Sendable, Equatable {
         currentDirectory: String,
         focusedPanel: ControlSidebarFocusedPanelInfo?,
         gitBranch: ControlSidebarGitBranchInfo?,
-        firstPullRequest: ControlSidebarPullRequestInfo?,
         listeningPorts: [Int],
         progress: ControlSidebarProgressInfo?,
         statusEntries: [ControlSidebarStatusEntrySnapshot],
@@ -62,7 +58,6 @@ public struct ControlSidebarStateSnapshot: Sendable, Equatable {
         self.currentDirectory = currentDirectory
         self.focusedPanel = focusedPanel
         self.gitBranch = gitBranch
-        self.firstPullRequest = firstPullRequest
         self.listeningPorts = listeningPorts
         self.progress = progress
         self.statusEntries = statusEntries

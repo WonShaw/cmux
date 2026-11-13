@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 import os
 
-nonisolated private let rosettaRelaunchLogger = Logger(subsystem: "com.cmuxterm.app", category: "RosettaRelaunch")
+nonisolated private let rosettaRelaunchLogger = Logger(subsystem: "com.comux.app", category: "RosettaRelaunch")
 
 /// Launch-time self-heal that re-execs cmux natively when the process is
 /// running translated under Rosetta on Apple Silicon.

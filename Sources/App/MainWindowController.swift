@@ -69,11 +69,7 @@ final class MainWindowController: ReleasingWindowController {
 #endif
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        let shouldClose = shouldClose?(sender) ?? true
-        if shouldClose {
-            WebViewInspectorTeardown.closeAllInspectors(in: sender)
-        }
-        return shouldClose
+        return shouldClose?(sender) ?? true
     }
 
     func windowWillUseStandardFrame(_ window: NSWindow, defaultFrame newFrame: NSRect) -> NSRect {

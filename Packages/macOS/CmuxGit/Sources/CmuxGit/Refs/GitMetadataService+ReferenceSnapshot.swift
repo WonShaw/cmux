@@ -2,61 +2,6 @@ import Dispatch
 import Foundation
 
 extension GitMetadataService {
-    /// Runs bounded remote fallback plumbing on the blocking-I/O lane.
-    @concurrent
-    nonisolated func gitRemoteVFallback(
-        repository: ResolvedGitRepository,
-        deadline: DispatchTime? = nil
-    ) async -> String? {
-        let wallTimeLimit = safetyConfiguration.gitStatusWallTime
-        let effectiveDeadline = deadline
-            ?? (DispatchTime.now() + wallTimeLimit)
-        let didAcquire = if deadline != nil {
-            await referenceSnapshotLimiter.acquire(until: effectiveDeadline)
-        } else {
-            await referenceSnapshotLimiter.acquire()
-        }
-        guard didAcquire else { return nil }
-        let cancellationSignal = WorkspaceChangesCancellationSignal(deadline: effectiveDeadline)
-        let output: String? = await withTaskCancellationHandler {
-            await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
-                Self.blockingStatusQueue.async {
-                    let output: String? = cancellationSignal.withCurrentBinding {
-                        let selector = GitReferenceRunnerSelector(wallTimeLimit: wallTimeLimit)
-                        let deadline = effectiveDeadline
-                        for runner in selector.candidateRunners {
-                            let now = DispatchTime.now()
-                            guard deadline > now else { break }
-                            let remaining = Double(deadline.uptimeNanoseconds - now.uptimeNanoseconds)
-                                / 1_000_000_000
-                            do {
-                                let result = try runner.run(
-                                    arguments: ["remote", "-v"],
-                                    in: URL(fileURLWithPath: repository.workTreeRoot, isDirectory: true),
-                                    maximumOutputByteCount: 1 * 1_024 * 1_024,
-                                    wallTimeLimit: remaining
-                                )
-                                if result.exitCode == 0,
-                                   !result.standardOutputWasTruncated,
-                                   let output = String(data: result.output, encoding: .utf8) {
-                                    return output
-                                }
-                            } catch {
-                                continue
-                            }
-                        }
-                        return nil
-                    }
-                    continuation.resume(returning: output)
-                }
-            }
-        } onCancel: {
-            cancellationSignal.cancel()
-        }
-        await referenceSnapshotLimiter.release()
-        return output
-    }
-
     /// Resolves the full reference snapshot for watcher/config consumers.
     nonisolated func gitReferenceSnapshotForConfig(
         repository: ResolvedGitRepository,
@@ -67,15 +12,6 @@ extension GitMetadataService {
             deadline: deadline,
             includeStorageWatchPaths: true
         )
-    }
-
-    /// Resolves the branch context for config traversal on the blocking-I/O lane.
-    @concurrent
-    nonisolated func gitReferenceBranchContext(
-        repository: ResolvedGitRepository,
-        deadline: DispatchTime? = nil
-    ) async -> GitConfigBranchContext {
-        .resolved((await gitReferenceSnapshot(repository: repository, deadline: deadline)).branchName)
     }
 
     /// Resolves refs on the package's bounded blocking-I/O lane.

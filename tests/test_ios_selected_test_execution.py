@@ -58,7 +58,7 @@ class SelectedIOSTestExecutionGuardTests(unittest.TestCase):
             "\n".join(
                 (
                     "XCTExpectFailure: matcher accepted Assertion Failure: "
-                    "Failed to activate application 'com.cmuxterm.app.debug "
+                    "Failed to activate application 'com.comux.app.debug "
                     "(current state: Running Background)",
                     "Executed 1 test, with 0 failures (0 unexpected)",
                 )

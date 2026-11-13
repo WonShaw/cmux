@@ -8,19 +8,19 @@ import Testing
 @MainActor
 @Suite("SettingsSectionMountModel")
 struct SettingsSectionMountModelTests {
-    private let order: [SettingsSectionID] = [.account, .app, .terminal, .browser, .reset]
+    private let order: [SettingsSectionID] = [.sleepyMode, .app, .terminal, .textBox, .reset]
 
-    @Test func displayOrderGivesEverySectionASlotExceptTheEmbeddedBrowserImport() {
+    @Test func displayOrderGivesEverySectionASlot() {
         let slots = Set(SettingsSectionMountModel.displayOrder)
         #expect(slots.count == SettingsSectionMountModel.displayOrder.count)
-        #expect(slots == Set(SettingsSectionID.allCases).subtracting([.browserImport]))
+        #expect(slots == Set(SettingsSectionID.allCases))
     }
 
     @Test func firstPassMountsOnlyTheInitialSection() {
         let model = SettingsSectionMountModel(initial: .terminal, order: order)
         #expect(model.mounted == [.terminal])
         #expect(model.isMounted(.terminal))
-        #expect(!model.isMounted(.account))
+        #expect(!model.isMounted(.sleepyMode))
         #expect(!model.isComplete)
     }
 
@@ -32,22 +32,22 @@ struct SettingsSectionMountModelTests {
             current = model.sectionDidAppear(section)
             if let current { mountedInOrder.append(current) }
         }
-        #expect(mountedInOrder == [.account, .app, .browser, .reset])
+        #expect(mountedInOrder == [.sleepyMode, .app, .textBox, .reset])
         #expect(model.isComplete)
         #expect(model.mounted == Set(order))
         #expect(model.sectionDidAppear(.reset) == nil)
     }
 
     @Test func appearanceOfASectionThatIsNotTheChainHeadDoesNotAdvance() {
-        let model = SettingsSectionMountModel(initial: .account, order: order)
-        // Navigation mounts .browser out of band; its appearance must not
+        let model = SettingsSectionMountModel(initial: .sleepyMode, order: order)
+        // Navigation mounts .textBox out of band; its appearance must not
         // start a second chain (two sections per turn).
-        #expect(model.ensureMounted(.browser) == false)
-        #expect(model.sectionDidAppear(.browser) == nil)
-        #expect(model.mounted == [.account, .browser])
-        #expect(model.sectionDidAppear(.account) == .app)
+        #expect(model.ensureMounted(.textBox) == false)
+        #expect(model.sectionDidAppear(.textBox) == nil)
+        #expect(model.mounted == [.sleepyMode, .textBox])
+        #expect(model.sectionDidAppear(.sleepyMode) == .app)
         #expect(model.sectionDidAppear(.app) == .terminal)
-        // .browser is already mounted, so the chain skips it.
+        // .textBox is already mounted, so the chain skips it.
         #expect(model.sectionDidAppear(.terminal) == .reset)
         // Everything is mounted, but the last mount is still under
         // construction until it appears.
@@ -57,58 +57,51 @@ struct SettingsSectionMountModelTests {
     }
 
     @Test func ensureMountedReportsAlreadyMountedSections() {
-        let model = SettingsSectionMountModel(initial: .account, order: order)
-        #expect(model.ensureMounted(.account))
+        let model = SettingsSectionMountModel(initial: .sleepyMode, order: order)
+        #expect(model.ensureMounted(.sleepyMode))
         #expect(model.ensureMounted(.reset) == false)
         #expect(model.ensureMounted(.reset))
     }
 
-    @Test func browserImportResolvesToTheBrowserSlot() {
-        let model = SettingsSectionMountModel(initial: .browserImport, order: order)
-        #expect(model.mounted == [.browser])
-        #expect(model.isMounted(.browserImport))
-        #expect(model.ensureMounted(.browserImport))
-    }
-
     @Test func sectionsOutsideTheOrderCountAsMounted() {
-        let model = SettingsSectionMountModel(initial: .account, order: [.account, .app])
-        #expect(model.isMounted(.cloudMachines))
-        #expect(model.ensureMounted(.cloudMachines))
-        #expect(model.mounted == [.account])
+        let model = SettingsSectionMountModel(initial: .sleepyMode, order: [.sleepyMode, .app])
+        #expect(model.isMounted(.mobile))
+        #expect(model.ensureMounted(.mobile))
+        #expect(model.mounted == [.sleepyMode])
     }
 
     @Test func initialSectionOutsideTheOrderFallsBackToTheFirstSlot() {
-        let model = SettingsSectionMountModel(initial: .cloudMachines, order: [.account, .app])
-        #expect(model.mounted == [.account])
-        #expect(model.sectionDidAppear(.account) == .app)
+        let model = SettingsSectionMountModel(initial: .mobile, order: [.sleepyMode, .app])
+        #expect(model.mounted == [.sleepyMode])
+        #expect(model.sectionDidAppear(.sleepyMode) == .app)
     }
 
     @Test func completionWaitsForTheFinalSectionToAppear() {
-        let model = SettingsSectionMountModel(initial: .account, order: [.account, .app])
+        let model = SettingsSectionMountModel(initial: .sleepyMode, order: [.sleepyMode, .app])
         #expect(!model.isComplete)
-        #expect(model.sectionDidAppear(.account) == .app)
-        #expect(model.mounted == Set([.account, .app]))
+        #expect(model.sectionDidAppear(.sleepyMode) == .app)
+        #expect(model.mounted == Set([.sleepyMode, .app]))
         #expect(!model.isComplete, "the App section is mounted but has not appeared yet")
         #expect(model.sectionDidAppear(.app) == nil)
         #expect(model.isComplete)
     }
 
     @Test func deferredScrollIsOwedToItsSectionOnly() {
-        let model = SettingsSectionMountModel(initial: .account, order: order)
+        let model = SettingsSectionMountModel(initial: .sleepyMode, order: order)
         let target = SettingsSectionScrollTarget(
-            section: .browserImport, anchorID: "section:browserImport", anchor: .top, generation: 3
+            section: .textBox, anchorID: "section:textBox", anchor: .top, generation: 3
         )
         model.deferScroll(target)
         #expect(model.takeDeferredScroll(for: .app) == nil)
-        #expect(model.takeDeferredScroll(for: .browser) == target)
-        #expect(model.takeDeferredScroll(for: .browser) == nil)
+        #expect(model.takeDeferredScroll(for: .textBox) == target)
+        #expect(model.takeDeferredScroll(for: .textBox) == nil)
         model.deferScroll(target)
         model.cancelDeferredScroll()
         #expect(model.deferredScroll == nil)
     }
 
     @Test func pinnedScrollTracksTheLatestNavigation() {
-        let model = SettingsSectionMountModel(initial: .account, order: order)
+        let model = SettingsSectionMountModel(initial: .sleepyMode, order: order)
         let first = SettingsSectionScrollTarget(section: .reset, anchorID: "section:reset", anchor: .top, generation: 1)
         let second = SettingsSectionScrollTarget(section: .app, anchorID: "row:app", anchor: .center, generation: 2)
         model.pin(first)
@@ -117,11 +110,11 @@ struct SettingsSectionMountModelTests {
     }
 
     @Test func isAboveFollowsDisplayOrder() {
-        let model = SettingsSectionMountModel(initial: .account, order: order)
-        #expect(model.isAbove(.account, .reset))
-        #expect(!model.isAbove(.reset, .account))
+        let model = SettingsSectionMountModel(initial: .sleepyMode, order: order)
+        #expect(model.isAbove(.sleepyMode, .reset))
+        #expect(!model.isAbove(.reset, .sleepyMode))
         #expect(!model.isAbove(.app, .app))
-        #expect(model.isAbove(.terminal, .browserImport))
-        #expect(!model.isAbove(.cloudMachines, .reset))
+        #expect(model.isAbove(.terminal, .textBox))
+        #expect(!model.isAbove(.mobile, .reset))
     }
 }

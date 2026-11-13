@@ -1,8 +1,7 @@
 public import Foundation
 
 /// The window-side seam the sidebar git services drive: snapshot reads of
-/// workspace/panel state, synchronous projection writes of branch and
-/// pull-request badges, and the environment toggles the schedulers honor.
+/// workspace/panel state, synchronous projection writes of branch state, and the environment toggles the schedulers honor.
 ///
 /// **Why a synchronous two-way protocol and not an AsyncStream of results.**
 /// Every state transition in the legacy subsystem is one MainActor turn that
@@ -47,18 +46,10 @@ public protocol SidebarGitHosting: AnyObject {
     func panelGitBranch(workspaceId: UUID, panelId: UUID) -> SidebarPanelGitBranch?
     /// Panel ids currently showing a git branch in the workspace.
     func panelGitBranchPanelIds(in workspaceId: UUID) -> Set<UUID>
-    /// The panel's currently displayed pull-request badge, if any.
-    func panelPullRequestBadge(workspaceId: UUID, panelId: UUID) -> SidebarPullRequestBadge?
-    /// Panel ids currently showing a pull-request badge in the workspace.
-    func panelPullRequestPanelIds(in workspaceId: UUID) -> Set<UUID>
     /// The workspace's focused panel id, if any.
     func focusedPanelId(in workspaceId: UUID) -> UUID?
-    /// Whether the workspace shows a workspace-level git branch or
-    /// pull-request signal (the legacy `gitBranch != nil || pullRequest != nil`).
+    /// Whether the workspace shows a workspace-level git branch.
     func hasWorkspaceLevelGitSignal(_ workspaceId: UUID) -> Bool
-    /// Whether the panel is the focused panel of the selected workspace
-    /// (drives the faster selected-panel PR poll cadence).
-    func isSelectedFocusedPanel(workspaceId: UUID, panelId: UUID) -> Bool
 
     // MARK: Projection writes
 
@@ -75,24 +66,13 @@ public protocol SidebarGitHosting: AnyObject {
     func updatePanelGitBranch(workspaceId: UUID, panelId: UUID, branch: String, isDirty: Bool)
     /// Clears the panel's branch (and any dependent badge state).
     func clearPanelGitBranch(workspaceId: UUID, panelId: UUID)
-    /// Shows `badge` on the panel.
-    func updatePanelPullRequest(workspaceId: UUID, panelId: UUID, badge: SidebarPullRequestBadge)
-    /// Clears the panel's pull-request badge.
-    func clearPanelPullRequest(workspaceId: UUID, panelId: UUID)
-    /// Asks the host to re-probe the panel's local git metadata because the
-    /// pull-request branch disagrees with the current sidebar branch projection.
-    func schedulePanelGitMetadataProbe(workspaceId: UUID, panelId: UUID, reason: String)
-    /// Clears every workspace's sidebar git metadata (branches and badges).
+    /// Clears every workspace's sidebar git metadata.
     func clearAllSidebarGitMetadata()
-    /// Clears every workspace's sidebar pull-request badges.
-    func clearAllSidebarPullRequestMetadata()
 
     // MARK: Environment
 
     /// The active/passive/disabled work level for sidebar git metadata.
     var gitMetadataActivity: SidebarGitMetadataActivity { get }
-    /// The active/passive/disabled work level for sidebar pull-request metadata.
-    var pullRequestActivity: SidebarGitMetadataActivity { get }
     /// Whether the paired mobile host served a request within `interval`
     /// seconds (background git/PR work defers while true).
     func mobileHostHasRecentActivity(within interval: TimeInterval) -> Bool

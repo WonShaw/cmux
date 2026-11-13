@@ -155,26 +155,6 @@ struct GhosttyTerminalStartupEnvironmentTests {
     }
 
     @Test
-    func testApplyManagedGitWatchEnvironmentDisablesShellPullRequestWatchWhenHidden() {
-        var environment = [
-            "CMUX_NO_PR_WATCH": ""
-        ]
-        var protectedKeys: Set<String> = []
-
-        TerminalSurface.applyManagedGitWatchEnvironment(
-            watchGitStatusEnabled: true,
-            showPullRequestsEnabled: false,
-            to: &environment,
-            protectedKeys: &protectedKeys
-        )
-
-        expectEqual(environment["CMUX_NO_GIT_WATCH"], "")
-        expectEqual(environment["CMUX_NO_PR_WATCH"], "1")
-        expectTrue(protectedKeys.contains("CMUX_NO_GIT_WATCH"))
-        expectTrue(protectedKeys.contains("CMUX_NO_PR_WATCH"))
-    }
-
-    @Test
     func testPathByPrependingUniqueDirectoryMovesDirectoryToFront() {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(

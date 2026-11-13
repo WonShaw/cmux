@@ -44,7 +44,7 @@ extension TerminalController {
         workspaceNotFound: Resolution,
         conflictingSelectors: (String) -> Resolution
     ) -> Resolution? {
-        guard panelType == .terminal || panelType == .browser else {
+        guard panelType == .terminal else {
             return unsupportedType(panelType.rawValue, dockUnsupportedSurfaceTypeMessage())
         }
         guard RightSidebarMode.dock.isAvailable() else {
@@ -83,7 +83,7 @@ extension TerminalController {
     }
 
     func dockUnsupportedSurfaceTypeMessage() -> String {
-        String(localized: "dock.error.unsupportedSurfaceType", defaultValue: "Dock placement supports only terminal and browser surfaces")
+        String(localized: "dock.error.unsupportedSurfaceType", defaultValue: "Dock placement supports only terminal surfaces")
     }
 
     func dockUnavailableMessage() -> String {
@@ -99,12 +99,11 @@ extension TerminalController {
     }
 
     /// Creates a surface (tab) in the routed window's right-sidebar Dock. The
-    /// Dock hosts terminal and browser surfaces only; agent-session is unsupported.
+    /// Dock hosts terminal surfaces only; agent-session is unsupported.
     func dockSurfaceCreate(
         routing: ControlRoutingSelectors,
         tabManager: TabManager,
         panelType: PanelType,
-        url: URL?,
         inputs: ControlSurfaceCreateInputs
     ) -> ControlSurfaceCreateResolution {
         if let invalid = validateDockSurfaceCreateRouting(routing: routing, tabManager: tabManager, panelType: panelType) {
@@ -120,7 +119,7 @@ extension TerminalController {
             return .paneNotFound
         }
         let focus = v2FocusAllowed(requested: inputs.requestedFocus)
-        let kind: DockSurfaceKind = (panelType == .browser) ? .browser : .terminal
+        let kind: DockSurfaceKind = .terminal
         if focus {
             // Creation is authoritative; revealing its secondary focus request
             // is best-effort when the Dock host is still mounting.
@@ -129,14 +128,12 @@ extension TerminalController {
         let newPanelId = dock.newSurface(
             kind: kind,
             inPane: paneId,
-            url: kind == .browser ? url : nil,
-            command: kind == .terminal ? inputs.initialCommand : nil,
-            workingDirectory: kind == .terminal ? inputs.workingDirectory : nil,
+            command: inputs.initialCommand,
+            workingDirectory: inputs.workingDirectory,
             environment: inputs.startupEnvironment,
-            tmuxStartCommand: kind == .terminal ? inputs.tmuxStartCommand : nil,
-            initialInput: kind == .terminal ? inputs.initialInput : nil,
-            focus: false,
-            preloadInitialNavigationInBackground: kind == .browser
+            tmuxStartCommand: inputs.tmuxStartCommand,
+            initialInput: inputs.initialInput,
+            focus: false
         )
         guard let newPanelId else {
             return .createFailed

@@ -233,7 +233,6 @@ extension TerminalController: ControlCanvasContext {
         guard ws.layoutMode == .canvas else { return .notCanvasMode }
         let paneType: CanvasNewPaneType
         switch type {
-        case "browser": paneType = .browser
         case "simulator": paneType = .simulator
         default: paneType = .terminal
         }

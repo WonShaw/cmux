@@ -214,4 +214,10 @@ extension CMUXCLI {
             defaultValue: "read-screen [--workspace <id|ref|index>] [--surface <id|ref|index>] [--window <id|ref|index>] [--scrollback] [--lines <n>] [--selection]"
         )
     }
+
+    static var surfaceUsage: String {
+        """
+        Usage: cmux surface resume …   (restart metadata; see `cmux surface resume --help`)
+        """
+    }
 }

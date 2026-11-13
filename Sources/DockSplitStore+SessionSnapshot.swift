@@ -239,7 +239,6 @@ extension DockSplitStore {
             : manualUnreadPanelIds.contains(panelId)
 
         let terminalSnapshot: SessionTerminalPanelSnapshot?
-        let browserSnapshot: SessionBrowserPanelSnapshot?
         let filePreviewSnapshot: SessionFilePreviewPanelSnapshot?
         switch panel.panelType {
         case .terminal:
@@ -356,45 +355,14 @@ extension DockSplitStore {
                 resumeBinding: localTmuxStartCommand == nil ? resumeBinding : nil,
                 managedAgentResumeBinding: localTmuxStartCommand == nil ? managedResumeBinding : nil,
                 textBoxDraft: terminal.sessionTextBoxDraftSnapshot(),
-                isRemoteTerminal: transfer?.isRemoteTerminal ?? false,
-                remotePTYSessionID: transfer?.remotePTYSessionID,
                 wasAgentRunning: localTmuxStartCommand == nil ? agentWasRunning : nil
             )
-            browserSnapshot = nil
-            filePreviewSnapshot = nil
-        case .browser:
-            terminalSnapshot = nil
-            if let browser = panel as? BrowserPanel {
-                guard browser.shouldPersistSessionSnapshot() else { return nil }
-                let history = browser.sessionNavigationHistorySnapshot()
-                let diffViewer = browser.diffViewerSessionComponents()
-                browserSnapshot = SessionBrowserPanelSnapshot(
-                    urlString: browser.preferredURLStringForSessionSnapshot(),
-                    profileID: browser.profileID,
-                    shouldRenderWebView: browser.shouldRenderWebViewForSessionSnapshot(),
-                    pageZoom: Double(browser.currentPageZoomFactor()),
-                    developerToolsVisible: browser.isDeveloperToolsVisible(),
-                    isMuted: browser.isMuted,
-                    chromeVisibility: browser.chromeVisibility,
-                    omnibarVisible: browser.isOmnibarVisible,
-                    backHistoryURLStrings: history.backHistoryURLStrings,
-                    forwardHistoryURLStrings: history.forwardHistoryURLStrings,
-                    transparentBackground: browser.sessionSnapshotTransparentBackground,
-                    diffViewerToken: diffViewer?.token,
-                    diffViewerRequestPath: diffViewer?.requestPath
-                )
-            } else if let deferred = panel as? DeferredBrowserPanel {
-                browserSnapshot = deferred.sessionPanelSnapshot.browser
-            } else {
-                return nil
-            }
             filePreviewSnapshot = nil
         case .filePreview:
             guard let filePreview = panel as? FilePreviewPanel else {
                 return nil
             }
             terminalSnapshot = nil
-            browserSnapshot = nil
             filePreviewSnapshot = SessionFilePreviewPanelSnapshot(
                 filePath: filePreview.filePath
             )
@@ -411,13 +379,11 @@ extension DockSplitStore {
             customTitleSource: titleMetadata.customTitleSource == .remote ? .user : titleMetadata.customTitleSource,
             customTitleWasRemote: titleMetadata.customTitleSource == .remote ? true : nil,
             directory: directory,
-            directoryIsTrustedRemoteReport: transfer?.directoryIsTrustedRemoteReport,
             isPinned: tab?.isPinned ?? transfer?.isPinned ?? false,
             isManuallyUnread: isManuallyUnread,
             listeningPorts: [],
             ttyName: transfer?.ttyName,
             terminal: terminalSnapshot,
-            browser: browserSnapshot,
             markdown: nil,
             filePreview: filePreviewSnapshot,
             rightSidebarTool: nil
@@ -428,8 +394,7 @@ extension DockSplitStore {
         panel: any Panel,
         transfer: Workspace.DetachedSurfaceTransfer?
     ) -> String? {
-        if transfer?.isRemoteTerminal != true,
-           let terminal = panel as? TerminalPanel,
+        if let terminal = panel as? TerminalPanel,
            let pid = terminal.surface.foregroundProcessID(),
            let liveDirectory = Workspace.processCurrentWorkingDirectory(pid: Int32(clamping: pid)) {
             return liveDirectory

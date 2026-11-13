@@ -12,42 +12,6 @@ import SwiftUI
 #endif
 
 final class WindowAppearanceSnapshotTests: XCTestCase {
-    func testUnifiedSurfaceBackdropsUseSingleWindowRootBackdrop() {
-        let snapshot = makeSnapshot(unifySurfaceBackdrops: true)
-
-        assertTerminalBackdrop(snapshot.policy(for: .windowRoot))
-        assertClearBackdrop(snapshot.policy(for: .terminalCanvas))
-        assertClearBackdrop(snapshot.policy(for: .bonsplitChrome))
-        assertClearBackdrop(snapshot.policy(for: .titlebar))
-        assertClearBackdrop(snapshot.policy(for: .browserSurface))
-        assertClearBackdrop(snapshot.policy(for: .leftSidebar))
-        assertClearBackdrop(snapshot.policy(for: .rightSidebar))
-    }
-
-    func testSeparateSurfaceBackdropsKeepRootBackdropAndSidebarMaterialsSeparate() {
-        let snapshot = makeSnapshot(unifySurfaceBackdrops: false)
-
-        assertTerminalBackdrop(snapshot.policy(for: .windowRoot))
-        assertClearBackdrop(snapshot.policy(for: .terminalCanvas))
-        assertClearBackdrop(snapshot.policy(for: .bonsplitChrome))
-        assertClearBackdrop(snapshot.policy(for: .titlebar))
-        assertClearBackdrop(snapshot.policy(for: .browserSurface))
-
-        guard case let .sidebarMaterial(leftPolicy) = snapshot.policy(for: .leftSidebar) else {
-            XCTFail("left sidebar should keep its own material policy")
-            return
-        }
-        XCTAssertEqual(leftPolicy.material, .sidebar)
-        XCTAssertEqual(leftPolicy.blendingMode, .withinWindow)
-
-        guard case let .sidebarMaterial(rightPolicy) = snapshot.policy(for: .rightSidebar) else {
-            XCTFail("right sidebar should keep its own material policy")
-            return
-        }
-        XCTAssertEqual(rightPolicy.material, .sidebar)
-        XCTAssertEqual(rightPolicy.blendingMode, .withinWindow)
-    }
-
     func testMacOSGlassClearForcesTransparentHostingAndClearGlassStyle() {
         let snapshot = makeSnapshot(
             unifySurfaceBackdrops: true,
@@ -265,36 +229,6 @@ final class WindowAppearanceSnapshotTests: XCTestCase {
                     "Dock/sidebar chrome diverged for terminal \(testCase.expected) and system \(systemResolvedSidebarScheme)"
                 )
             }
-        }
-    }
-
-    func testMatchedLeftAndRightSidebarBackdropsShareTerminalRootBackdrop() {
-        let cases: [(backgroundHex: String, opacity: CGFloat)] = [
-            ("#FFFFFF", 1),
-            ("#000000", 1),
-            ("#777777", 1),
-            ("#000000", 0.05),
-        ]
-
-        for testCase in cases {
-            let snapshot = makeSnapshot(
-                unifySurfaceBackdrops: true,
-                backgroundHex: testCase.backgroundHex,
-                backgroundOpacity: testCase.opacity
-            )
-
-            assertTerminalBackdrop(
-                snapshot.policy(for: .windowRoot),
-                expectedHex: testCase.backgroundHex,
-                expectedOpacity: testCase.opacity
-            )
-            assertClearBackdrop(snapshot.policy(for: .terminalCanvas))
-            assertClearBackdrop(snapshot.policy(for: .bonsplitChrome))
-            assertClearBackdrop(snapshot.policy(for: .titlebar))
-            assertClearBackdrop(snapshot.policy(for: .browserSurface))
-            assertClearBackdrop(snapshot.policy(for: .leftSidebar))
-            assertClearBackdrop(snapshot.policy(for: .rightSidebar))
-            XCTAssertEqual(snapshot.sidebarContentColorScheme, snapshot.chromeColorScheme)
         }
     }
 

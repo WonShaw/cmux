@@ -2,14 +2,11 @@ import Foundation
 import SQLite3
 
 enum GlobalSearchKind: String, Codable, Sendable {
-    case browser
     case markdown
     case title
 
     var localizedLabel: String {
         switch self {
-        case .browser:
-            return String(localized: "globalSearch.kind.browser", defaultValue: "Browser")
         case .markdown:
             return String(localized: "globalSearch.kind.markdown", defaultValue: "Markdown")
         case .title:
@@ -307,6 +304,8 @@ actor SearchIndex {
                 VALUES (new.rowid, new.title, new.location, new.text);
             END
             """, database: database)
+        // Rows indexed from the removed built-in browser are no longer readable.
+        try execute("DELETE FROM chunks WHERE kind = 'browser'", database: database)
 
         if existingSchemaVersion < Self.schemaVersion {
             try execute("INSERT INTO chunks_fts(chunks_fts) VALUES('rebuild')", database: database)

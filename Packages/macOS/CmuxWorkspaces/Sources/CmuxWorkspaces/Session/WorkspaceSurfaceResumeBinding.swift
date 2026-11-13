@@ -28,8 +28,6 @@ public protocol WorkspaceSurfaceResumeBinding: Sendable {
 
     /// Returns the startup input used to restore this binding.
     ///
-    /// Local bindings return a short `cmux restore` verb. Remote bindings may
-    /// retain their compatibility command because the local CLI cannot replace
-    /// a process on the remote host.
+    /// Local bindings return a short `cmux restore` verb.
     func restoreStartupInput() -> String?
 }

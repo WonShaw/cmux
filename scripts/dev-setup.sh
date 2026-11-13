@@ -9,7 +9,7 @@
 # Flow (--surface both):
 #   1. Select exactly one auth profile for both surfaces.
 #   2. Enable the iOS pairing host on the tagged build (opt-in, default OFF):
-#        defaults write com.cmuxterm.app.debug.<tag-id> mobile.iOSPairingHost.enabled -bool true
+#        defaults write com.comux.app.debug.<tag-id> mobile.iOSPairingHost.enabled -bool true
 #      Written BEFORE the macOS launch so a single build binds the NWListener on
 #      first launch. NOTE: the first bind per bundle id triggers a one-time macOS
 #      "Local Network" permission prompt; click Allow.
@@ -30,8 +30,8 @@
 #   --surface <s>       mac | ios | both   (default both)
 #   --profile <name>    apply an environment preset after the app is up. Replays
 #                       scripts/dev-profiles/<name>.json against the tagged debug
-#                       socket (composer, notif, browser, groups, multi-mac, ...).
-#                       Accepts a comma-list to compose (e.g. composer,browser).
+#                       socket (composer, notif, groups, multi-mac, ...).
+#                       Accepts a comma-list to compose (e.g. composer,notif).
 #                       Run `scripts/dev-profiles/replay-cli.mjs --list` for names.
 #   --no-pair           skip enabling the host + minting + auto-pair.
 #   --simulator <name>  iOS simulator name (default "iPhone 17").
@@ -145,7 +145,7 @@ dev_setup__sanitize_bundle() {
 
 TAG_SLUG="$(dev_setup__sanitize_path "$TAG")"
 TAG_ID="$(dev_setup__sanitize_bundle "$TAG")"
-BUNDLE_ID="com.cmuxterm.app.debug.${TAG_ID}"
+BUNDLE_ID="com.comux.app.debug.${TAG_ID}"
 SOCKET_PATH="/tmp/cmux-debug-${TAG_SLUG}.sock"
 
 # --- enable the iOS pairing host (must precede the macOS launch) -------------

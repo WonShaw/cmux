@@ -303,13 +303,9 @@ extension CMUXCLI {
       select <workspace>      Make a workspace active
       status [set <lane|auto>]
                               Show or pin the workspace todo status
-      reconnect [workspace]   Reconnect a remote (SSH) workspace, including one
-                              whose automatic reconnect paused because the host
-                              was unreachable
-      disconnect [workspace]  Stop a remote (SSH) workspace's connection
       loading <on|off> [--id <name>] Toggle the workspace loading spinner.
       group <subcommand>      Workspace group operations (see cmux workspace-group --help)
-    env/reconnect/disconnect accept a positional handle or --workspace
+    env accepts a positional handle or --workspace
     <id|ref|index>, defaulting to the caller's workspace, then the
     selected one (of --window's window when given).
     Examples:
@@ -317,8 +313,6 @@ extension CMUXCLI {
       cmux workspace create --name Build --cwd ~/projects/myapp
       cmux workspace env workspace:3 --mask
       cmux workspace close workspace:3
-      cmux workspace reconnect
-      cmux workspace disconnect --workspace workspace:3
     """)
 
     static let workspaceStatusUsage = String(localized: "cli.workspace.status.usage", defaultValue: """

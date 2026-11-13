@@ -17,7 +17,7 @@ tail -f "$(cat /tmp/cmux-last-debug-log-path 2>/dev/null || echo /tmp/cmux-debug
 - `reload.sh` writes the current log path to `/tmp/cmux-last-debug-log-path` and the selected dev CLI path to `/tmp/cmux-last-cli-path`, and points `/tmp/cmux-cli` and `$HOME/.local/bin/cmux-dev` at that CLI.
 - Implementation: `Packages/macOS/CMUXDebugLog/Sources/CMUXDebugLog/DebugEventLog.swift`. App shim: `Sources/App/DebugLogging.swift`. Both are `#if DEBUG`, so every call site must be wrapped in `#if DEBUG` / `#endif`.
 - `cmuxDebugLog("message")` timestamps and appends in real time. A 500-entry ring buffer backs it; `CMUXDebugLog.DebugEventLog.shared.dump()` writes the full buffer to file.
-- Key events are logged in `AppDelegate.swift` (monitor, `performKeyEquivalent`); mouse/UI events inline in views (`ContentView`, `BrowserPanelView`).
+- Key events are logged in `AppDelegate.swift` (monitor, `performKeyEquivalent`); mouse/UI events inline in views (`ContentView`).
 - Stable event prefixes: `focus.panel`, `focus.bonsplit`, `focus.firstResponder`, `focus.moveFocus`, `tab.select`, `tab.close`, `tab.dragStart`, `tab.drop`, `pane.focus`, `pane.drop`, `divider.dragStart`.
 
 ## Debug menu

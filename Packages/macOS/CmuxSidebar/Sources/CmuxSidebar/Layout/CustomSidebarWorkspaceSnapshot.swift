@@ -23,23 +23,6 @@ public struct CustomSidebarWorkspaceSnapshot: Sendable, Equatable {
         }
     }
 
-    /// Remote-connection state projected to the `workspaces[i].remote` object.
-    public struct Remote: Sendable, Equatable {
-        /// The remote display target (`remote.target`).
-        public let target: String
-        /// The raw connection-state string (`remote.state`).
-        public let stateRawValue: String
-        /// Whether the workspace is currently connected (`remote.connected`).
-        public let isConnected: Bool
-
-        /// Creates a remote projection.
-        public init(target: String, stateRawValue: String, isConnected: Bool) {
-            self.target = target
-            self.stateRawValue = stateRawValue
-            self.isConnected = isConnected
-        }
-    }
-
     /// The containing workspace group's id (`workspaces[i].group`), or `nil`
     /// when the workspace is ungrouped.
     public let groupId: UUID?
@@ -72,9 +55,6 @@ public struct CustomSidebarWorkspaceSnapshot: Sendable, Equatable {
     /// Whether that branch is dirty (`workspaces[i].dirty`); only meaningful
     /// when ``gitBranch`` is non-nil.
     public let gitIsDirty: Bool
-    /// Pull-request value objects already projected in display order, mapped to
-    /// `workspaces[i].pr` (first) and `workspaces[i].prs` (all).
-    public let pullRequestValues: [SwiftValue]
     /// Progress projection; omitted when `nil` (`workspaces[i].progress`).
     public let progress: Progress?
     /// Latest conversation message; omitted when `nil`/empty
@@ -85,8 +65,6 @@ public struct CustomSidebarWorkspaceSnapshot: Sendable, Equatable {
     public let latestSubmittedMessage: String?
     /// Latest submission time; omitted when `nil` (`workspaces[i].latestAt`).
     public let latestSubmittedAt: Date?
-    /// Remote projection; omitted when `nil` (`workspaces[i].remote`).
-    public let remote: Remote?
     /// Coding-agent sessions hosted by this workspace's terminals, most
     /// recent first (`workspaces[i].agents`); the key is omitted when empty.
     public let agents: [CustomSidebarAgentSnapshot]
@@ -107,12 +85,10 @@ public struct CustomSidebarWorkspaceSnapshot: Sendable, Equatable {
         customColor: String?,
         gitBranch: String?,
         gitIsDirty: Bool,
-        pullRequestValues: [SwiftValue],
         progress: Progress?,
         latestConversationMessage: String?,
         latestSubmittedMessage: String?,
         latestSubmittedAt: Date?,
-        remote: Remote?,
         agents: [CustomSidebarAgentSnapshot] = [],
         groupId: UUID? = nil
     ) {
@@ -131,12 +107,10 @@ public struct CustomSidebarWorkspaceSnapshot: Sendable, Equatable {
         self.customColor = customColor
         self.gitBranch = gitBranch
         self.gitIsDirty = gitIsDirty
-        self.pullRequestValues = pullRequestValues
         self.progress = progress
         self.latestConversationMessage = latestConversationMessage
         self.latestSubmittedMessage = latestSubmittedMessage
         self.latestSubmittedAt = latestSubmittedAt
-        self.remote = remote
         self.agents = agents
     }
 }

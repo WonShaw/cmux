@@ -80,28 +80,6 @@ final class CommandPaletteSettingsToggleTests: XCTestCase {
         }
     }
 
-    func testInterceptTerminalOpenCommandReadsRawSettingWhenBrowserIsDisabled() throws {
-        try withTemporaryDefaults { defaults in
-            let descriptor = try XCTUnwrap(
-                CommandPaletteSettingsToggleCommands.descriptor(
-                    commandId: "palette.toggleSetting.interceptTerminalOpenCommandInCmuxBrowser"
-                )
-            )
-            defaults.set(true, forKey: BrowserAvailabilitySettings.disabledKey)
-            defaults.set(true, forKey: BrowserLinkOpenSettings.interceptTerminalOpenCommandInCmuxBrowserKey)
-
-            XCTAssertTrue(descriptor.isOn(defaults))
-
-            descriptor.toggle(defaults: defaults, notificationCenter: NotificationCenter())
-
-            XCTAssertEqual(
-                defaults.object(forKey: BrowserLinkOpenSettings.interceptTerminalOpenCommandInCmuxBrowserKey) as? Bool,
-                false
-            )
-            XCTAssertFalse(descriptor.isOn(defaults))
-        }
-    }
-
     func testOpenSupportedFilesCommandTogglesAndPostsChangeNotification() throws {
         try withTemporaryDefaults { defaults in
             let descriptor = try XCTUnwrap(
@@ -211,19 +189,6 @@ final class CommandPaletteSettingsToggleTests: XCTestCase {
         }
     }
 
-    func testConfigLinkAndFileOpeningSettingsHaveCommandPaletteToggles() throws {
-        XCTAssertNotNil(
-            CommandPaletteSettingsToggleCommands.descriptor(
-                commandId: "palette.toggleSetting.openTerminalLinksInCmuxBrowser"
-            )
-        )
-        XCTAssertNotNil(
-            CommandPaletteSettingsToggleCommands.descriptor(
-                commandId: "palette.toggleSetting.openSupportedFilesInCmux"
-            )
-        )
-    }
-
     func testSuppressSubagentNotificationsCommandTogglesDefaultAndReportsState() throws {
         try withTemporaryDefaults { defaults in
             let descriptor = try XCTUnwrap(
@@ -248,20 +213,6 @@ final class CommandPaletteSettingsToggleTests: XCTestCase {
         }
     }
 
-    func testOpenSidebarPortLinksCommandIsUnavailableWhenPortsAreHidden() throws {
-        try withTemporaryDefaults { defaults in
-            let descriptor = try XCTUnwrap(
-                CommandPaletteSettingsToggleCommands.descriptor(
-                    commandId: "palette.toggleSetting.openSidebarPortLinksInCmuxBrowser"
-                )
-            )
-
-            XCTAssertTrue(descriptor.isAvailable(defaults))
-            defaults.set(false, forKey: SidebarWorkspaceDetailDefaults.showPortsKey)
-            XCTAssertFalse(descriptor.isAvailable(defaults))
-        }
-    }
-
     func testWrapWorkspaceTitlesCommandTogglesDefaultAndReportsState() throws {
         try withTemporaryDefaults { defaults in
             let descriptor = try XCTUnwrap(
@@ -275,25 +226,6 @@ final class CommandPaletteSettingsToggleTests: XCTestCase {
 
             XCTAssertEqual(defaults.object(forKey: SidebarWorkspaceTitleWrapSettings.key) as? Bool, true)
             XCTAssertTrue(descriptor.isOn(defaults))
-        }
-    }
-
-    func testUnavailableCommandDoesNotToggleStoredValue() throws {
-        try withTemporaryDefaults { defaults in
-            let descriptor = try XCTUnwrap(
-                CommandPaletteSettingsToggleCommands.descriptor(
-                    commandId: "palette.toggleSetting.openSidebarPortLinksInCmuxBrowser"
-                )
-            )
-            defaults.set(false, forKey: BrowserLinkOpenSettings.openSidebarPortLinksInCmuxBrowserKey)
-            defaults.set(false, forKey: SidebarWorkspaceDetailDefaults.showPortsKey)
-
-            descriptor.toggle(defaults: defaults, notificationCenter: NotificationCenter())
-
-            XCTAssertEqual(
-                defaults.object(forKey: BrowserLinkOpenSettings.openSidebarPortLinksInCmuxBrowserKey) as? Bool,
-                false
-            )
         }
     }
 

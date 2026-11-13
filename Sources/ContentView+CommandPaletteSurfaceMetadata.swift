@@ -5,8 +5,6 @@ extension ContentView {
         switch panelType {
         case .terminal:
             return String(localized: "commandPalette.kind.terminal", defaultValue: "Terminal")
-        case .browser:
-            return String(localized: "commandPalette.kind.browser", defaultValue: "Browser")
         case .markdown:
             return String(localized: "commandPalette.kind.markdown", defaultValue: "Markdown")
         case .filePreview:
@@ -20,26 +18,16 @@ extension ContentView {
             return String(localized: "commandPalette.kind.agentSession", defaultValue: "Agent")
         case .project:
             return String(localized: "commandPalette.kind.project", defaultValue: "Project")
-        case .extensionBrowser:
-            return String(localized: "sidebar.extensions.browser.title", defaultValue: "Sidebar Extensions")
         case .workspaceTodo:
             return String(localized: "commandPalette.kind.workspaceTodo", defaultValue: "Todos")
         case .notifications:
             return String(localized: "notifications.title", defaultValue: "Notifications")
-        case .cloudVMLoading:
-            return String(localized: "commandPalette.kind.cloudVMLoading", defaultValue: "Cloud VM")
-        case .mobilePairing:
-            return String(localized: "command.mobileConnect.subtitle", defaultValue: "Tailscale")
-        case .accountSignIn:
-            return String(localized: "settings.section.account", defaultValue: "Account")
         }
     }
     func commandPaletteSurfaceKeywords(for panelType: PanelType) -> [String] {
         switch panelType {
         case .terminal:
             return ["terminal", "shell", "console"]
-        case .browser:
-            return ["browser", "web", "page"]
         case .markdown:
             return ["markdown", "note", "preview"]
         case .filePreview:
@@ -53,18 +41,10 @@ extension ContentView {
             return ["agent", "codex", "claude", "opencode", "react", "solid"]
         case .project:
             return ["project", "xcode", "build", "settings", "schemes", "targets"]
-        case .extensionBrowser:
-            return ["sidebar", "extensions", "extensionkit", "browser"]
         case .workspaceTodo:
             return ["todo", "todos", "checklist", "task", "status"]
         case .notifications:
             return ["notifications", "alerts", "feed"]
-        case .cloudVMLoading:
-            return ["cloud", "vm", "loading"]
-        case .mobilePairing:
-            return ContentView.commandPaletteMobileConnectKeywords
-        case .accountSignIn:
-            return ["account", "auth", "profile", "sign in"]
         }
     }
 }

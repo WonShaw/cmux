@@ -194,33 +194,13 @@ def test_bash_integration_does_not_emit_done_notifications() -> None:
                 bash.run(f"cd {repo_path}")
 
                 # The next prompts exercise the shell-state, port-kick, TTY,
-                # CWD, PR-action, and git-branch reporters.
+                # CWD, and git-branch reporters.
                 bash.run("gh pr merge 123")
                 bash.run(" true")
                 bash.run("cd ..")
                 bash.run("true")
                 bash.run("sleep 0.2")
                 bash.run("echo __CMUX_DONE_CHECK__")
-
-                sent_payloads = (
-                    send_log.read_text(encoding="utf-8")
-                    if send_log.exists()
-                    else ""
-                )
-                expected_payload = (
-                    'report_pr_action merge --tab=tab-test '
-                    '--panel=panel-test --target="123"'
-                )
-                payload_count = sent_payloads.splitlines().count(expected_payload)
-                if payload_count != 1:
-                    raise AssertionError(
-                        "bash integration did not emit exactly one PR action "
-                        "payload after the real gh preexec path.\n\n"
-                        f"Expected payload:\n{expected_payload}\n\n"
-                        f"Observed count: {payload_count}\n\n"
-                        f"Sent payloads:\n{sent_payloads}\n\n"
-                        f"Full PTY output:\n{bash.text}"
-                    )
 
                 done_lines = JOB_DONE_RE.findall(bash.text)
                 if done_lines:

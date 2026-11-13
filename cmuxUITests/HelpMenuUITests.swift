@@ -20,7 +20,7 @@ private func helpMenuPollUntil(
 private func helpMenuResetMenuBarOnlyDefault() {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-    process.arguments = ["write", "com.cmuxterm.app.debug", "menuBarOnly", "-bool", "false"]
+    process.arguments = ["write", "com.comux.app.debug", "menuBarOnly", "-bool", "false"]
     do {
         try process.run()
         process.waitUntilExit()
@@ -79,7 +79,6 @@ final class HelpMenuUITests: XCTestCase {
         XCTAssertTrue(app.menuItems["Skills"].waitForExistence(timeout: 2.0))
         XCTAssertTrue(app.menuItems["Agent Integrations"].waitForExistence(timeout: 2.0))
         XCTAssertTrue(app.menuItems["Changelog"].waitForExistence(timeout: 2.0))
-        XCTAssertTrue(app.menuItems["Send Feedback"].waitForExistence(timeout: 2.0))
         XCTAssertFalse(app.menuItems["Codex Integration"].exists)
 
         let keyboardShortcutsItem = requireElement(

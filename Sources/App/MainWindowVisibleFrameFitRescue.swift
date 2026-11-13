@@ -51,14 +51,6 @@ final class MainWindowVisibleFrameFitRescue {
                     "from={\(Self.rectDescription(originalFrame))} to={\(Self.rectDescription(targetFrame))}"
             )
 #endif
-            sentryBreadcrumb(
-                "mainWindow.visibleFrameFit.clamp",
-                category: "window",
-                data: [
-                    "from": Self.rectDescription(originalFrame),
-                    "to": Self.rectDescription(targetFrame),
-                ]
-            )
             window.setFrame(targetFrame, display: true)
             if window.frame != targetFrame {
                 fitCompleted = false

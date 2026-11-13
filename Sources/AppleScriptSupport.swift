@@ -579,15 +579,6 @@ final class ScriptTerminal: NSObject {
             return nil
         }
 
-        if workspace.remoteTmuxControlPane(surfaceID: terminalId) != nil {
-            // The scripting contract returns the newly created terminal, but
-            // tmux publishes that identity asynchronously. Fail before sending
-            // the split instead of returning a false or missing result.
-            command.scriptErrorNumber = errAEEventFailed
-            command.scriptErrorString = AppleScriptStrings.failedToCreateSplit
-            return nil
-        }
-
         guard let newPanelId = state.tabManager.newSplit(tabId: workspaceId, surfaceId: terminalId, direction: direction),
               workspace.scriptingTerminalPanel(for: newPanelId) != nil else {
             command.scriptErrorNumber = errAEEventFailed
@@ -627,19 +618,6 @@ final class ScriptTerminal: NSObject {
               terminal != nil else {
             command.scriptErrorNumber = errAEEventFailed
             command.scriptErrorString = AppleScriptStrings.terminalUnavailable
-            return nil
-        }
-
-        if let remotePane = workspace.remoteTmuxControlPane(surfaceID: terminalId) {
-            guard remotePane.requestKill() else {
-                command.scriptErrorNumber = errAEEventFailed
-                command.scriptErrorString = AppleScriptStrings.terminalUnavailable
-                return nil
-            }
-            AppDelegate.shared?.notificationStore?.clearNotifications(
-                forTabId: workspaceId,
-                surfaceId: terminalId
-            )
             return nil
         }
 

@@ -89,13 +89,6 @@ public struct CmuxSidebarHost {
         try await send(.createTerminalSurface(workspaceID: workspaceID))
     }
 
-    public func createBrowserSurface(
-        in workspaceID: UUID? = nil,
-        url: URL? = nil
-    ) async throws {
-        try await send(.createBrowserSurface(workspaceID: workspaceID, url: url?.absoluteString))
-    }
-
     public func selectSurface(workspaceID: UUID, surfaceID: UUID) async throws {
         try await send(.selectSurface(workspaceID: workspaceID, surfaceID: surfaceID))
     }
@@ -118,15 +111,6 @@ public struct CmuxSidebarHost {
         direction: CmuxSidebarSplitDirection
     ) async throws {
         try await send(.splitTerminal(workspaceID: workspaceID, surfaceID: surfaceID, direction: direction))
-    }
-
-    public func splitBrowser(
-        workspaceID: UUID,
-        surfaceID: UUID,
-        direction: CmuxSidebarSplitDirection,
-        url: URL? = nil
-    ) async throws {
-        try await send(.splitBrowser(workspaceID: workspaceID, surfaceID: surfaceID, direction: direction, url: url?.absoluteString))
     }
 
     public func toggleSurfaceZoom(workspaceID: UUID, surfaceID: UUID) async throws {

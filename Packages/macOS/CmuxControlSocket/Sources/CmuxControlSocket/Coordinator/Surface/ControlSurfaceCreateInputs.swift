@@ -3,8 +3,8 @@ public import Foundation
 /// The pre-parsed inputs for `surface.create`, lifted from the legacy
 /// `v2SurfaceCreate` body's param parsing.
 ///
-/// The coordinator parses the raw tokens; the app maps `typeRaw` → `PanelType`,
-/// `urlRaw` → `URL`, and (for agent sessions) the raw provider/renderer tokens →
+/// The coordinator parses the raw tokens; the app maps `typeRaw` → `PanelType`
+/// and (for agent sessions) the raw provider/renderer tokens →
 /// the app enums, returning the matching invalid resolution on a bad token. The
 /// agent-session option parsing happens only when the type is `agent-session`,
 /// exactly as the legacy body.
@@ -15,8 +15,6 @@ public struct ControlSurfaceCreateInputs: Sendable, Equatable {
     public let providerRaw: String?
     /// The raw `renderer_kind`/`renderer` token, or `nil` (defaults to react).
     public let rendererRaw: String?
-    /// The raw `url` string, or `nil`.
-    public let urlRaw: String?
     /// The trimmed-non-empty `working_directory`, or `nil`.
     public let workingDirectory: String?
     /// The trimmed-non-empty `initial_command`, or `nil`.
@@ -25,8 +23,6 @@ public struct ControlSurfaceCreateInputs: Sendable, Equatable {
     public let initialInput: String?
     /// The trimmed-non-empty `tmux_start_command`, or `nil`.
     public let tmuxStartCommand: String?
-    /// The trimmed-non-empty `remote_pty_session_id`, or `nil`.
-    public let remotePTYSessionID: String?
     /// The raw `remote_context` token (`inherit`/`local`/`cloud`), or `nil`.
     public let remoteContextRaw: String?
     /// The startup environment (`startup_environment`/`initial_env`), `[:]` if none.
@@ -45,12 +41,10 @@ public struct ControlSurfaceCreateInputs: Sendable, Equatable {
         typeRaw: String?,
         providerRaw: String?,
         rendererRaw: String?,
-        urlRaw: String?,
         workingDirectory: String?,
         initialCommand: String?,
         initialInput: String? = nil,
         tmuxStartCommand: String?,
-        remotePTYSessionID: String?,
         remoteContextRaw: String?,
         startupEnvironment: [String: String],
         requestedPaneID: UUID?,
@@ -60,12 +54,10 @@ public struct ControlSurfaceCreateInputs: Sendable, Equatable {
         self.typeRaw = typeRaw
         self.providerRaw = providerRaw
         self.rendererRaw = rendererRaw
-        self.urlRaw = urlRaw
         self.workingDirectory = workingDirectory
         self.initialCommand = initialCommand
         self.initialInput = initialInput
         self.tmuxStartCommand = tmuxStartCommand
-        self.remotePTYSessionID = remotePTYSessionID
         self.remoteContextRaw = remoteContextRaw
         self.startupEnvironment = startupEnvironment
         self.requestedPaneID = requestedPaneID

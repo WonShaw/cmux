@@ -20,19 +20,6 @@ extension TerminalSurface {
     /// The managed `COLORTERM` value exported to spawned shells.
     public static let managedColorTerm = "truecolor"
 
-    /// Spawn-time fallback for the app-managed Computer Use setting.
-    public static let computerUseAppEnabledEnvironmentKey = "CMUX_COMPUTER_USE_APP_ENABLED"
-
-    /// The live computer-use authority read by every generated agent shim.
-    public static func computerUseLiveSettingFileURL(homeDirectory: URL) -> URL {
-        homeDirectory
-            .appendingPathComponent("Library", isDirectory: true)
-            .appendingPathComponent("Application Support", isDirectory: true)
-            .appendingPathComponent("cmux", isDirectory: true)
-            .appendingPathComponent("cmux-cua", isDirectory: true)
-            .appendingPathComponent("enabled", isDirectory: false)
-    }
-
     private static let inheritedClaudeAuthSelectionEnvironmentKeys: Set<String> = [
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_MODEL",
@@ -79,14 +66,11 @@ extension TerminalSurface {
     /// Applies the sidebar git/PR watch flags and protects them.
     public static func applyManagedGitWatchEnvironment(
         watchGitStatusEnabled: Bool,
-        showPullRequestsEnabled: Bool = true,
         to environment: inout [String: String],
         protectedKeys: inout Set<String>
     ) {
         environment["CMUX_NO_GIT_WATCH"] = watchGitStatusEnabled ? "" : "1"
         protectedKeys.insert("CMUX_NO_GIT_WATCH")
-        environment["CMUX_NO_PR_WATCH"] = (watchGitStatusEnabled && showPullRequestsEnabled) ? "" : "1"
-        protectedKeys.insert("CMUX_NO_PR_WATCH")
     }
 
     /// Prepends `directory` to a `PATH`-style string exactly once.
@@ -209,7 +193,7 @@ extension TerminalSurface {
         if fileManager.fileExists(atPath: integrationDir, isDirectory: &isDirectory), isDirectory.boolValue {
             return true
         }
-        Logger(subsystem: "com.cmuxterm.app", category: "ghostty.initialization")
+        Logger(subsystem: "com.comux.app", category: "ghostty.initialization")
             .error("cmux shell-integration dir missing at \(integrationDir, privacy: .private); spawning shell without cmux shell integration so the user's shell config still loads")
         return false
     }
@@ -242,7 +226,7 @@ extension TerminalSurface {
         func bundledBootstrapIsReadable(_ relativePath: String) -> Bool {
             let path = (integrationDir as NSString).appendingPathComponent(relativePath)
             if FileManager.default.isReadableFile(atPath: path) { return true }
-            Logger(subsystem: "com.cmuxterm.app", category: "ghostty.initialization")
+            Logger(subsystem: "com.comux.app", category: "ghostty.initialization")
                 .error("cmux \(shellName, privacy: .public) bootstrap unreadable at \(path, privacy: .private); skipping cmux shell-startup redirection so the user's shell config still loads")
             return false
         }
@@ -274,7 +258,7 @@ extension TerminalSurface {
                     .joined(separator: "\n")
                 if !bootstrap.isEmpty { setManagedEnvironmentValue("PROMPT_COMMAND", bootstrap) }
             } catch {
-                Logger(subsystem: "com.cmuxterm.app", category: "ghostty.initialization")
+                Logger(subsystem: "com.comux.app", category: "ghostty.initialization")
                     .error("cmux bash bootstrap unreadable at \(bashBootstrapPath, privacy: .private): \(error.localizedDescription, privacy: .public); bash shell integration will not load")
             }
         case "fish":
@@ -293,7 +277,7 @@ extension TerminalSurface {
                 guard !payload.isEmpty else { return nil }
                 return managedNushellShellCommand(shell: shell, startupPayload: payload)
             } catch {
-                Logger(subsystem: "com.cmuxterm.app", category: "ghostty.initialization")
+                Logger(subsystem: "com.comux.app", category: "ghostty.initialization")
                     .error("cmux nushell bootstrap unreadable at \(bootstrapPath, privacy: .private): \(error.localizedDescription, privacy: .public); nushell shell integration will not load")
                 return nil
             }

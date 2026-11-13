@@ -934,16 +934,12 @@ struct CmuxSurfaceTabBarButton: Codable, Sendable, Hashable, Identifiable {
     }
 
     static let newTerminal = actionReference(CmuxSurfaceTabBarBuiltInAction.newTerminal.configID)
-    static let newBrowser = actionReference(CmuxSurfaceTabBarBuiltInAction.newBrowser.configID)
     static let newSimulator = actionReference(CmuxSurfaceTabBarBuiltInAction.newSimulator.configID)
     static let splitRight = actionReference(CmuxSurfaceTabBarBuiltInAction.splitRight.configID)
     static let splitDown = actionReference(CmuxSurfaceTabBarBuiltInAction.splitDown.configID)
 
-    static let mobileConnect = actionReference(CmuxSurfaceTabBarBuiltInAction.mobileConnect.configID)
-
     static let defaults: [CmuxSurfaceTabBarButton] = [
         .newTerminal,
-        .newBrowser,
         .splitRight,
         .splitDown
     ]
@@ -1146,19 +1142,27 @@ struct CmuxSurfaceTabBarButton: Codable, Sendable, Hashable, Identifiable {
         } else if let rawAgent {
             action = .agent(rawAgent, args: rawArgs)
         } else if let rawBuiltin {
-            guard let builtIn = CmuxSurfaceTabBarBuiltInAction(configID: rawBuiltin) else {
+            if let builtIn = CmuxSurfaceTabBarBuiltInAction(configID: rawBuiltin) {
+                action = .builtIn(builtIn)
+            } else if CmuxSurfaceTabBarBuiltInAction.isRemovedConfigID(rawBuiltin) {
+                // Removed built-in: decoded as a reference so the button is
+                // dropped when buttons are resolved, instead of failing the file.
+                action = .actionReference(rawBuiltin)
+            } else {
                 throw DecodingError.dataCorruptedError(
                     forKey: .builtin,
                     in: container,
                     debugDescription: "Unknown built-in surface tab bar action '\(rawBuiltin)'"
                 )
             }
-            action = .builtIn(builtIn)
         } else if let rawAction {
             action = .actionReference(rawAction)
         } else if let explicitId,
                   let builtIn = CmuxSurfaceTabBarBuiltInAction(configID: explicitId) {
             action = .builtIn(builtIn)
+        } else if let explicitId,
+                  CmuxSurfaceTabBarBuiltInAction.isRemovedConfigID(explicitId) {
+            action = .actionReference(explicitId)
         } else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
@@ -1595,7 +1599,14 @@ struct CmuxPaneDefinition: Codable, Sendable, Hashable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        surfaces = try container.decode([CmuxSurfaceDefinition].self, forKey: .surfaces)
+        // Older files may still list `browser` surfaces; those are skipped. A pane
+        // that only held browser surfaces falls back to a single terminal so the
+        // surrounding split layout stays valid.
+        let entries = try container.decode([CmuxLayoutSurfaceEntry].self, forKey: .surfaces)
+        surfaces = entries.compactMap(\.surface)
+        if surfaces.isEmpty, !entries.isEmpty {
+            surfaces = [CmuxSurfaceDefinition(type: .terminal)]
+        }
         if surfaces.isEmpty {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
@@ -1619,8 +1630,26 @@ struct CmuxSurfaceDefinition: Codable, Sendable, Hashable {
 
 enum CmuxSurfaceType: String, Codable, Sendable {
     case terminal
-    case browser
     case project
+}
+
+/// Decodes one layout surface, yielding `nil` for the removed `browser` surface
+/// type so cmux.json files written for older versions keep loading.
+private struct CmuxLayoutSurfaceEntry: Decodable {
+    let surface: CmuxSurfaceDefinition?
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if (try? container.decode(String.self, forKey: .type)) == "browser" {
+            surface = nil
+        } else {
+            surface = try CmuxSurfaceDefinition(from: decoder)
+        }
+    }
 }
 
 struct CmuxResolvedCommand: Sendable {
@@ -1683,15 +1712,12 @@ struct CmuxConfigIssue: Identifiable, Equatable, Sendable {
 @MainActor
 final class CmuxConfigStore: ObservableObject {
     /// Plus-menu rows when `ui.newWorkspace.contextMenu` is not configured.
-    /// Feature-gated rows (Cloud, browser) are filtered at menu-build time by
+    /// Feature-gated rows are filtered at menu-build time by
     /// `AppDelegate.isBuiltInActionAvailableInNewWorkspaceMenu` so a flag flip
     /// takes effect without a config reload.
     static let defaultNewWorkspaceContextMenu: [CmuxConfigContextMenuItem] = [
         .action(CmuxConfigContextMenuActionItem(action: CmuxSurfaceTabBarBuiltInAction.newWorkspace.configID)),
-        .action(CmuxConfigContextMenuActionItem(action: CmuxSurfaceTabBarBuiltInAction.newCloudWorkspace.configID)),
-        .action(CmuxConfigContextMenuActionItem(action: CmuxSurfaceTabBarBuiltInAction.newCloudMachine.configID)),
         .action(CmuxConfigContextMenuActionItem(action: CmuxSurfaceTabBarBuiltInAction.newTerminal.configID)),
-        .action(CmuxConfigContextMenuActionItem(action: CmuxSurfaceTabBarBuiltInAction.newBrowser.configID)),
     ]
 
     @Published private(set) var loadedCommands: [CmuxCommandDefinition] = []
@@ -2065,7 +2091,6 @@ final class CmuxConfigStore: ObservableObject {
             try $0.resolved(actions: resolvedActionLookup, codingPath: [])
         }) ?? [
             .builtIn(.newTerminal),
-            .builtIn(.newBrowser),
             .builtIn(.splitRight),
             .builtIn(.splitDown)
         ]
@@ -2333,6 +2358,12 @@ final class CmuxConfigStore: ObservableObject {
         resolvedButtons.reserveCapacity(buttons.count)
 
         for button in buttons {
+            if case .actionReference(let identifier) = button.action,
+               CmuxSurfaceTabBarBuiltInAction.isRemovedConfigID(identifier),
+               actions[identifier] == nil {
+                // The built-in browser was removed; ignore its button in older configs.
+                continue
+            }
             do {
                 let resolved = try resolvedSurfaceTabBarButton(button, actions: actions)
                 resolvedButtons.append(resolved.button)
@@ -2753,6 +2784,11 @@ final class CmuxConfigStore: ObservableObject {
                 resolvedItems.append(.separator(id: "\(settingName).separator.\(index)"))
             case .action(let item):
                 let resolvedActionID = canonicalActionID(item.action)
+                if actions[resolvedActionID] == nil,
+                   CmuxSurfaceTabBarBuiltInAction.isRemovedConfigID(item.action) {
+                    // The built-in browser was removed; ignore its row in older configs.
+                    continue
+                }
                 guard let action = actions[resolvedActionID] else {
                     let issue = CmuxConfigIssue(
                         kind: .newWorkspaceActionNotFound,

@@ -116,17 +116,14 @@ extension DockSplitStore {
         let kind = bonsplitController.tab(tabId)?.kind
             ?? Self.surfaceKind(for: panel)
         let icon = panel.displayIcon
-        let browser = panel as? BrowserPanel
-        let iconImageData = browser?.faviconPNGData
-        let isLoading = browser?.isLoading ?? false
+        let iconImageData: Data? = nil
+        let isLoading = false
         // The Dock has no cwd-report routing, so a preserved transfer's
         // directory is frozen at Dock-entry time and goes stale if the
         // terminal cds while docked. Prefer the live foreground process's
-        // actual cwd at detach time. Local panes only: a remote pane's
-        // foreground process is the local relay, not the remote shell.
+        // actual cwd at detach time.
         let liveTerminalDirectory: String?
-        if preservedTransfer?.isRemoteTerminal != true,
-           let terminal = panel as? TerminalPanel {
+        if let terminal = panel as? TerminalPanel {
             liveTerminalDirectory = terminalWorkingDirectoryResolver
                 .liveForegroundProcessWorkingDirectory(for: terminal)
         } else {
@@ -245,10 +242,6 @@ extension DockSplitStore {
 
         // Drop our ownership first: once the tab close fires `reconcilePanels`,
         // a still-tracked panel would be `panel.close()`d (killing the process).
-        if panel is BrowserPanel {
-            removeBrowserOpenTabSuggestion(panelId: panelId)
-        }
-        appLinkHandoffCoordinator.cancel(sourcePanelID: panelId)
         panelCancellables[panelId]?.cancel()
         panelCancellables.removeValue(forKey: panelId)
         (panel as? FilePreviewPanel)?.unbindTabMetadata()
@@ -295,9 +288,6 @@ extension DockSplitStore {
                 ?? preservedTransfer?.isPinned
                 ?? false,
             directory: detachedDirectory,
-            directoryIsTrustedRemoteReport: detachedDirectory != nil &&
-                detachedDirectory == preservedTransfer?.directory &&
-                preservedTransfer?.directoryIsTrustedRemoteReport == true,
             directoryDisplayLabel: detachedDirectory == preservedTransfer?.directory
                 ? preservedTransfer?.directoryDisplayLabel
                 : nil,
@@ -319,16 +309,7 @@ extension DockSplitStore {
             resumeBinding: resumeBinding,
             deferredAgentResumeRestore: deferredAgentResumeRestore,
             managedAgentResumeBinding: managedResumeBinding,
-            agentRuntime: agentProvenExited ? nil : cachedRuntime,
-            isRemoteTerminal: preservedTransfer?.isRemoteTerminal ?? false,
-            remoteTerminalSessionPhase: preservedTransfer?.remoteTerminalSessionPhase,
-            remoteTerminalAuthority: preservedTransfer?.remoteTerminalAuthority,
-            remoteTerminalLifecycleID: preservedTransfer?.remoteTerminalLifecycleID,
-            remoteTerminalAttemptID: preservedTransfer?.remoteTerminalAttemptID,
-            remoteRelayPort: preservedTransfer?.remoteRelayPort,
-            remoteRelayNamespaceConfiguration: preservedTransfer?.remoteRelayNamespaceConfiguration,
-            remotePTYSessionID: preservedTransfer?.remotePTYSessionID,
-            remoteCleanupConfiguration: preservedTransfer?.remoteCleanupConfiguration
+            agentRuntime: agentProvenExited ? nil : cachedRuntime
         )
         adoptManualUnreadState(false, panelId: panelId)
         clearSessionRestoreState(panelId: panelId)
@@ -349,10 +330,6 @@ extension DockSplitStore {
     private func bindDetachedPanelToDock(_ panel: any Panel) {
         if let terminal = panel as? TerminalPanel {
             terminal.updateWorkspaceId(workspaceId)
-        } else if let browser = panel as? BrowserPanel {
-            browser.updateWorkspaceId(workspaceId)
-        } else if let deferredBrowser = panel as? DeferredBrowserPanel {
-            deferredBrowser.updateWorkspaceId(workspaceId)
         } else if let filePreview = panel as? FilePreviewPanel {
             filePreview.updateWorkspaceId(
                 workspaceId,
@@ -403,7 +380,7 @@ extension DockSplitStore {
             isDirty: panel.isDirty,
             showsNotificationBadge: detached.manuallyUnread,
             isLoading: detached.isLoading,
-            isAudioMuted: resolvedAudioMuted(for: panel),
+            isAudioMuted: false,
             isPinned: detached.isPinned,
             inPane: paneId
         ) else {
@@ -419,9 +396,6 @@ extension DockSplitStore {
             detached.manuallyUnread,
             panelId: detached.panelId
         )
-        if let browser = panel as? BrowserPanel {
-            configureBrowserPanel(browser)
-        }
         AgentHibernationController.shared.transferTrackingStateForMovedPanel(
             panelId: detached.panelId,
             from: detached.sourceWorkspaceId,
@@ -488,7 +462,7 @@ extension DockSplitStore {
             isDirty: panel.isDirty,
             showsNotificationBadge: detached.manuallyUnread,
             isLoading: detached.isLoading,
-            isAudioMuted: resolvedAudioMuted(for: panel),
+            isAudioMuted: false,
             isPinned: detached.isPinned
         )
 
@@ -518,9 +492,6 @@ extension DockSplitStore {
             detached.manuallyUnread,
             panelId: detached.panelId
         )
-        if let browser = panel as? BrowserPanel {
-            configureBrowserPanel(browser)
-        }
         AgentHibernationController.shared.transferTrackingStateForMovedPanel(
             panelId: detached.panelId,
             from: detached.sourceWorkspaceId,
@@ -584,8 +555,6 @@ extension DockSplitStore {
         switch panel.panelType {
         case .terminal:
             return SurfaceKind.terminal.rawValue
-        case .browser:
-            return SurfaceKind.browser.rawValue
         case .filePreview:
             return SurfaceKind.filePreview.rawValue
         default:

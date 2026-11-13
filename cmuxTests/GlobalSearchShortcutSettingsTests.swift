@@ -41,7 +41,6 @@ extension GlobalSearchShortcutBehaviorTests {
         )
         #expect(KeyboardShortcutSettings.publicShortcutActions.contains(.globalSearch))
         #expect(KeyboardShortcutSettings.settingsVisibleActions.contains(.globalSearch))
-        #expect(KeyboardShortcutSettings.shortcut(for: .sendFeedback) == .unbound)
         #expect(
             KeyboardShortcutSettings.Action.globalSearch.normalizedRecordedShortcutResult(defaultShortcut) ==
                 .accepted(defaultShortcut)

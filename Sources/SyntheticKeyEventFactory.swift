@@ -1,6 +1,5 @@
 import AppKit
 import CoreGraphics
-import CmuxBrowser
 import Foundation
 
 struct SyntheticKeySpecification {
@@ -47,51 +46,6 @@ enum SyntheticKeyEventFactory {
             flags.insert(flag)
         }
         return specification(key: key, modifierFlags: flags)
-    }
-
-    /// Resolves the canonical browser automation key vocabulary into the
-    /// AppKit key specification used by the native WebKit input seam.
-    ///
-    /// Browser automation keys are expressed with W3C/Playwright names,
-    /// whereas the CGEvent factory uses macOS virtual-key names. Keeping this
-    /// conversion beside the existing factory makes mobile replay and socket
-    /// automation share one native mapping instead of maintaining two event
-    /// pipelines.
-    static func specification(forBrowserEvent event: BrowserKeyboardEvent) -> SyntheticKeySpecification? {
-        guard let nativeKey = event.nativeKey else { return nil }
-        return specification(forBrowserNativeKey: nativeKey)
-    }
-
-    /// Converts the browser package's platform-neutral descriptor into the
-    /// AppKit representation consumed by CGEvent construction.
-    static func specification(
-        forBrowserNativeKey key: BrowserKeyboardNativeKey,
-        additionalModifierFlags: NSEvent.ModifierFlags = []
-    ) -> SyntheticKeySpecification {
-        let flags = appKitModifierFlags(for: key.modifiers).union(additionalModifierFlags)
-
-        return SyntheticKeySpecification(
-            storedKey: key.charactersIgnoringModifiers ?? "",
-            keyCode: key.keyCode,
-            modifierFlags: flags,
-            characters: key.characters ?? "",
-            charactersIgnoringModifiers: key.charactersIgnoringModifiers ?? ""
-        )
-    }
-
-    /// Converts the browser package's modifier bitset into AppKit flags.
-    static func appKitModifierFlags(
-        for modifiers: BrowserKeyboardNativeModifiers
-    ) -> NSEvent.ModifierFlags {
-        var flags: NSEvent.ModifierFlags = []
-        if modifiers.contains(.shift) { flags.insert(.shift) }
-        if modifiers.contains(.control) { flags.insert(.control) }
-        if modifiers.contains(.option) { flags.insert(.option) }
-        if modifiers.contains(.command) { flags.insert(.command) }
-        if modifiers.contains(.numericPad) { flags.insert(.numericPad) }
-        if modifiers.contains(.capsLock) { flags.insert(.capsLock) }
-        if modifiers.contains(.function) { flags.insert(.function) }
-        return flags
     }
 
     static func specification(forASCIICharacter character: Character) -> SyntheticKeySpecification? {

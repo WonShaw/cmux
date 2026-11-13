@@ -21,8 +21,6 @@ public struct ControlWorkspaceSummary: Sendable, Equatable {
     public let isPinned: Bool
     /// The workspace's currently-listening ports, in app order.
     public let listeningPorts: [Int]
-    /// The bridged `remoteStatusPayload()` object.
-    public let remoteStatus: JSONValue
     /// The workspace's current working directory, if any.
     public let currentDirectory: String?
     /// The user-set custom color, if any.
@@ -43,7 +41,6 @@ public struct ControlWorkspaceSummary: Sendable, Equatable {
     ///   - customDescription: The user-set description, if any.
     ///   - isPinned: Whether the workspace is pinned.
     ///   - listeningPorts: The listening ports.
-    ///   - remoteStatus: The bridged `remoteStatusPayload()` object.
     ///   - currentDirectory: The current working directory, if any.
     ///   - customColor: The custom color, if any.
     ///   - latestConversationMessage: The latest conversation message, if any.
@@ -56,7 +53,6 @@ public struct ControlWorkspaceSummary: Sendable, Equatable {
         customDescription: String?,
         isPinned: Bool,
         listeningPorts: [Int],
-        remoteStatus: JSONValue,
         currentDirectory: String?,
         customColor: String?,
         latestConversationMessage: String?,
@@ -69,7 +65,6 @@ public struct ControlWorkspaceSummary: Sendable, Equatable {
         self.customDescription = customDescription
         self.isPinned = isPinned
         self.listeningPorts = listeningPorts
-        self.remoteStatus = remoteStatus
         self.currentDirectory = currentDirectory
         self.customColor = customColor
         self.latestConversationMessage = latestConversationMessage

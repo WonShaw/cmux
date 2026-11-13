@@ -229,7 +229,7 @@ struct CmuxTaskManagerListView: View {
         } else if rows.isEmpty && agentRows.isEmpty && aggregateRows.isEmpty && childMemoryRows.isEmpty {
             CmuxTaskManagerMessageView(
                 title: String(localized: "taskManager.empty.title", defaultValue: "No resource usage"),
-                detail: String(localized: "taskManager.empty.detail", defaultValue: "Open a workspace, terminal, or browser surface to see it here.")
+                detail: String(localized: "taskManager.empty.detail", defaultValue: "Open a workspace or terminal surface to see it here.")
             )
         } else {
             ScrollView {

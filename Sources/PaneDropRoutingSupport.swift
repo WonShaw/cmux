@@ -120,7 +120,6 @@ extension PaneDropRoutingHost {
 }
 
 extension WindowTerminalHostView: PaneDropRoutingHost {}
-extension WindowBrowserHostView: PaneDropRoutingHost {}
 
 enum PaneDropRouting {
     private static func fullPaneSize(for size: CGSize, topChromeHeight: CGFloat) -> CGSize {

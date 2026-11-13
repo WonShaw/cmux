@@ -6,8 +6,6 @@ extension ContentView {
         switch commandId {
         case "palette.newTerminalTab":
             return CmuxSurfaceTabBarBuiltInAction.newTerminal.configID
-        case "palette.newBrowserTab":
-            return CmuxSurfaceTabBarBuiltInAction.newBrowser.configID
         case "palette.newSimulatorPane":
             return CmuxSurfaceTabBarBuiltInAction.newSimulator.configID
         case "palette.newAgentChat":
@@ -27,8 +25,7 @@ extension ContentView {
             commandId: "palette.newAgentChat",
             title: { _ in String(localized: "command.newAgentChat.title", defaultValue: "New agent chat") },
             subtitle: { _ in String(localized: "command.newAgentChat.subtitle", defaultValue: "Agent Chat") },
-            keywords: ["create", "new", "agent", "chat", "browser", "codex", "claude"],
-            when: { !$0.bool(CommandPaletteContextKeys.browserDisabled) }
+            keywords: ["create", "new", "agent", "chat", "codex", "claude"]
         )]
     }
 

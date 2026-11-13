@@ -7,13 +7,13 @@ extension BuildFlavor {
     private static let releaseChannels: [BuildFlavor] = [.nightly, .rc]
 
     /// Detects a release channel from the bundle identifier first
-    /// (`com.cmuxterm.app.<channel>` or a tagged `com.cmuxterm.app.<channel>.<slug>`),
+    /// (`com.comux.app.<channel>` or a tagged `com.comux.app.<channel>.<slug>`),
     /// then from a channel token in any of the bundle names ("cmux NIGHTLY",
     /// "cmux RC"). Returns nil for stable and for identifiers that belong to
     /// no channel, so `detect` can fall through to `.stable`.
     static func releaseChannel(normalizedBundleIdentifier: String?, bundleNames: [String]) -> BuildFlavor? {
         for channel in releaseChannels {
-            let identifier = "com.cmuxterm.app.\(channel.rawValue)"
+            let identifier = "com.comux.app.\(channel.rawValue)"
             if normalizedBundleIdentifier == identifier
                 || normalizedBundleIdentifier?.hasPrefix("\(identifier).") == true {
                 return channel

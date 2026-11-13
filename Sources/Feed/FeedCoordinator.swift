@@ -1576,7 +1576,7 @@ private func makeFeedNotificationPolicyContext(
             ),
             effects: effects
         ),
-        hooks: context?.cmuxConfigStore?.notificationHooks(startingFrom: workspace?.isRemoteWorkspace == true ? nil : (normalizedFeedNotificationCWD(event.cwd) ?? workspace?.surfaceTabBarDirectory)) ?? [],
+        hooks: context?.cmuxConfigStore?.notificationHooks(startingFrom: normalizedFeedNotificationCWD(event.cwd) ?? workspace?.surfaceTabBarDirectory) ?? [],
         globalConfigPath: context?.cmuxConfigStore?.globalConfigPath
     )
 }

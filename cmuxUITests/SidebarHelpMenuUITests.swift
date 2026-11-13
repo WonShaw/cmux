@@ -23,106 +23,6 @@ final class SidebarHelpMenuUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testHelpMenuCheckForUpdatesTriggersSidebarUpdatePill() {
-        let app = XCUIApplication.cmuxTestApplication()
-        app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
-        app.launchEnvironment["CMUX_UI_TEST_FEED_URL"] = "https://cmux.test/appcast.xml"
-        app.launchEnvironment["CMUX_UI_TEST_FEED_MODE"] = "available"
-        app.launchEnvironment["CMUX_UI_TEST_UPDATE_VERSION"] = "9.9.9"
-        app.launchEnvironment["CMUX_UI_TEST_AUTO_ALLOW_PERMISSION"] = "1"
-        launchAndActivate(app)
-
-        XCTAssertTrue(waitForWindowCount(atLeast: 1, app: app, timeout: 6.0))
-
-        let helpButton = requireElement(
-            candidates: helpButtonCandidates(in: app),
-            timeout: 6.0,
-            description: "sidebar help button"
-        )
-        helpButton.click()
-
-        let checkForUpdatesItem = requireElement(
-            candidates: helpMenuItemCandidates(in: app, identifier: "SidebarHelpMenuOptionCheckForUpdates", title: "Check for Updates"),
-            timeout: 3.0,
-            description: "Check for Updates help menu item"
-        )
-        checkForUpdatesItem.click()
-
-        let updatePill = app.buttons["UpdatePill"]
-        XCTAssertTrue(updatePill.waitForExistence(timeout: 6.0))
-        XCTAssertEqual(updatePill.label, "Update Available: 9.9.9")
-    }
-
-    func testHelpMenuSendFeedbackOpensComposerSheet() {
-        let app = XCUIApplication.cmuxTestApplication()
-        app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
-        launchAndActivate(app)
-
-        XCTAssertTrue(waitForWindowCount(atLeast: 1, app: app, timeout: 6.0))
-
-        let helpButton = requireElement(
-            candidates: helpButtonCandidates(in: app),
-            timeout: 6.0,
-            description: "sidebar help button"
-        )
-        helpButton.click()
-
-        let sendFeedbackItem = requireElement(
-            candidates: helpMenuItemCandidates(in: app, identifier: "SidebarHelpMenuOptionSendFeedback", title: "Send Feedback"),
-            timeout: 3.0,
-            description: "Send Feedback help menu item"
-        )
-        sendFeedbackItem.click()
-
-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
-        XCTAssertTrue(
-            firstExistingElement(
-                candidates: [
-                    app.textFields["SidebarFeedbackEmailField"],
-                    app.textFields["Your Email"],
-                ],
-                timeout: 2.0
-            ) != nil
-        )
-        XCTAssertTrue(
-            firstExistingElement(
-                candidates: [
-                    app.buttons["SidebarFeedbackAttachButton"],
-                    app.buttons["Attach Images"],
-                ],
-                timeout: 2.0
-            ) != nil
-        )
-        XCTAssertTrue(
-            firstExistingElement(
-                candidates: [
-                    app.buttons["SidebarFeedbackSendButton"],
-                    app.buttons["Send"],
-                ],
-                timeout: 2.0
-            ) != nil
-        )
-        XCTAssertTrue(
-            app.staticTexts[
-                "A human will read this! You can also reach us at founders@manaflow.com."
-            ].waitForExistence(timeout: 2.0)
-        )
-
-        let messageEditor = requireElement(
-            candidates: [
-                app.textViews["SidebarFeedbackMessageEditor"],
-                app.scrollViews["SidebarFeedbackMessageEditor"],
-                app.otherElements["SidebarFeedbackMessageEditor"],
-                app.textViews["Message"],
-            ],
-            timeout: 2.0,
-            description: "feedback message editor"
-        )
-        messageEditor.click()
-        app.typeText("hello")
-        XCTAssertTrue(app.staticTexts["5/4000"].waitForExistence(timeout: 2.0))
-    }
-
     private func waitForWindowCount(atLeast count: Int, app: XCUIApplication, timeout: TimeInterval) -> Bool {
         sidebarHelpPollUntil(timeout: timeout) {
             app.windows.count >= count
@@ -213,84 +113,9 @@ final class SidebarHelpMenuUITests: XCTestCase {
     }
 }
 
-final class FeedbackComposerShortcutUITests: XCTestCase {
-    override func setUp() {
-        super.setUp()
-        continueAfterFailure = false
-    }
-
-    func testCmdOptionFOpensFeedbackComposer() {
-        let app = XCUIApplication.cmuxTestApplication()
-        app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
-        app.launch()
-        app.activate()
-
-        XCTAssertTrue(
-            sidebarHelpPollUntil(timeout: 6.0) {
-                app.windows.count >= 1
-            }
-        )
-
-        app.typeKey("f", modifierFlags: [.command, .option])
-
-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
-        XCTAssertTrue(
-            app.textFields["SidebarFeedbackEmailField"].waitForExistence(timeout: 2.0)
-                || app.textFields["Your Email"].waitForExistence(timeout: 2.0)
-        )
-    }
-
-    func testCmdOptionFWorksWithHiddenSidebar() {
-        let app = XCUIApplication.cmuxTestApplication()
-        app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
-        app.launch()
-        app.activate()
-
-        XCTAssertTrue(
-            sidebarHelpPollUntil(timeout: 6.0) {
-                app.windows.count >= 1
-            }
-        )
-
-        app.typeKey("b", modifierFlags: [.command])
-
-        XCTAssertTrue(
-            sidebarHelpPollUntil(timeout: 3.0) {
-                !app.buttons["SidebarHelpMenuButton"].exists && !app.buttons["Help"].exists
-            }
-        )
-
-        app.typeKey("f", modifierFlags: [.command, .option])
-
-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
-    }
-
-    func testCmdOptionFWorksFromSettingsWindow() {
-        let app = XCUIApplication.cmuxTestApplication()
-        app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
-        app.launchEnvironment["CMUX_UI_TEST_SHOW_SETTINGS"] = "1"
-        app.launch()
-        app.activate()
-
-        XCTAssertTrue(
-            sidebarHelpPollUntil(timeout: 6.0) {
-                app.windows.count >= 2
-            }
-        )
-
-        app.typeKey("f", modifierFlags: [.command, .option])
-
-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
-        XCTAssertTrue(
-            app.textFields["SidebarFeedbackEmailField"].waitForExistence(timeout: 2.0)
-                || app.textFields["Your Email"].waitForExistence(timeout: 2.0)
-        )
-    }
-}
-
 final class CommandPaletteAllSurfacesUITests: XCTestCase {
     private var socketPath = ""
-    private let debugDefaultsDomain = "com.cmuxterm.app.debug"
+    private let debugDefaultsDomain = "com.comux.app.debug"
     private let hiddenSurfaceToken = "cmux-command-palette-hidden-surface"
     private let visibleSurfaceToken = "cmux-command-palette-visible-surface"
     private let noMatchWorkspaceQuery = "cmux-command-palette-no-match"
@@ -402,39 +227,6 @@ final class CommandPaletteAllSurfacesUITests: XCTestCase {
             },
             "Expected the stale command row to disappear after deleting the command prefix. snapshot=\(switcherSnapshot)"
         )
-    }
-
-    func testCmdShiftPCheckQueryPrefersCheckForUpdatesBeforeAttemptUpdate() throws {
-        let app = XCUIApplication.cmuxTestApplication()
-        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
-        app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
-        launchAndActivate(app)
-
-        XCTAssertTrue(
-            sidebarHelpPollUntil(timeout: 8.0) {
-                app.windows.count >= 1
-            },
-            "Expected the main window to be visible"
-        )
-
-        openCommandPaletteCommands(app: app)
-        let searchField = app.textFields["CommandPaletteSearchField"]
-        searchField.typeText("check")
-
-        let row0 = app.descendants(matching: .any).matching(identifier: "CommandPaletteResultRow.0").firstMatch
-        let row1 = app.descendants(matching: .any).matching(identifier: "CommandPaletteResultRow.1").firstMatch
-
-        XCTAssertTrue(
-            sidebarHelpPollUntil(timeout: 5.0) {
-                row0.exists &&
-                    row1.exists &&
-                    (row0.value as? String) == "palette.checkForUpdates" &&
-                    (row1.value as? String) == "palette.attemptUpdate"
-            },
-            "Expected the check query to rank Check for Updates before Attempt Update. row0=\(String(describing: row0.value)) row1=\(String(describing: row1.value))"
-        )
-        XCTAssertEqual(row0.value as? String, "palette.checkForUpdates")
-        XCTAssertEqual(row1.value as? String, "palette.attemptUpdate")
     }
 
     func testCmdPSearchCanIncludeSurfacesFromOtherWorkspacesWhenEnabled() throws {

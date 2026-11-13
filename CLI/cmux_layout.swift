@@ -149,7 +149,7 @@ extension CMUXCLI {
         if let cwdOpt { params["cwd"] = resolvePath(cwdOpt) }
         try applyFocusOption(focusOpt, defaultValue: false, to: &params)
         let payload = try client.sendV2(method: "layout.open", params: params)
-        printV2Payload(payload, jsonOutput: jsonOutput, idFormat: idFormat, fallbackText: v2CreationSummary(payload, idFormat: idFormat, kinds: ["workspace"]))
+        printV2Payload(payload, jsonOutput: jsonOutput, idFormat: idFormat, fallbackText: v2OKSummary(payload, idFormat: idFormat, kinds: ["workspace"]))
     }
 
     private func runLayoutDelete(

@@ -22,22 +22,6 @@ MIN_BUILD="$CURRENT_BUILD"
 
 echo "Current: MARKETING_VERSION=$CURRENT_MARKETING, CURRENT_PROJECT_VERSION=$CURRENT_BUILD"
 
-# Keep Sparkle build numbers monotonic with the latest published stable appcast.
-# If local build numbers have fallen behind due merges/rebases, auto-correct upward.
-LATEST_RELEASE_BUILD="$(
-  curl -fsSL --max-time 8 https://github.com/manaflow-ai/cmux/releases/latest/download/appcast.xml 2>/dev/null \
-    | sed -n 's#.*<sparkle:version>\([0-9][0-9]*\)</sparkle:version>.*#\1#p' \
-    | head -n1
-)"
-if [[ "$LATEST_RELEASE_BUILD" =~ ^[0-9]+$ ]]; then
-  if (( LATEST_RELEASE_BUILD > MIN_BUILD )); then
-    MIN_BUILD="$LATEST_RELEASE_BUILD"
-  fi
-  echo "Latest release appcast build: $LATEST_RELEASE_BUILD"
-else
-  echo "Latest release appcast build: unavailable (continuing with local build baseline)"
-fi
-
 # Parse current marketing version
 IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_MARKETING"
 

@@ -17,9 +17,6 @@ struct SidebarTabItemSettingsSnapshot: Equatable {
     let branchDirectory: SidebarWorkspaceBranchDirectorySettings
     let details: SidebarWorkspaceDetailSettings
     let showsGitBranchIcon: Bool
-    let makesPullRequestsClickable: Bool
-    let openPullRequestLinksInCmuxBrowser: Bool
-    let openPortLinksInCmuxBrowser: Bool
     let showsNotificationMessage: Bool
     let notificationMessageLineLimit: Int
     let activeTabIndicatorStyle: WorkspaceIndicatorStyle
@@ -32,7 +29,6 @@ struct SidebarTabItemSettingsSnapshot: Equatable {
     let workspaceTodoChecklistStyle: WorkspaceTodoChecklistStyle
 
     var usesLastSegmentPath: Bool { branchDirectory.usesLastSegmentPath }
-    var showsSSH: Bool { details.showSSH }
 
     init(
         defaults: UserDefaults = .standard,
@@ -51,13 +47,6 @@ struct SidebarTabItemSettingsSnapshot: Equatable {
         sidebarFontScale = SidebarTabItemFontScale.scale(for: sidebarFontSize)
         showsGitBranch = Self.bool(defaults: defaults, key: "sidebarShowGitBranch", defaultValue: true)
         showsGitBranchIcon = Self.bool(defaults: defaults, key: "sidebarShowGitBranchIcon", defaultValue: false)
-        makesPullRequestsClickable = settings.value(for: sidebar.makePullRequestsClickable)
-        openPullRequestLinksInCmuxBrowser = BrowserLinkOpenSettings.openSidebarPullRequestLinksInCmuxBrowser(
-            defaults: defaults
-        )
-        openPortLinksInCmuxBrowser = BrowserLinkOpenSettings.openSidebarPortLinksInCmuxBrowser(
-            defaults: defaults
-        )
         hidesAllDetails = settings.value(for: sidebar.hideAllDetails)
         wrapsWorkspaceTitles = settings.value(for: sidebar.wrapWorkspaceTitles)
         let detailVisibility = SidebarWorkspaceDetailVisibility(
@@ -79,7 +68,6 @@ struct SidebarTabItemSettingsSnapshot: Equatable {
             showLog: details.showLog,
             showProgress: details.showProgress,
             showBranchDirectory: details.showBranchDirectory,
-            showPullRequests: details.showPullRequests,
             showPorts: details.showPorts,
             hideAllDetails: hidesAllDetails
         )

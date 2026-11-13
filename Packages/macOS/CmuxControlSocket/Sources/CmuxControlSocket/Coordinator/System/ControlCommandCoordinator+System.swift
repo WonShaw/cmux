@@ -1,7 +1,7 @@
 internal import Foundation
 
 /// The system/misc domain (`system.identify`, `system.tree`, `auth.login`,
-/// `session.restore_previous`, `settings.open`, `feedback.open`,
+/// `session.restore_previous`, `settings.open`,
 /// `extension.sidebar.snapshot`, `workspace.action`, `surface.action` /
 /// `tab.action`, `surface.drag_to_split` / `surface.split_off`, and the
 /// DEBUG-only `mobile.dev_stack_auth.configure`), lifted byte-faithfully from
@@ -32,8 +32,6 @@ extension ControlCommandCoordinator {
             return sessionRestorePrevious()
         case "settings.open":
             return settingsOpen(request.params)
-        case "feedback.open":
-            return feedbackOpen(request.params)
         case "extension.sidebar.snapshot":
             return extensionSidebarSnapshot(request.params)
         case "workspace.action":
@@ -42,10 +40,6 @@ extension ControlCommandCoordinator {
             return tabAction(request.params)
         case "surface.drag_to_split", "surface.split_off":
             return surfaceSplitOff(request.params)
-#if DEBUG
-        case "mobile.dev_stack_auth.configure":
-            return mobileDevStackAuthConfigure(request.params)
-#endif
         default:
             return nil
         }
@@ -352,8 +346,8 @@ extension ControlCommandCoordinator {
         return .object(item)
     }
 
-    /// The `system.tree` surface node payload (browser surfaces emit their URL
-    /// string — empty when absent — and non-browsers emit JSON `null`).
+    /// The `system.tree` surface node payload (`url` is always JSON `null`; the
+    /// key is kept for wire compatibility).
     private nonisolated func systemTreeSurfacePayload(
         _ node: ControlSystemTreeSurfaceNode,
         refs: SystemTreeSurfaceRefs
@@ -373,7 +367,7 @@ extension ControlCommandCoordinator {
             "tty": orNull(node.tty),
             "render_health": orNull(node.renderHealthRawValue),
         ]
-        item["url"] = node.isBrowser ? .string(node.url ?? "") : .null
+        item["url"] = .null
         if let dockScope = node.dockScopeRawValue {
             item["dock_scope"] = .string(dockScope)
         }

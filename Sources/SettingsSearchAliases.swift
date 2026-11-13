@@ -3,8 +3,6 @@ import Foundation
 enum SettingsSearchAliasIndex {
     static func sectionAliases(for target: SettingsNavigationTarget) -> String {
         switch target {
-        case .account:
-            return localized("settings.search.alias.section.account", defaultValue: "auth authentication login logout sign in sign out email user profile team")
         case .app:
             return localized("settings.search.alias.section.app", defaultValue: "general preferences prefs behavior chrome dock menubar menu bar status notifications telemetry")
         case .terminal:
@@ -13,12 +11,6 @@ enum SettingsSearchAliasIndex {
             return localized("settings.search.alias.section.textBox", defaultValue: "textbox text box rich input prompt beta focus composer compose attachments")
         case .sleepyMode:
             return localized("settings.search.alias.section.sleepyMode", defaultValue: "sleepy mode screensaver caffeinate keep awake do not sleep lock touch id battery wifi clock mascot theme glow pixel night")
-        case .mobile:
-            return localized("settings.search.alias.section.mobile", defaultValue: "ios iphone ipad mobile pairing local network permission sync")
-        case .cloudMachines:
-            return localized("settings.search.alias.section.cloudMachines", defaultValue: "cloud machines vm virtual machine persistent computer sandbox plan upgrade fleet freestyle")
-        case .networking:
-            return localized("settings.search.alias.section.networking", defaultValue: "iroh relay relays server fleet provider region custom self hosted private network tailscale vpn direct peer")
         case .sidebarAppearance:
             return localized("settings.search.alias.section.sidebarAppearance", defaultValue: "sidebar left rail navigation details branches badges material terminal background")
         case .customSidebars:
@@ -27,12 +19,6 @@ enum SettingsSearchAliasIndex {
             return localized("settings.search.alias.section.betaFeatures", defaultValue: "beta experimental unstable preview feed dock right sidebar")
         case .automation:
             return localized("settings.search.alias.section.automation", defaultValue: "api cli control socket mcp agents hooks ports")
-        case .computerUse:
-            return localized("settings.search.alias.section.computerUse", defaultValue: "computer use cua accessibility screen capture recording permissions cursor mcp agents menu bar onboarding")
-        case .browser:
-            return localized("settings.search.alias.section.browser", defaultValue: "web webview address bar omnibar links urls embedded default browser")
-        case .browserImport:
-            return localized("settings.search.alias.section.browserImport", defaultValue: "chrome safari firefox brave edge arc bookmarks history cookies profiles")
         case .globalHotkey:
             return localized("settings.search.alias.section.globalHotkey", defaultValue: "system shortcut global keyboard show hide bring forward")
         case .keyboardShortcuts:
@@ -55,7 +41,6 @@ enum SettingsSearchAliasIndex {
     }
 
     private static let settingAliases: [String: String] = [
-        "account:account": localized("settings.search.alias.setting.account.account", defaultValue: "auth authentication login logout signin sign-in signout sign-out email user profile stack team"),
         "app:language": localized("settings.search.alias.setting.app.language", defaultValue: "app.language locale l10n localization translation japanese english ja en nihongo restart"),
         "app:appearance": localized("settings.search.alias.setting.app.appearance", defaultValue: "app.appearance theme color scheme light mode dark mode system mode"),
         "app:app-icon": localized("settings.search.alias.setting.app.app-icon", defaultValue: "app.appIcon dock icon application icon app switcher alternate icon"),
@@ -92,7 +77,6 @@ enum SettingsSearchAliasIndex {
         "app:notification-sound": localized("settings.search.alias.setting.app.notification-sound", defaultValue: "notifications.sound notifications.customSoundFilePath sound audio alert chime beep custom file wav mp3 caf aiff"),
         "app:notification-sound-overrides": localized("settings.search.alias.setting.app.notification-sound-overrides", defaultValue: "notifications.soundOverrides per-agent agent sound turn done needs input permission error stalled custom file"),
         "app:notification-command": localized("settings.search.alias.setting.app.notification-command", defaultValue: "notifications.command shell command hook script env environment variable variables done agent"),
-        "app:telemetry": localized("settings.search.alias.setting.app.telemetry", defaultValue: "app.sendAnonymousTelemetry analytics crash reports sentry posthog usage anonymous privacy"),
         "app:warn-before-quit": localized("settings.search.alias.setting.app.warn-before-quit", defaultValue: "app.warnBeforeQuit quit confirmation command-q cmd-q exit close app"),
         "app:warn-before-closing-tab": localized("settings.search.alias.setting.app.warn-before-closing-tab", defaultValue: "app.warnBeforeClosingTab close tab confirmation command-w cmd-w terminal surface"),
         "app:warn-before-closing-tab-x-button": localized(
@@ -130,12 +114,7 @@ enum SettingsSearchAliasIndex {
         "sidebarAppearance:path-last-segment-only": localized("settings.search.alias.setting.app.path-last-segment-only", defaultValue: "sidebar.pathLastSegmentOnly cwd path directory last segment basename short truncate folder repo"),
         "sidebarAppearance:show-notification-message": localized("settings.search.alias.setting.app.show-notification-message", defaultValue: "sidebar.showNotificationMessage latest message unread notification text sidebar"),
         "sidebarAppearance:show-branch-directory": localized("settings.search.alias.setting.app.show-branch-directory", defaultValue: "sidebar.showBranchDirectory git branch cwd path directory folder repo sidebar"),
-        "sidebarAppearance:show-pull-requests": localized("settings.search.alias.setting.app.show-pull-requests", defaultValue: "sidebar.showPullRequests pr mr review github gitlab bitbucket pull request merge request"),
         "sidebarAppearance:watch-git-status": localized("settings.search.alias.setting.app.watch-git-status", defaultValue: "sidebar.watchGitStatus git status branch watcher index lock"),
-        "sidebarAppearance:make-pr-clickable": localized("settings.search.alias.setting.sidebarAppearance.make-pr-clickable", defaultValue: "sidebar.makePullRequestsClickable clickable pull requests pr mr reviews links select workspace row"),
-        "sidebarAppearance:open-pr-links": localized("settings.search.alias.setting.app.open-pr-links", defaultValue: "sidebar.openPullRequestLinksInCmuxBrowser pr links github browser default external embedded"),
-        "sidebarAppearance:open-port-links": localized("settings.search.alias.setting.app.open-port-links", defaultValue: "sidebar.openPortLinksInCmuxBrowser ports localhost links browser default external embedded"),
-        "sidebarAppearance:show-ssh": localized("settings.search.alias.setting.app.show-ssh", defaultValue: "sidebar.showSSH remote host target ssh server"),
         "sidebarAppearance:show-ports": localized("settings.search.alias.setting.app.show-ports", defaultValue: "sidebar.showPorts localhost port listener dev server url"),
         "sidebarAppearance:show-log": localized("settings.search.alias.setting.app.show-log", defaultValue: "sidebar.showLog log status latest message imperative"),
         "sidebarAppearance:show-progress": localized("settings.search.alias.setting.app.show-progress", defaultValue: "sidebar.showProgress progress bar percent status set_progress"),
@@ -146,16 +125,6 @@ enum SettingsSearchAliasIndex {
         "sidebarAppearance:right-max-width": localized("settings.search.alias.setting.sidebarAppearance.right-max-width", defaultValue: "sidebar.rightMaxWidth dock right sidebar max width terminal reservation cap logs lazygit"),
         "betaFeatures:feed": localized("settings.search.alias.setting.betaFeatures.feed", defaultValue: "feed right sidebar agent decisions permissions questions approval beta unstable"),
         "betaFeatures:dock": localized("settings.search.alias.setting.betaFeatures.dock", defaultValue: "dock right sidebar terminal controls tui beta unstable"),
-        "mobile:iOSPairingHost": localized("settings.search.alias.setting.mobile.iOSPairingHost", defaultValue: "ios iphone ipad mobile pairing local network permission sync"),
-        "mobile:iOSPairingPort": localized("settings.search.alias.setting.mobile.iOSPairingPort", defaultValue: "mobile ios iphone pairing port tcp listener firewall conflict bind"),
-        "mobile:iOSPairingDisplayName": localized("settings.search.alias.setting.mobile.iOSPairingDisplayName", defaultValue: "mobile ios iphone pairing display name mac hostname device label"),
-        "mobile:artifactFolderAccess": localized("settings.search.alias.setting.mobile.artifactFolderAccess", defaultValue: "mobile ios iphone files folders directory subtree one level authorization security"),
-        "networking:relayPreference": localized("settings.search.alias.setting.networking.relayPreference", defaultValue: "iroh relay preference automatic managed selected cmux fleet provider region account"),
-        "networking:customRelays": localized("settings.search.alias.setting.networking.customRelays", defaultValue: "iroh custom relay self hosted server url secret credential device authentication"),
-        "networking:privateNetworks": localized("settings.search.alias.setting.networking.privateNetworks", defaultValue: "private network lan vpn direct peer path local address generic provider automatic"),
-        "networking:tailscaleCompatibility": localized("settings.search.alias.setting.networking.tailscaleCompatibility", defaultValue: "tailscale tailnet private ip compatibility vpn legacy tcp automatic"),
-        "networking:status": localized("settings.search.alias.setting.networking.status", defaultValue: "iroh status diagnostics direct peer relay degraded active inactive refresh"),
-        "networking:policy": localized("settings.search.alias.setting.networking.policy", defaultValue: "relay policy signed verified catalog cached server expiry sequence security"),
         "automation:socket-mode": localized("settings.search.alias.setting.automation.socket-mode", defaultValue: "automation.socketControlMode api socket unix domain control server auth allow password disabled"),
         "automation:socket-password": localized("settings.search.alias.setting.automation.socket-password", defaultValue: "automation.socketPassword auth token credential secret password access key"),
         "automation:claude-code": localized("settings.search.alias.setting.automation.claude-code", defaultValue: "automation.claudeCodeIntegration claude code hooks agent integration status notifications"),
@@ -169,26 +138,6 @@ enum SettingsSearchAliasIndex {
         "automation:kiro-notification-level": localized("settings.search.alias.setting.automation.kiro-notification-level", defaultValue: "automation.kiroNotificationLevel kiro cli notification verbosity minimal standard verbose tool events"),
         "automation:port-base": localized("settings.search.alias.setting.automation.port-base", defaultValue: "automation.portBase cmux_port start first base env environment variable"),
         "automation:port-range": localized("settings.search.alias.setting.automation.port-range", defaultValue: "automation.portRange cmux_port_end range size count env ports"),
-        "computerUse:enabled": localized("settings.search.alias.setting.computerUse.enabled", defaultValue: "computerUse.enabled enable disable computer use cua mcp agent sessions"),
-        "computerUse:permissions": localized("settings.search.alias.setting.computerUse.permissions", defaultValue: "accessibility screen recording capture permissions privacy system settings grant"),
-        "computerUse:show-in-menu-bar": localized("settings.search.alias.setting.computerUse.showInMenuBar", defaultValue: "computerUse.showInMenuBar menu bar menubar status item cursor agents"),
-        "browser:enable-browser": localized("settings.search.alias.setting.browser.enable-browser", defaultValue: "browser.enabled enable disable webview embedded browser tabs links"),
-        "browser:search-engine": localized("settings.search.alias.setting.browser.search-engine", defaultValue: "browser.defaultSearchEngine browser.customSearchEngineName browser.customSearchEngineURLTemplate omnibar address bar google duckduckgo bing kagi brave startpage perplexity exa yahoo ecosia qwant mojeek wikipedia github baidu yandex custom search provider"),
-        "browser:search-suggestions": localized("settings.search.alias.setting.browser.search-suggestions", defaultValue: "browser.showSearchSuggestions suggest autocomplete address bar search suggestions"),
-        "browser:theme": localized("settings.search.alias.setting.browser.theme", defaultValue: "browser.theme web page theme color scheme light dark system"),
-        "browser:hidden-webview-discard": localized("settings.search.alias.setting.browser.hidden-webview-discard", defaultValue: "browser.discardHiddenWebViews memory hidden tabs webview discard unload reclaim"),
-        "browser:hidden-webview-discard-delay": localized("settings.search.alias.setting.browser.hidden-webview-discard-delay", defaultValue: "browser.hiddenWebViewDiscardDelaySeconds memory hidden tabs delay seconds discard unload"),
-        "browser:ask-where-to-save-downloads": localized("settings.search.alias.setting.browser.ask-where-to-save-downloads", defaultValue: "browser.askWhereToSaveDownloads downloads save panel folder attachments files pdf gmail"),
-        "browser:terminal-links": localized("settings.search.alias.setting.browser.terminal-links", defaultValue: "browser.openTerminalLinksInCmuxBrowser click url terminal links open in browser href"),
-        "browser:intercept-open": localized("settings.search.alias.setting.browser.intercept-open", defaultValue: "browser.interceptTerminalOpenCommandInCmuxBrowser open command http https url terminal intercept"),
-        "browser:host-whitelist": localized("settings.search.alias.setting.browser.host-whitelist", defaultValue: "browser.hostsToOpenInEmbeddedBrowser allowlist whitelist host wildcard domain embedded browser"),
-        "browser:external-patterns": localized("settings.search.alias.setting.browser.external-patterns", defaultValue: "browser.urlsToAlwaysOpenExternally denylist blocklist regex rules external default browser"),
-        "browser:http-allowlist": localized("settings.search.alias.setting.browser.http-allowlist", defaultValue: "browser.insecureHttpHostsAllowedInEmbeddedBrowser insecure http allowlist localhost localtest non-https warning"),
-        "browser:url-allowlist": localized("settings.search.alias.setting.browser.url-allowlist", defaultValue: "browser.urlAllowlist URL allowlist localhost wildcard scheme port organization policy"),
-        "browserImport:import-data": localized("settings.search.alias.setting.browserImport.import-data", defaultValue: "chrome safari firefox brave edge arc bookmarks history cookies profiles migration"),
-        "browserImport:import-hint": localized("settings.search.alias.setting.browserImport.import-hint", defaultValue: "browser.showImportHintOnBlankTabs blank tab onboarding hint import prompt dismiss"),
-        "browser:react-grab": localized("settings.search.alias.setting.browser.react-grab", defaultValue: "browser.reactGrabVersion react grab npm version toolbar cmd-shift-g inspect component"),
-        "browser:history": localized("settings.search.alias.setting.browser.history", defaultValue: "clear browser history visited pages suggestions omnibar"),
         "globalHotkey:enable-hotkey": localized("settings.search.alias.setting.globalHotkey.enable-hotkey", defaultValue: "global hotkey enable system wide show hide all windows"),
         "globalHotkey:shortcut": localized("settings.search.alias.setting.globalHotkey.shortcut", defaultValue: "global hotkey shortcut recorder key command option control"),
         "keyboardShortcuts:shortcut-chords": localized("settings.search.alias.setting.keyboardShortcuts.shortcut-chords", defaultValue: "tmux prefix ctrl-b control-b multi key sequence chord cmux json"),

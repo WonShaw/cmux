@@ -2,53 +2,8 @@ import Foundation
 import Testing
 import CmuxTerminalCore
 
-/// A deterministic stand-in for the browser domain: hosts containing a dot or
-/// equal to localhost are navigable, and scheme-less host-ish text becomes an
-/// HTTPS URL the way the embedded browser's omnibox would treat it.
-private struct StubHostNormalizer: BrowserHostNormalizing {
-    var rejectsEveryHost = false
-
-    func normalizedHost(_ rawHost: String) -> String? {
-        guard !rejectsEveryHost else { return nil }
-        let trimmed = rawHost.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !trimmed.isEmpty else { return nil }
-        guard trimmed.contains(".") || trimmed == "localhost" else { return nil }
-        return trimmed
-    }
-
-    func navigableWebURL(_ input: String) -> URL? {
-        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !trimmed.contains(" ") else { return nil }
-        if URL(string: trimmed)?.scheme != nil { return URL(string: trimmed) }
-        guard trimmed.contains(".") || trimmed.lowercased().hasPrefix("localhost") else { return nil }
-        return URL(string: "https://\(trimmed)")
-    }
-}
-
 @Suite struct TerminalLinkRouterTests {
-    private let router = TerminalLinkRouter(hostNormalizer: StubHostNormalizer())
-
-    @Test func resolvesHTTPSAsEmbeddedBrowser() throws {
-        let target = try #require(router.resolveOpenURLTarget("https://example.com/path?q=1"))
-        guard case let .embeddedBrowser(url) = target else {
-            Issue.record("Expected web URL to route to embedded browser")
-            return
-        }
-        #expect(url.scheme == "https")
-        #expect(url.host == "example.com")
-        #expect(url.path == "/path")
-    }
-
-    @Test func resolvesBareDomainAsEmbeddedBrowser() throws {
-        let target = try #require(router.resolveOpenURLTarget("example.com/docs"))
-        guard case let .embeddedBrowser(url) = target else {
-            Issue.record("Expected bare domain to be normalized as an HTTPS browser URL")
-            return
-        }
-        #expect(url.scheme == "https")
-        #expect(url.host == "example.com")
-        #expect(url.path == "/docs")
-    }
+    private let router = TerminalLinkRouter()
 
     @Test func resolvesFileSchemeAsExternal() throws {
         let target = try #require(router.resolveOpenURLTarget("file:///tmp/cmux.txt"))
@@ -88,33 +43,6 @@ private struct StubHostNormalizer: BrowserHostNormalizing {
         #expect(url.scheme == "https")
         #expect(url.host == nil)
         #expect(url.path == "/tmp/cmux.txt")
-    }
-
-    @Test func rejectedHostRoutesWebURLExternally() throws {
-        let rejecting = TerminalLinkRouter(
-            hostNormalizer: StubHostNormalizer(rejectsEveryHost: true)
-        )
-        let target = try #require(rejecting.resolveOpenURLTarget("https://example.com/path"))
-        guard case let .external(url) = target else {
-            Issue.record("Expected rejected host to fall back to external routing")
-            return
-        }
-        #expect(url.host == "example.com")
-    }
-
-    @Test func rejectedHostRoutesBareDomainExternally() throws {
-        let rejecting = TerminalLinkRouter(
-            hostNormalizer: StubHostNormalizer(rejectsEveryHost: true)
-        )
-        // The rejecting stub also refuses navigableWebURL inputs only at the
-        // host check, so build one that still yields a URL but fails the host
-        // gate: navigableWebURL is unaffected by rejectsEveryHost.
-        let target = rejecting.resolveOpenURLTarget("example.com/docs")
-        guard case let .external(url)? = target else {
-            Issue.record("Expected bare domain with rejected host to open externally")
-            return
-        }
-        #expect(url.host == "example.com")
     }
 
     @Test func emptyTextResolvesToNil() {

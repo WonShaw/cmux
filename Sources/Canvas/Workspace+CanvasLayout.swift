@@ -44,9 +44,6 @@ extension Workspace {
         } else {
             reconcileTerminalPortalVisibilityForCurrentRenderedLayout()
         }
-        reconcileBrowserPortalVisibilityForCurrentRenderedLayout(
-            reason: "workspace.setLayoutMode.\(mode.rawValue)"
-        )
         // Let chrome (the toolbar mode toggle) reflect the change regardless
         // of which entrypoint drove it (shortcut, palette, menu, toolbar).
         NotificationCenter.default.post(name: .workspaceLayoutModeDidChange, object: self)
@@ -219,7 +216,6 @@ extension Workspace {
 /// The kind of surface `openNewCanvasPane` should create.
 enum CanvasNewPaneType {
     case terminal
-    case browser
     case simulator
 }
 
@@ -227,8 +223,8 @@ extension Workspace {
     /// Creates a new surface as its own free-floating canvas pane (not joined
     /// as a tab of an existing pane), the automation counterpart to the
     /// canvas "new pane" gesture. Returns the new surface/panel UUID, or `nil`
-    /// when creation fails (e.g. no focused bonsplit pane, or the browser is
-    /// disabled). Must be called in canvas mode.
+    /// when creation fails (e.g. no focused bonsplit pane). Must be called in
+    /// canvas mode.
     @discardableResult
     func openNewCanvasPane(
         type: CanvasNewPaneType,
@@ -245,11 +241,6 @@ extension Workspace {
         switch type {
         case .terminal:
             guard let panel = newTerminalSurface(inPane: focusedPaneId, focus: focus) else {
-                return nil
-            }
-            newPanelId = panel.id
-        case .browser:
-            guard let panel = newBrowserSurface(inPane: focusedPaneId, focus: focus) else {
                 return nil
             }
             newPanelId = panel.id
@@ -289,23 +280,3 @@ extension Workspace {
     }
 }
 
-
-extension Workspace {
-    /// Mirrors canvas pane z-order onto portal-hosted browser webviews so a
-    /// front pane's webview stacks above a back pane's.
-    func syncCanvasBrowserPortalZOrder() {
-        guard layoutMode == .canvas else { return }
-        let zOrder = canvasModel.layout.paneIDs
-        for panel in panels.values {
-            guard let browserPanel = panel as? BrowserPanel,
-                  !browserPanel.canvasInlineHostingActive,
-                  let paneID = canvasModel.paneID(containing: browserPanel.id),
-                  let z = zOrder.firstIndex(of: paneID) else { continue }
-            BrowserWindowPortalRegistry.updateEntryVisibility(
-                for: browserPanel.webView,
-                visibleInUI: true,
-                zPriority: 2 + z
-            )
-        }
-    }
-}

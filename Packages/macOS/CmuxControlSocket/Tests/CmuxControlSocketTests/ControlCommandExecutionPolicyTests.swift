@@ -3,32 +3,9 @@ import Testing
 
 @Suite("ControlCommandExecutionPolicy")
 struct ControlCommandExecutionPolicyTests {
-    @Test func vmPrefixedMethodsRunOnTheSocketWorker() {
-        #expect(ControlCommandExecutionPolicy(forMethod: "vm.create") == .socketWorker(mainThreadCallable: false))
-        #expect(ControlCommandExecutionPolicy(forMethod: "vm.anything.else").runsOnSocketWorker)
-    }
-
-    @Test func remotesPrefixedMethodsRunOnTheSocketWorker() {
-        // `cmux remotes` verbs make blocking authenticated web API calls, so
-        // they must run on the worker; otherwise the dispatcher never reaches
-        // their handler and returns method_not_found.
-        #expect(ControlCommandExecutionPolicy(forMethod: "remotes.list") == .socketWorker(mainThreadCallable: false))
-        #expect(ControlCommandExecutionPolicy(forMethod: "remotes.add") == .socketWorker(mainThreadCallable: false))
-        #expect(ControlCommandExecutionPolicy(forMethod: "remotes.remove") == .socketWorker(mainThreadCallable: false))
-    }
-
-    @Test func aiAccountsPrefixedMethodsRunOnTheSocketWorker() {
-        // `cmux ai-accounts` verbs make blocking authenticated web API calls, so
-        // they must run on the worker; otherwise the dispatcher never reaches
-        // their handler and returns method_not_found.
-        #expect(ControlCommandExecutionPolicy(forMethod: "aiAccounts.list") == .socketWorker(mainThreadCallable: false))
-        #expect(ControlCommandExecutionPolicy(forMethod: "aiAccounts.upload") == .socketWorker(mainThreadCallable: false))
-        #expect(ControlCommandExecutionPolicy(forMethod: "aiAccounts.remove") == .socketWorker(mainThreadCallable: false))
-    }
-
     @Test func coderouterPrefixedMethodsRunOnTheSocketWorker() {
         // `cmux coderouter` verbs (team Claude upstream, per-machine usage) make
-        // blocking authenticated web API calls like `aiAccounts.*`; off the
+        // blocking authenticated web API calls; off the
         // worker the dispatcher answers method_not_found.
         #expect(ControlCommandExecutionPolicy(forMethod: "coderouter.claude_upstream.get") == .socketWorker(mainThreadCallable: false))
         #expect(ControlCommandExecutionPolicy(forMethod: "coderouter.claude_upstream.set") == .socketWorker(mainThreadCallable: false))
@@ -41,36 +18,18 @@ struct ControlCommandExecutionPolicyTests {
 
     @Test func fixedWorkerSetRunsOnTheSocketWorker() {
         for method in [
-            "system.ping", "system.capabilities", "auth.status", "auth.sign_in_url",
+            "system.ping", "system.capabilities",
             "feed.jump", "feed.push", "agent.hook.enqueue", "agent.hook.barrier",
             "agent.restore.admit", "agent.restore.release",
-            "browser.download.list", "browser.download.wait", "system.top", "system.memory",
+            "system.top", "system.memory",
             "workspace.remote.pty_bridge", "workspace.env", "sidebar.custom.reload",
             "sidebar.custom.open",
-            "debug.sidebar.simulate_drag", "debug.mobile.transport.disconnect", "debug.mobile.transport.reconnect_loop",
-            "debug.window.screenshot", "mobile.attach_ticket.create",
-            "mobile.terminal.set_font", "mobile.task.models.list",
+            "debug.sidebar.simulate_drag", 
+            "debug.window.screenshot",
             // Vault session-index verbs scan transcript stores on disk and
             // must never hold the main actor (see socketWorkerMethods).
             "vault.sessions", "vault.search", "vault.checkpoints",
             "vault.checkpoint", "vault.fork",
-            "mobile.compatible_tags.get", "mobile.compatible_tags.set",
-            "mobile.panel.artifact.stat", "mobile.panel.artifact.fetch",
-            "mobile.panel.artifact.thumbnail",
-            // JavaScript-evaluating browser methods block on page JS and must
-            // not hold the main actor (see socketWorkerMethods rationale).
-            "browser.eval", "browser.wait", "browser.snapshot", "browser.click",
-            "browser.fill", "browser.navigate", "browser.get.text",
-            "browser.find.text", "browser.highlight",
-            // Adjacent WebKit/page-state methods wait on JS, cookie, or
-            // capture callbacks and follow the same worker-lane contract.
-            "browser.screenshot", "browser.frame.select", "browser.dialog.accept",
-            "browser.dialog.dismiss", "browser.cookies.get", "browser.cookies.set",
-            "browser.cookies.clear", "browser.storage.get", "browser.storage.set",
-            "browser.storage.clear", "browser.console.list", "browser.console.clear",
-            "browser.errors.list", "browser.state.save", "browser.state.load",
-            "browser.addinitscript", "browser.addscript", "browser.addstyle",
-            "browser.design_mode.set", "browser.design_mode.status",
         ] {
             #expect(ControlCommandExecutionPolicy(forMethod: method).runsOnSocketWorker, "\(method)")
         }
@@ -85,8 +44,7 @@ struct ControlCommandExecutionPolicyTests {
 
     @Test func everythingElseRunsOnTheMainActor() {
         for method in [
-            "workspace.create", "browser.url.get",
-            "browser.open_split", "browser.get.title", "browser.frame.main",
+            "workspace.create",
             "mobile.terminal.create", "mobile.task.attachment.upload",
             "vmx.create", "",
             // Focus-intent verbs stay on the main lane until the mutations
@@ -122,7 +80,7 @@ struct ControlCommandExecutionPolicyTests {
         // main-thread in-process callers (cmuxTests drive these verbs via
         // handleSocketLine on the main actor).
         for method in [
-            "surface.list", "browser.download.list", "surface.current",
+            "surface.list", "surface.current",
             "workspace.list", "workspace.current",
             "window.list", "window.current", "window.displays",
             "pane.list", "pane.surfaces",
@@ -171,11 +129,6 @@ struct ControlCommandExecutionPolicyTests {
         #expect(ControlCommandExecutionPolicy(forMethod: "system.ping") == .socketWorker(mainThreadCallable: true))
         #expect(ControlCommandExecutionPolicy(forMethod: "system.capabilities") == .socketWorker(mainThreadCallable: true))
         #expect(ControlCommandExecutionPolicy(forMethod: "system.top") == .socketWorker(mainThreadCallable: false))
-        #expect(ControlCommandExecutionPolicy(forMethod: "mobile.task.models.list") == .socketWorker(mainThreadCallable: false))
-        #expect(ControlCommandExecutionPolicy(forMethod: "mobile.panel.artifact.stat") == .socketWorker(mainThreadCallable: false))
-        #expect(ControlCommandExecutionPolicy(forMethod: "mobile.panel.artifact.fetch") == .socketWorker(mainThreadCallable: false))
-        #expect(ControlCommandExecutionPolicy(forMethod: "mobile.panel.artifact.thumbnail") == .socketWorker(mainThreadCallable: false))
-        #expect(ControlCommandExecutionPolicy(forMethod: "vm.create") == .socketWorker(mainThreadCallable: false))
     }
 
     @Test func terminalReadsRunOnTheWorkerAndAreNotMainThreadCallable() {
@@ -213,10 +166,6 @@ struct ControlCommandExecutionPolicyTests {
         )
     }
 
-    @Test func diagnosticReadsRunOnTheWorkerAndAreNotMainThreadCallable() {
-        #expect(ControlCommandExecutionPolicy(forV1Command: "iroh_diag") == .socketWorker(mainThreadCallable: false))
-    }
-
     @Test func v1PingRunsOnTheWorkerAndIsMainThreadCallable() {
         // `ping` is the dispatcher's former hard-coded worker fast path; it is
         // a pure probe, so in-process main-thread callers may run it inline.
@@ -239,7 +188,6 @@ struct ControlCommandExecutionPolicyTests {
             "clear_agent_pid",
             "log", "clear_log", "list_log", "set_progress", "clear_progress",
             "report_git_branch", "clear_git_branch",
-            "report_pr", "report_review", "clear_pr", "report_pr_action",
             "report_ports", "clear_ports",
             "report_pwd", "report_shell_state", "report_tty", "ports_kick",
         ] {
@@ -305,9 +253,9 @@ struct ControlCommandExecutionPolicyTests {
             "sidebar_state", "reset_sidebar", "list_panes", "new_pane",
             "new_workspace", "select_workspace", "close_workspace",
             "help", "",
-            // The v2 namespace prefix rules (vm./remotes.) and v2 worker
+            // The v2 namespace prefix rules (coderouter.) and v2 worker
             // method names must not leak into v1 classification.
-            "vm.create", "remotes.list", "system.ping",
+            "coderouter.machines", "system.ping",
             "surface.report_pwd", "notification.create",
         ] {
             let policy = ControlCommandExecutionPolicy(forV1Command: command)
@@ -348,7 +296,6 @@ struct ControlCommandExecutionPolicyTests {
             "clear_agent_pid",
             "log", "clear_log", "list_log", "set_progress", "clear_progress",
             "report_git_branch", "clear_git_branch",
-            "report_pr", "report_review", "clear_pr", "report_pr_action",
             "report_ports", "clear_ports",
             "report_pwd", "report_shell_state", "report_tty", "ports_kick",
         ]
@@ -362,8 +309,6 @@ struct ControlCommandExecutionPolicyTests {
         #expect(ControlCommandExecutionPolicy.agentJournalV1Commands == agentJournal)
         let terminalRead: Set<String> = ["read_screen"]
         #expect(ControlCommandExecutionPolicy.terminalReadV1Commands == terminalRead)
-        let diagnosticRead: Set<String> = ["iroh_diag"]
-        #expect(ControlCommandExecutionPolicy.diagnosticReadV1Commands == diagnosticRead)
         let resolutionReads: Set<String> = [
             "list_windows", "current_window", "list_workspaces",
             "list_surfaces", "current_workspace",
@@ -384,7 +329,7 @@ struct ControlCommandExecutionPolicyTests {
         )
         let expectedWorker = telemetry.union(notification).union(agentJournal)
             .union(terminalRead)
-            .union(diagnosticRead).union(resolutionReads).union(sends)
+            .union(resolutionReads).union(sends)
             .union(configurationMutations).union(windowCapture).union(["ping"])
         #expect(ControlCommandExecutionPolicy.socketWorkerV1Commands == expectedWorker)
         // Every member except terminal and diagnostic reads, the journal
@@ -396,7 +341,6 @@ struct ControlCommandExecutionPolicyTests {
             ControlCommandExecutionPolicy.mainThreadCallableSocketWorkerV1Commands
                 == expectedWorker
                     .subtracting(terminalRead)
-                    .subtracting(diagnosticRead)
                     .subtracting(agentJournal)
                     .subtracting(configurationMutations)
                     .subtracting(windowCapture)

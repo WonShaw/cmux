@@ -21,16 +21,8 @@ extension Workspace {
                 return nil
             }
         }
-        let activeRemotePanelIds = panels.keys.filter {
-            isRemoteTerminalSurface($0) ||
-                (cloudVMBinding != nil && terminalPanel(for: $0) != nil) ||
-                cloudProjectedResource(forPanel: $0)?.kind == .terminal
-        }
-        guard !activeRemotePanelIds.isEmpty else { return nil }
-        let reportedDirectories = activeRemotePanelIds.compactMap { trustedReportedPanelDirectory(panelId: $0) }
-        guard reportedDirectories.count == activeRemotePanelIds.count else { return nil }
-        let directories = Set(reportedDirectories)
-        return directories.count == 1 ? directories.first : nil
+        // No panel in this build is a remote terminal surface.
+        return nil
     }
 
     private var reportedRemoteCurrentDirectory: String? {
@@ -41,26 +33,10 @@ extension Workspace {
         reportedRemoteCurrentDirectory(allowLocalFallback: false)
     }
 
-    /// Directory metadata for a cloud-bound or cloud-projected panel is remote
-    /// state, even though its transport is not SSH.
+    /// This build has no remote (ssh or cloud) workspaces, so directory
+    /// metadata always belongs to this Mac.
     var usesRemoteDirectoryProvenance: Bool {
-        isRemoteWorkspace || isRemoteTmuxMirror || cloudVMBinding != nil ||
-            panels.keys.contains(where: { cloudDirectoryProvenanceRequired(panelId: $0) })
-    }
-
-    /// Returns whether a panel's directory belongs to a Cloud machine rather than this Mac.
-    func cloudDirectoryProvenanceRequired(panelId: UUID) -> Bool {
-        cloudVMBinding != nil || SurfaceCatalog.shared.hasCloudProjection(panelID: panelId, workspaceID: id)
-    }
-
-    /// Applies the cwd carried by a terminal in an accepted cloud snapshot.
-    /// Branch and PR metadata remain absent until the cloud transport reports them.
-    func updateCloudPanelDirectory(panelId: UUID, directory: String?) {
-        guard let directory = normalizedSidebarDirectory(directory) else {
-            clearRemotePanelDirectory(panelId: panelId)
-            return
-        }
-        updateRemotePanelDirectoryWithMetadata(panelId: panelId, directory: directory)
+        false
     }
 
     var presentedCurrentDirectory: String? {
@@ -75,15 +51,11 @@ extension Workspace {
     }
 
     private func trustedReportedPanelDirectory(panelId: UUID) -> String? {
-        guard remoteDirectoryReportPanelIds.contains(panelId) else { return nil }
-        return normalizedSidebarDirectory(panelDirectories[panelId])
+        // No panel in this build reports a trusted remote directory.
+        nil
     }
 
     func effectivePanelDirectory(panelId: UUID, localFallback: String? = nil) -> String? {
-        if let remotePane = remoteTmuxControlPane(surfaceID: panelId),
-           let directory = remotePane.windowMirror?.cwdByPaneId[remotePane.pane.tmuxPaneID] {
-            return normalizedSidebarDirectory(directory)
-        }
         if let directory = reportedPanelDirectory(panelId: panelId) {
             return directory
         }
@@ -94,53 +66,14 @@ extension Workspace {
 
     func allowsLocalDirectoryFallback(panelId: UUID) -> Bool {
         if !usesRemoteDirectoryProvenance { return true }
-        if cloudDirectoryProvenanceRequired(panelId: panelId) { return false }
-        guard !remoteDirectoryTrustRequiredPanelIds.contains(panelId),
-              !isRemoteTerminalSurface(panelId),
-              !isRemoteTmuxMirror else { return false }
         if let agentPanel = panels[panelId] as? AgentSessionPanel {
             return normalizedSidebarDirectory(agentPanel.workingDirectory) != nil
         }
         return terminalPanel(for: panelId) != nil
     }
 
-    func clearDemotedRemoteDirectoryState(panelIds: Set<UUID>) {
-        guard !panelIds.isEmpty else { return }
-        let removedDirectories = Set(panelIds.compactMap { normalizedSidebarDirectory(panelDirectories[$0]) })
-        for panelId in panelIds {
-            if let agentPanel = panels[panelId] as? AgentSessionPanel,
-               let workingDirectory = normalizedSidebarDirectory(agentPanel.workingDirectory),
-               removedDirectories.contains(workingDirectory) {
-                agentPanel.clearWorkingDirectory()
-            }
-            panelDirectories.removeValue(forKey: panelId)
-            panelDirectoryDisplayLabels.removeValue(forKey: panelId)
-            clearPanelGitBranch(panelId: panelId)
-        }
-        guard let current = normalizedSidebarDirectory(currentDirectory),
-              removedDirectories.contains(current) else { return }
-        currentDirectory = demotedRemoteDirectoryReplacement(excluding: panelIds)
-            ?? FileManager.default.homeDirectoryForCurrentUser.path
-    }
-
-    private func demotedRemoteDirectoryReplacement(excluding excludedPanelIds: Set<UUID>) -> String? {
-        for panelId in sidebarOrderedPanelIds() where !excludedPanelIds.contains(panelId) {
-            if let directory = normalizedSidebarDirectory(panelDirectories[panelId]) { return directory }
-            if allowsLocalDirectoryFallback(panelId: panelId),
-               let directory = normalizedSidebarDirectory(terminalPanel(for: panelId)?.requestedWorkingDirectory) {
-                return directory
-            }
-        }
-        return nil
-    }
-
     func restoresLegacyRemoteDirectoryWithoutProvenance(_ snapshot: SessionPanelSnapshot) -> Bool {
-        guard remoteConfiguration != nil || cloudVMBinding != nil,
-              snapshot.directoryIsTrustedRemoteReport == nil,
-              snapshot.directoryRequiresRemoteTrust == nil else { return false }
-        if cloudVMBinding != nil { return true }
-        if let terminal = snapshot.terminal { return terminal.isRemoteTerminal != false }
-        return snapshot.agentSession != nil
+        false
     }
 
     func currentDirectoryChangeRevisionPublisher() -> AnyPublisher<UInt64, Never> {
@@ -306,13 +239,11 @@ extension Workspace {
     }
 
     var presentedGitBranch: SidebarGitBranchState? {
-        if let focusedPanelId, cloudDirectoryProvenanceRequired(panelId: focusedPanelId) { return nil }
         if usesRemoteDirectoryProvenance, presentedCurrentDirectory == nil { return nil }
         return gitBranch
     }
 
     func reportedPanelGitBranch(panelId: UUID) -> SidebarGitBranchState? {
-        guard !cloudDirectoryProvenanceRequired(panelId: panelId) else { return nil }
         guard let branch = panelGitBranches[panelId] else { return nil }
         if usesRemoteDirectoryProvenance, effectivePanelDirectory(panelId: panelId) == nil { return nil }
         return branch

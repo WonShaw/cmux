@@ -210,7 +210,7 @@ final class SharedLiveAgentIndex {
 
     private var directoryWatchSource: DispatchSourceFileSystemObject?
     // DispatchSource file watching requires a delivery queue; state hops back to MainActor.
-    private let watchQueue = DispatchQueue(label: "com.cmuxterm.app.sharedLiveAgentIndexWatch")
+    private let watchQueue = DispatchQueue(label: "com.comux.app.sharedLiveAgentIndexWatch")
 
     private let indexLoader: @Sendable () -> SharedLiveAgentIndexLoader.LoadResult
     private let forkExecutableIdentityResolver: AgentForkExecutableIdentityResolver

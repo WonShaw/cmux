@@ -1,3 +1,4 @@
+internal import CmuxFoundation
 import Darwin
 import Foundation
 
@@ -65,7 +66,8 @@ struct SystemWorkspaceChangesGitRunner: WorkspaceChangesGitRunning {
             scopedEnvironment["GIT_CONFIG_GLOBAL"] = "/dev/null"
         }
         scopedEnvironment["GIT_OPTIONAL_LOCKS"] = "0"
-        self.environment = scopedEnvironment
+        // Offline fork: no git child process may ever reach a remote.
+        self.environment = GitOfflineEnvironment.applying(to: scopedEnvironment)
         self.boundedCommandWallTimeLimit = max(0, boundedCommandWallTimeLimit)
     }
 

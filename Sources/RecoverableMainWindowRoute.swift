@@ -4,8 +4,8 @@ import AppKit
 final class RecoverableMainWindowRoute {
     let windowId: UUID
     /// Workspace identities captured while the live owner is still available.
-    /// Owner-deinit and stale-route retirement can use this bounded snapshot to
-    /// detach remote mirrors even after the weak manager reference disappears.
+    /// Owner-deinit and stale-route retirement can use this bounded snapshot
+    /// even after the weak manager reference disappears.
     let workspaceIds: [UUID]
     private weak var weakTabManager: TabManager?
     private var retainedTabManager: TabManager?
@@ -55,12 +55,7 @@ final class RecoverableMainWindowRoute {
         if frozenWindowSnapshot != nil {
             return true
         }
-        guard let manager = tabManager else { return false }
-        let workspaces = manager.tabs
-        let omitsRemoteMirrorOnlyWindow = windowDock == nil
-            && !workspaces.isEmpty
-            && workspaces.allSatisfy(\.isRemoteTmuxMirror)
-        return !omitsRemoteMirrorOnlyWindow
+        return tabManager != nil
     }
 
     var frozenWindowSnapshot: SessionWindowSnapshot? {

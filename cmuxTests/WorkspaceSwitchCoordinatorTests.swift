@@ -160,24 +160,6 @@ struct WorkspaceSwitchCoordinatorTests {
     }
 
     @Test
-    func browserPresentationTracksInteractionSeparately() {
-        var readiness = WorkspaceSwitchReadiness(
-            contentKind: .browser,
-            requiresInteraction: true,
-            portalPresented: false,
-            firstFramePresented: false,
-            interactionReady: false
-        )
-
-        #expect(!readiness.presentationIsReady)
-        readiness.portalPresented = true
-        #expect(readiness.presentationIsReady)
-        #expect(!readiness.interactionIsReady)
-        readiness.interactionReady = true
-        #expect(readiness.interactionIsReady)
-    }
-
-    @Test
     func rendererProtectionIsHeldUntilSourceRetires() {
         var protectedRequestIDs: [UUID] = []
         var releasedRequestIDs: [UUID] = []

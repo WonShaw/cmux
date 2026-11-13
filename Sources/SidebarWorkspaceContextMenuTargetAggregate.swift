@@ -4,13 +4,10 @@ import Foundation
 /// Shared context-menu facts derived from a target workspace selection.
 ///
 /// The sidebar computes the selected-set aggregate once above `LazyVStack`.
-/// Selected rows reuse this immutable value instead of repeating remote,
+/// Selected rows reuse this immutable value instead of repeating
 /// grouping, unread, and notification aggregation during row realization.
 struct SidebarWorkspaceContextMenuTargetAggregate: Equatable {
     let targetWorkspaceIds: [UUID]
-    let remoteTargetWorkspaceIds: [UUID]
-    let allRemoteTargetsConnecting: Bool
-    let allRemoteTargetsDisconnected: Bool
     let eligibleGroupTargetIds: [UUID]
     let allEligibleTargetsGroupId: UUID?
     let hasGroupedEligibleTarget: Bool
@@ -28,18 +25,6 @@ struct SidebarWorkspaceContextMenuTargetAggregate: Equatable {
         notificationIndex: SidebarWorkspaceNotificationIndex
     ) {
         self.targetWorkspaceIds = targetWorkspaceIds
-        remoteTargetWorkspaceIds = targetWorkspaceIds.filter {
-            workspaceRowsById[$0]?.isRemoteContextMenuEligible == true
-        }
-        allRemoteTargetsConnecting = !remoteTargetWorkspaceIds.isEmpty
-            && remoteTargetWorkspaceIds.allSatisfy {
-                guard let state = workspaceRowsById[$0]?.remoteConnectionState else { return false }
-                return state == .connecting || state == .reconnecting
-            }
-        allRemoteTargetsDisconnected = !remoteTargetWorkspaceIds.isEmpty
-            && remoteTargetWorkspaceIds.allSatisfy {
-                workspaceRowsById[$0]?.remoteConnectionState == .disconnected
-            }
         eligibleGroupTargetIds = targetWorkspaceIds.filter {
             !anchorWorkspaceIds.contains($0) && workspaceRowsById[$0] != nil
         }

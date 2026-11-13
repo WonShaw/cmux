@@ -5,7 +5,6 @@ import Foundation
 import Bonsplit
 import AppKit
 import CmuxAppKitSupportUI
-import CmuxFeedback
 
 /// View that renders the appropriate panel view based on panel type
 struct PanelContentView: View {
@@ -25,13 +24,6 @@ struct PanelContentView: View {
     let customSidebarUnread: SidebarUnreadModel = TerminalNotificationStore.shared.sidebarUnread
     let hasUnreadNotification: Bool
     let terminalAgentContext: String
-    /// Appearance inherited from the host before this view injects the
-    /// surface-resolved scheme for its rendered panel subtree. Browser WebKit
-    /// system theming may observe this value; browser chrome must not.
-    @Environment(\.colorScheme) private var inheritedColorScheme
-    /// Explicit browser pane-ownership signal for hosts whose panels live outside
-    /// the main `Workspace` tree (the Dock). `nil` keeps the main-area behavior.
-    var paneOwnershipOverride: Bool? = nil
     /// Live terminal pane ownership. Portal callbacks invoke this again instead
     /// of trusting the SwiftUI snapshot captured before a cross-container move.
     var terminalPaneOwnershipResolver: (@MainActor () -> Bool)? = nil
@@ -40,8 +32,6 @@ struct PanelContentView: View {
     let onResumeAgentHibernation: () -> Void
     let onAutoResumeAgentHibernation: () -> Void
     let onTriggerFlash: () -> Void
-    /// Owner action used to materialize a deferred browser after its host reports visibility.
-    let onRequestDeferredBrowserMaterialization: () -> Void
 
     var body: some View {
         renderedPanel
@@ -74,31 +64,6 @@ struct PanelContentView: View {
                 )
             } else {
                 TerminalPanelUnavailableView(appearance: appearance)
-            }
-        case .browser:
-            if let browserPanel = panel as? BrowserPanel {
-                BrowserPanelView(
-                    panel: browserPanel,
-                    paneId: paneId,
-                    isFocused: isFocused,
-                    isVisibleInUI: isVisibleInUI,
-                    portalPriority: portalPriority,
-                    paneOwnershipOverride: paneOwnershipOverride,
-                    resolvedColorScheme: windowAppearance.resolvedColorScheme,
-                    inheritedColorScheme: inheritedColorScheme,
-                    resolvedThemeBackgroundColor: windowAppearance.resolvedChromeBackgroundColor,
-                    onRequestPanelFocus: onRequestPanelFocus
-                )
-                // Browser chrome owns panel-scoped edit/focus state. Bonsplit reuses this
-                // structural slot when a pane selects another browser, so bind its lifetime
-                // to the panel instead of carrying the prior panel's omnibar draft forward.
-                .id(browserPanel.id)
-            } else if panel is DeferredBrowserPanel {
-                DeferredBrowserPanelView(
-                    isVisibleInUI: isVisibleInUI,
-                    onRequestMaterialization: onRequestDeferredBrowserMaterialization,
-                    onRequestPanelFocus: onRequestPanelFocus
-                )
             }
         case .markdown:
             if let markdownPanel = panel as? MarkdownPanel {
@@ -186,14 +151,6 @@ struct PanelContentView: View {
                     onRequestPanelFocus: onRequestPanelFocus
                 )
             }
-        case .extensionBrowser:
-            if let extensionBrowserPanel = panel as? CMUXSidebarExtensionBrowserPanel {
-                CMUXSidebarExtensionBrowserPanelView(
-                    panel: extensionBrowserPanel,
-                    onRequestPanelFocus: onRequestPanelFocus
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
         case .workspaceTodo:
             if let workspaceTodoPanel = panel as? WorkspaceTodoPanel {
                 WorkspaceTodoPanelView(
@@ -211,27 +168,6 @@ struct PanelContentView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { onRequestPanelFocus() }
             }
-        case .cloudVMLoading:
-            if let loadingPanel = panel as? CloudVMLoadingPanel {
-                CloudVMLoadingPanelView(panel: loadingPanel)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        case .mobilePairing:
-            if panel is MobilePairingPanel {
-                MobilePairingPanelView(
-                    appearance: appearance,
-                    onRequestPanelFocus: onRequestPanelFocus
-                )
-            }
-        case .accountSignIn:
-            if let accountSignInPanel = panel as? AccountSignInPanel {
-                AccountSignInPanelView(
-                    panel: accountSignInPanel,
-                    appearance: appearance,
-                    onRequestPanelFocus: onRequestPanelFocus
-                )
-            }
-
         }
     }
 
@@ -249,9 +185,9 @@ struct PanelContentView: View {
     private var shouldInstallPaneDropTarget: Bool {
         guard isVisibleInUI else { return false }
         switch panel.panelType {
-        case .markdown, .filePreview, .rightSidebarTool, .customSidebar, .simulator, .agentSession, .project, .extensionBrowser, .workspaceTodo, .notifications, .cloudVMLoading, .mobilePairing, .accountSignIn:
+        case .markdown, .filePreview, .rightSidebarTool, .customSidebar, .simulator, .agentSession, .project, .workspaceTodo, .notifications:
             return true
-        case .terminal, .browser:
+        case .terminal:
             return false
         }
     }

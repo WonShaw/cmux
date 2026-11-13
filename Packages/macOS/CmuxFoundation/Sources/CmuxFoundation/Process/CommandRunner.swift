@@ -13,7 +13,7 @@ public import Foundation
 /// ```swift
 /// let runner = CommandRunner()
 /// let token = await runner.runStandardOutput(
-///     directory: ".", executable: "gh", arguments: ["auth", "token"], timeout: 5
+///     directory: ".", executable: "uname", arguments: ["-m"], timeout: 5
 /// )
 /// ```
 public struct CommandRunner: CommandRunning, Sendable {

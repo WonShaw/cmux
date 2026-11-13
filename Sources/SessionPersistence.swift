@@ -1,5 +1,4 @@
 import CoreGraphics
-import CmuxBrowser
 import CmuxCore
 import Foundation
 import Bonsplit
@@ -364,18 +363,16 @@ struct SurfaceResumeBindingSnapshot: Codable, Equatable, Sendable {
                 ?? Date().timeIntervalSince1970
         )
         wasDecodedWithoutLaunchFlavor = decodedLaunchFlavor == nil
+        if launchFlavor != .local {
+            // A legacy remote binding must never auto-run on this Mac.
+            autoResume = false
+            approvalPolicy = .manual
+            approvalRecordId = nil
+        }
     }
 
     var isProcessDetected: Bool {
         source == "process-detected"
-    }
-
-    /// Plain interactive SSH bindings are intentionally durable across a
-    /// restore pass.  Their process is expected to be absent while the new
-    /// local PTY is starting, so a transiently empty process scan must not
-    /// erase the command before the next autosave can observe it again.
-    var isPlainSSHProcessDetectedBinding: Bool {
-        isProcessDetected && kind?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "ssh"
     }
 
     var isAgentHookBinding: Bool {
@@ -907,7 +904,7 @@ enum SurfaceResumeApprovalStore {
     private static let secretFileName = ".surface-resume-approval-secret"
     private static let settingsTerminalSectionKey = "terminal"
     private static let settingsRecordsKey = "resumeCommands"
-    private static let keychainService = "com.cmuxterm.app.surface-resume-approvals"
+    private static let keychainService = "com.comux.app.surface-resume-approvals"
     private static let keychainAccount = "hmac-secret-v1"
     private static let signingSecretCache = SurfaceResumeApprovalSigningSecretCache(
         loader: {
@@ -1464,8 +1461,6 @@ struct SessionTerminalPanelSnapshot: Codable, Sendable {
     /// the effective terminal resume target.
     var managedAgentResumeBinding: SurfaceResumeBindingSnapshot?
     var textBoxDraft: SessionTextBoxInputDraftSnapshot?
-    var isRemoteTerminal: Bool?
-    var remotePTYSessionID: String?
     /// Whether the agent process was actively running when this snapshot was captured.
     /// Nil means unknown (legacy snapshots); treated as true for backwards compatibility.
     var wasAgentRunning: Bool?
@@ -1481,8 +1476,6 @@ struct SessionTerminalPanelSnapshot: Codable, Sendable {
         resumeBinding: SurfaceResumeBindingSnapshot? = nil,
         managedAgentResumeBinding: SurfaceResumeBindingSnapshot? = nil,
         textBoxDraft: SessionTextBoxInputDraftSnapshot? = nil,
-        isRemoteTerminal: Bool? = nil,
-        remotePTYSessionID: String? = nil,
         wasAgentRunning: Bool? = nil
     ) {
         self.workingDirectory = workingDirectory
@@ -1495,13 +1488,9 @@ struct SessionTerminalPanelSnapshot: Codable, Sendable {
         self.resumeBinding = resumeBinding
         self.managedAgentResumeBinding = managedAgentResumeBinding
         self.textBoxDraft = textBoxDraft
-        self.isRemoteTerminal = isRemoteTerminal
-        self.remotePTYSessionID = remotePTYSessionID
         self.wasAgentRunning = wasAgentRunning
     }
 }
-
-extension SessionTerminalPanelSnapshot: WorkspaceSessionRemoteRestoreTerminalSnapshot {}
 
 struct SessionAgentHibernationSnapshot: Codable, Sendable {
     var hibernatedAt: TimeInterval
@@ -1592,89 +1581,6 @@ struct SessionTextBoxInputAttachmentSnapshot: Codable, Equatable, Sendable {
     var cleanupLocalPathWhenDisposed: Bool
 }
 
-struct SessionBrowserPanelSnapshot: Codable, Sendable {
-    var urlString: String?
-    var profileID: UUID?
-    var shouldRenderWebView: Bool
-    var pageZoom: Double
-    var developerToolsVisible: Bool
-    var isMuted: Bool
-    var chromeVisibility: BrowserChromeVisibility? = nil
-    var omnibarVisible: Bool? = nil
-    var backHistoryURLStrings: [String]?
-    var forwardHistoryURLStrings: [String]?
-    /// True when the surface is a transparent internal cmux UI (e.g. the diff
-    /// viewer). Restored so the surface comes back transparent, not opaque.
-    var transparentBackground: Bool? = nil
-    /// Diff viewer token + request path, when this browser surface hosts a diff viewer.
-    /// Restored by re-registering the token with the app-owned `CmuxDiffViewerURLSchemeHandler`
-    /// and navigating via the custom scheme, independent of the (possibly-dead) local HTTP server.
-    var diffViewerToken: String? = nil
-    var diffViewerRequestPath: String? = nil
-
-    init(
-        urlString: String?,
-        profileID: UUID?,
-        shouldRenderWebView: Bool,
-        pageZoom: Double,
-        developerToolsVisible: Bool,
-        isMuted: Bool = false,
-        chromeVisibility: BrowserChromeVisibility? = nil,
-        omnibarVisible: Bool? = nil,
-        backHistoryURLStrings: [String]?,
-        forwardHistoryURLStrings: [String]?,
-        transparentBackground: Bool? = nil,
-        diffViewerToken: String? = nil,
-        diffViewerRequestPath: String? = nil
-    ) {
-        self.urlString = urlString
-        self.profileID = profileID
-        self.shouldRenderWebView = shouldRenderWebView
-        self.pageZoom = pageZoom
-        self.developerToolsVisible = developerToolsVisible
-        self.isMuted = isMuted
-        self.chromeVisibility = chromeVisibility
-        self.omnibarVisible = omnibarVisible
-        self.backHistoryURLStrings = backHistoryURLStrings
-        self.forwardHistoryURLStrings = forwardHistoryURLStrings
-        self.transparentBackground = transparentBackground
-        self.diffViewerToken = diffViewerToken
-        self.diffViewerRequestPath = diffViewerRequestPath
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case urlString
-        case profileID
-        case shouldRenderWebView
-        case pageZoom
-        case developerToolsVisible
-        case isMuted
-        case chromeVisibility
-        case omnibarVisible
-        case backHistoryURLStrings
-        case forwardHistoryURLStrings
-        case transparentBackground
-        case diffViewerToken
-        case diffViewerRequestPath
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        urlString = try container.decodeIfPresent(String.self, forKey: .urlString)
-        profileID = try container.decodeIfPresent(UUID.self, forKey: .profileID)
-        shouldRenderWebView = try container.decode(Bool.self, forKey: .shouldRenderWebView)
-        pageZoom = try container.decode(Double.self, forKey: .pageZoom)
-        developerToolsVisible = try container.decode(Bool.self, forKey: .developerToolsVisible)
-        isMuted = try container.decodeIfPresent(Bool.self, forKey: .isMuted) ?? false
-        chromeVisibility = try container.decodeIfPresent(BrowserChromeVisibility.self, forKey: .chromeVisibility)
-        omnibarVisible = try container.decodeIfPresent(Bool.self, forKey: .omnibarVisible)
-        backHistoryURLStrings = try container.decodeIfPresent([String].self, forKey: .backHistoryURLStrings)
-        forwardHistoryURLStrings = try container.decodeIfPresent([String].self, forKey: .forwardHistoryURLStrings)
-        transparentBackground = try container.decodeIfPresent(Bool.self, forKey: .transparentBackground)
-        diffViewerToken = try container.decodeIfPresent(String.self, forKey: .diffViewerToken)
-        diffViewerRequestPath = try container.decodeIfPresent(String.self, forKey: .diffViewerRequestPath)
-    }
-}
 struct SessionMarkdownPanelSnapshot: Codable, Sendable {
     var filePath: String
 }
@@ -1721,8 +1627,6 @@ struct SessionPanelSnapshot: Codable, Sendable {
     /// `.user`; newer builds restore the remote provenance from the marker.
     var customTitleWasRemote: Bool? = nil
     var directory: String?
-    var directoryIsTrustedRemoteReport: Bool? = nil
-    var directoryRequiresRemoteTrust: Bool? = nil
     var isPinned: Bool
     var isManuallyUnread: Bool
     var hasUnreadIndicator: Bool? = nil
@@ -1732,7 +1636,6 @@ struct SessionPanelSnapshot: Codable, Sendable {
     var listeningPorts: [Int]
     var ttyName: String?
     var terminal: SessionTerminalPanelSnapshot?
-    var browser: SessionBrowserPanelSnapshot?
     var markdown: SessionMarkdownPanelSnapshot?
     var filePreview: SessionFilePreviewPanelSnapshot?
     var rightSidebarTool: SessionRightSidebarToolPanelSnapshot?
@@ -1743,7 +1646,120 @@ struct SessionPanelSnapshot: Codable, Sendable {
     var workspaceTodo: SessionWorkspaceTodoPanelSnapshot? = nil
     var notificationsPanel: SessionNotificationsPanelSnapshot? = nil
 }
-extension SessionPanelSnapshot: WorkspaceSessionRemoteRestorePanelSnapshot {}
+
+/// Decodes a persisted panel list while dropping panels whose `type` no longer
+/// exists (the removed built-in browser panels), so session files written by
+/// older builds keep restoring their remaining panels.
+@propertyWrapper
+struct SessionRestorablePanelList: Codable, Sendable {
+    var wrappedValue: [SessionPanelSnapshot]
+
+    init(wrappedValue: [SessionPanelSnapshot]) {
+        self.wrappedValue = wrappedValue
+    }
+
+    private static let removedPanelTypeRawValues: Set<String> = ["browser", "extensionbrowser"]
+
+    private enum Element: Decodable {
+        case panel(SessionPanelSnapshot)
+        case removed
+
+        private enum CodingKeys: String, CodingKey {
+            case type
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            if let rawType = try? container.decode(String.self, forKey: .type),
+               SessionRestorablePanelList.removedPanelTypeRawValues.contains(rawType.lowercased()) {
+                self = .removed
+                return
+            }
+            self = .panel(try SessionPanelSnapshot(from: decoder))
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        var panels: [SessionPanelSnapshot] = []
+        if let count = container.count {
+            panels.reserveCapacity(count)
+        }
+        while !container.isAtEnd {
+            if case .panel(let panel) = try container.decode(Element.self) {
+                panels.append(panel)
+            }
+        }
+        wrappedValue = panels
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(wrappedValue)
+    }
+}
+
+/// Decodes the persisted surface-projection records while dropping records that
+/// no longer decode (projections of the removed browser surface kind), so one
+/// stale record never invalidates the whole session file. A missing key stays `nil`.
+@propertyWrapper
+struct SessionRestorableSurfaceProjectionList: Codable, Sendable {
+    var wrappedValue: [SurfaceProjectionRecord]?
+
+    init(wrappedValue: [SurfaceProjectionRecord]?) {
+        self.wrappedValue = wrappedValue
+    }
+
+    private struct Element: Decodable {
+        let record: SurfaceProjectionRecord?
+
+        init(from decoder: Decoder) throws {
+            record = try? SurfaceProjectionRecord(from: decoder)
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let single = try decoder.singleValueContainer()
+        if single.decodeNil() {
+            wrappedValue = nil
+            return
+        }
+        var container = try decoder.unkeyedContainer()
+        var records: [SurfaceProjectionRecord] = []
+        while !container.isAtEnd {
+            if let record = try container.decode(Element.self).record {
+                records.append(record)
+            }
+        }
+        wrappedValue = records
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(wrappedValue)
+    }
+}
+
+extension KeyedDecodingContainer {
+    /// Lets the synthesized `Decodable` conformance treat a missing key as `nil`.
+    func decode(
+        _ type: SessionRestorableSurfaceProjectionList.Type,
+        forKey key: Key
+    ) throws -> SessionRestorableSurfaceProjectionList {
+        try decodeIfPresent(type, forKey: key) ?? SessionRestorableSurfaceProjectionList(wrappedValue: nil)
+    }
+}
+
+extension KeyedEncodingContainer {
+    /// Keeps the synthesized `Encodable` conformance omitting the key when there are no records.
+    mutating func encode(
+        _ value: SessionRestorableSurfaceProjectionList,
+        forKey key: Key
+    ) throws {
+        guard let records = value.wrappedValue else { return }
+        try encode(records, forKey: key)
+    }
+}
 
 enum SessionSplitOrientation: String, Codable, Sendable {
     case horizontal
@@ -1833,18 +1849,6 @@ struct SessionCanvasPaneSnapshot: Codable, Equatable, Sendable {
     var selectedPanelId: UUID? = nil
 }
 
-/// A cloud machine bound to a workspace through the cmux-tui remote daemon, persisted so a
-/// restored `vm:<id>` workspace stays that machine's workspace (`workspace(forCloudVMID:)`,
-/// the sidebar cloud button's Base reuse, `vm.terminal_open` targeting). Only the binding is
-/// persisted: the pane's link is a process and is not replayed on restore.
-struct SessionCloudVMBindingSnapshot: Codable, Sendable, Equatable {
-    var vmID: String
-    var isBase: Bool
-    /// The machine's cmux-tui workspace this local workspace stands for; absent in
-    /// legacy snapshots and for machine-only bindings (`vm shell`).
-    var remoteWorkspaceID: String? = nil
-}
-
 struct SessionWorkspaceSnapshot: Codable, Sendable {
     /// Original workspace ID captured when the snapshot comes from a live workspace.
     /// Restore reuses this identity when it is present and non-colliding; legacy,
@@ -1882,18 +1886,18 @@ struct SessionWorkspaceSnapshot: Codable, Sendable {
     /// Canvas pane frames in z-order; persisted whenever any exist so
     /// positions survive toggling back to splits across restarts.
     var canvasPanes: [SessionCanvasPaneSnapshot]? = nil
-    var panels: [SessionPanelSnapshot]
+    @SessionRestorablePanelList var panels: [SessionPanelSnapshot]
     var statusEntries: [SessionStatusEntrySnapshot]
     var logEntries: [SessionLogEntrySnapshot]
     var progress: SessionProgressSnapshot?
     var gitBranch: SessionGitBranchSnapshot?
-    var remote: SessionRemoteWorkspaceSnapshot?
-    /// cmux-tui cloud machine binding; absent in manifests written before the Cloud tree and for
-    /// workspaces that are not cloud machines.
-    var cloudVM: SessionCloudVMBindingSnapshot? = nil
+    /// Decode-only marker for the `remote` object that older builds wrote for
+    /// ssh/remote workspaces. This build has no remote workspaces: a snapshot
+    /// carrying the marker is skipped on restore and the marker is never written.
+    var remote: SessionLegacyRemoteWorkspaceMarker? = nil
     /// Remote surfaces this workspace's panes projected (`SurfaceCatalog`); absent for
     /// workspaces that only ever showed local panes, so older manifests decode unchanged.
-    var surfaceProjections: [SurfaceProjectionRecord]? = nil
+    @SessionRestorableSurfaceProjectionList var surfaceProjections: [SurfaceProjectionRecord]? = nil
     /// Optional so manifests written before this field decode cleanly.
     var environment: [String: String]? = nil
     /// Manual task-status override raw values and the persisted checklist. Optional-with-nil-default
@@ -1905,7 +1909,14 @@ struct SessionWorkspaceSnapshot: Codable, Sendable {
     var checklist: [SessionChecklistItemSnapshot]? = nil
     var dock: SessionSplitContainerSnapshot? = nil // Missing legacy fields continue to seed from dock.json.
 }
-extension SessionWorkspaceSnapshot: WorkspaceSessionRemoteRestoreSnapshot {}
+
+/// Presence marker for a legacy remote-workspace snapshot object. It ignores
+/// every field of the old payload, so any shape decodes, and it is never
+/// produced by this build.
+struct SessionLegacyRemoteWorkspaceMarker: Codable, Sendable {
+    init(from decoder: Decoder) throws {}
+    func encode(to encoder: Encoder) throws {}
+}
 
 extension SessionPanelSnapshot {
     /// The source after applying the forward-compatible remote marker.

@@ -11,8 +11,7 @@ enum CanvasPaneContent {
     /// A terminal surface hosted directly as an AppKit subview.
     case terminal(TerminalPanel, SessionContentWidthPresentation)
     /// Any other panel kind, hosted through an `NSHostingView`. Carries the
-    /// panel so the mount can drive panel-level lifecycle (browser webview
-    /// visibility / hidden-discard restore).
+    /// panel so the mount can drive panel-level lifecycle.
     case hosted(any Panel, NSView, CanvasHostedPanelPresentation)
 }
 
@@ -67,16 +66,8 @@ final class CanvasPaneContentMount: CanvasPaneContentMounting {
                 self.onFocusPanel?(self.panelId)
             }
             view = hostedView
-        case .hosted(let panel, let hostedView, _):
+        case .hosted(_, let hostedView, _):
             view = hostedView
-            // Canvas drives panel-level webview lifecycle: mounting makes the
-            // browser visible (and restores a hidden-discarded webview), and
-            // marks the webview inline-hosted so portal reconcilers leave it
-            // to the pane hierarchy.
-            if let browserPanel = panel as? BrowserPanel {
-                browserPanel.canvasInlineHostingActive = true
-                browserPanel.noteWebViewVisibility(true, reason: "canvas.mount")
-            }
         }
 
         switch content {
@@ -158,12 +149,6 @@ final class CanvasPaneContentMount: CanvasPaneContentMounting {
             panel.surface.applyVisibilityOcclusion(rendering)
         case .hosted(let panel, _, _):
             (panel as? SimulatorPanel)?.setCanvasRendering(rendering)
-            // Offscreen browsers may hidden-discard their webview; coming
-            // back into the render region restores it.
-            (panel as? BrowserPanel)?.noteWebViewVisibility(
-                rendering,
-                reason: rendering ? "canvas.render" : "canvas.occlude"
-            )
         }
     }
 
@@ -182,10 +167,6 @@ final class CanvasPaneContentMount: CanvasPaneContentMounting {
             if let simulatorPanel = panel as? SimulatorPanel {
                 simulatorPanel.setVisibleInUI(false)
                 simulatorPanel.setCanvasRendering(nil)
-            }
-            if let browserPanel = panel as? BrowserPanel {
-                browserPanel.canvasInlineHostingActive = false
-                browserPanel.noteWebViewVisibility(false, reason: "canvas.unmount")
             }
             view.removeFromSuperview()
         }

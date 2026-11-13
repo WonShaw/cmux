@@ -29,10 +29,10 @@ private final class CanvasRoutingViewportSpy: CanvasViewportControlling {
 struct CanvasShortcutContextTests {
     @Test
     func canvasOnlyShortcutDefaultWhenClausesRequireCanvasLayout() {
-        var splitContext = ShortcutFocusState(browser: false, markdown: false, sidebar: false).context
+        var splitContext = ShortcutFocusState(markdown: false, sidebar: false).context
         splitContext.setBool(ShortcutContextKnownKey.workspaceCanvasLayout.rawValue, false)
 
-        var canvasContext = ShortcutFocusState(browser: false, markdown: false, sidebar: false).context
+        var canvasContext = ShortcutFocusState(markdown: false, sidebar: false).context
         canvasContext.setBool(ShortcutContextKnownKey.workspaceCanvasLayout.rawValue, true)
 
         #expect(
@@ -53,75 +53,6 @@ struct CanvasShortcutContextTests {
         }
     }
 
-    @Test
-    func canvasLayoutContextOverlapsNormalTerminalFocusShortcuts() {
-        let canvas = KeyboardShortcutSettings.Action.canvasOverview.shortcutContext
-        let nonBrowser = KeyboardShortcutSettings.Action.renameTab.shortcutContext
-        let browser = KeyboardShortcutSettings.Action.browserReload.shortcutContext
-        let markdown = KeyboardShortcutSettings.Action.markdownZoomIn.shortcutContext
-        let sidebar = KeyboardShortcutSettings.Action.fileExplorerOpenSelection.shortcutContext
-
-        #expect(canvas == .canvasLayout)
-        #expect(nonBrowser == .nonBrowserPanel)
-        #expect(canvas.isAvailable(
-            focusedBrowserPanel: false,
-            focusedMarkdownPanel: false,
-            rightSidebarFocused: false,
-            workspaceCanvasLayout: true
-        ))
-        #expect(nonBrowser.isAvailable(
-            focusedBrowserPanel: false,
-            focusedMarkdownPanel: false,
-            rightSidebarFocused: false,
-            workspaceCanvasLayout: true
-        ))
-        #expect(canvas.overlaps(nonBrowser))
-        #expect(nonBrowser.overlaps(canvas))
-        #expect(canvas.overlaps(browser))
-        #expect(browser.overlaps(canvas))
-        #expect(canvas.overlaps(markdown))
-        #expect(markdown.overlaps(canvas))
-        #expect(canvas.overlaps(sidebar))
-        #expect(sidebar.overlaps(canvas))
-    }
-
-    @Test
-    func canvasActualSizeSharesCommandZeroWithBrowserAndMarkdownActualSize() {
-        let canvasActualSize = KeyboardShortcutSettings.Action.canvasZoomReset.defaultShortcut
-        let browserActualSize = KeyboardShortcutSettings.Action.browserZoomReset.defaultShortcut
-        let markdownActualSize = KeyboardShortcutSettings.Action.markdownZoomReset.defaultShortcut
-        let canvasActualSizeContext = KeyboardShortcutSettings.Action.canvasZoomReset.shortcutContext
-        let canvasActualSizeWhen = KeyboardShortcutSettings.effectiveWhenClause(for: .canvasZoomReset)
-        var backgroundCanvasContext = ShortcutFocusState(browser: false, markdown: false, sidebar: false).context
-        backgroundCanvasContext.setBool(ShortcutContextKnownKey.workspaceCanvasLayout.rawValue, true)
-        var browserCanvasContext = ShortcutFocusState(browser: true, markdown: false, sidebar: false).context
-        browserCanvasContext.setBool(ShortcutContextKnownKey.workspaceCanvasLayout.rawValue, true)
-        var markdownCanvasContext = ShortcutFocusState(browser: false, markdown: true, sidebar: false).context
-        markdownCanvasContext.setBool(ShortcutContextKnownKey.workspaceCanvasLayout.rawValue, true)
-        var filePreviewTextEditorCanvasContext = ShortcutFocusState(browser: false, markdown: false, sidebar: false, filePreviewTextEditor: true).context
-        filePreviewTextEditorCanvasContext.setBool(ShortcutContextKnownKey.workspaceCanvasLayout.rawValue, true)
-        let browserActualSizeWhen = KeyboardShortcutSettings.effectiveWhenClause(for: .browserZoomReset)
-
-        #expect(canvasActualSize == StoredShortcut(key: "0", command: true, shift: false, option: false, control: false))
-        #expect(browserActualSize == canvasActualSize)
-        #expect(markdownActualSize == canvasActualSize)
-        #expect(canvasActualSizeContext == .canvasLayoutOutsideFocusedContent)
-        #expect(canvasActualSizeWhen.evaluate(backgroundCanvasContext))
-        #expect(!canvasActualSizeWhen.evaluate(browserCanvasContext))
-        #expect(!canvasActualSizeWhen.evaluate(markdownCanvasContext))
-        #expect(!canvasActualSizeWhen.evaluate(filePreviewTextEditorCanvasContext))
-        #expect(browserActualSizeWhen.evaluate(filePreviewTextEditorCanvasContext))
-        #expect(!KeyboardShortcutSettings.Action.browserZoomReset.conflicts(
-            with: canvasActualSize,
-            proposedAction: .canvasZoomReset,
-            configuredShortcut: browserActualSize
-        ))
-        #expect(!KeyboardShortcutSettings.Action.markdownZoomReset.conflicts(
-            with: canvasActualSize,
-            proposedAction: .canvasZoomReset,
-            configuredShortcut: markdownActualSize
-        ))
-    }
 }
 
 @MainActor

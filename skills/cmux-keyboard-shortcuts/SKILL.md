@@ -53,7 +53,7 @@ fi
    - **Audit:** inspect bindings, validate, summarize overrides and unbound shortcuts without writing.
    - **Reset:** clarify file-managed overrides vs true built-in defaults (see the `unset` rule above).
    - **Broad customization:** propose 3-5 templates below and ask the user to choose.
-   - **Named style** (tmux, Vim, iTerm, browser, agent triage): pick the closest template, show the changed actions and likely collisions, and ask before a bulk apply unless the user already named that template.
+   - **Named style** (tmux, Vim, iTerm, agent triage): pick the closest template, show the changed actions and likely collisions, and ask before a bulk apply unless the user already named that template.
 2. Inspect existing config:
 
    ```bash
@@ -156,18 +156,6 @@ Workspaces and surfaces on distinct number and bracket lanes.
 "$CMUX_SETTINGS" set shortcuts.bindings.prevSurface 'cmd+shift+['
 ```
 
-### Browser Defaults Restore
-
-Return embedded-browser behavior to common macOS browser shortcuts. `unset` keeps future cmux defaults applying.
-
-```bash
-for a in openBrowser focusBrowserAddressBar browserBack browserForward browserReload \
-         browserZoomIn browserZoomOut browserZoomReset toggleBrowserDeveloperTools \
-         showBrowserJavaScriptConsole find findNext findPrevious; do
-  "$CMUX_SETTINGS" unset "shortcuts.bindings.$a"
-done
-```
-
 ### Terminal-First Cleanup
 
 Fewer app-level shortcuts. Prefer unbinding only the actions the user names; this is a starting proposal.
@@ -185,5 +173,4 @@ done
 - Do not invent action IDs. Validate against the schema or `shortcut-actions.md`.
 - Do not apply a broad template without showing the changed actions first, unless the user named that template.
 - Do not promise conflict detection from `cmux-settings validate`. It validates JSON and supported keys, not shortcut syntax, macOS reservation, or focus-context conflicts.
-- Before assigning `cmd+[` or `cmd+]` to application-scoped actions, warn that they collide with browser Back/Forward unless the browser actions are also changed or unbound.
 - `unset` clears file-managed overrides for one action. Do not call that a built-in default reset unless Settings UI/UserDefaults values were also reset.

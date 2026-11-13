@@ -152,19 +152,4 @@ extension CmuxSettingsFileStore {
             logInvalid("markdown.maxWidth", sourcePath: sourcePath)
         }
     }
-
-    func parseMobileSection(
-        _ section: [String: Any],
-        sourcePath: String,
-        snapshot: inout ResolvedSettingsSnapshot
-    ) {
-        guard section.keys.contains("artifactFolderAccess") else { return }
-        guard let raw = jsonString(section["artifactFolderAccess"]),
-              let value = MobileArtifactFolderAccess(rawValue: raw) else {
-            logInvalid("mobile.artifactFolderAccess", sourcePath: sourcePath)
-            return
-        }
-        let key = SettingCatalog().mobile.artifactFolderAccess
-        snapshot.managedUserDefaults[key.userDefaultsKey] = .string(value.rawValue)
-    }
 }

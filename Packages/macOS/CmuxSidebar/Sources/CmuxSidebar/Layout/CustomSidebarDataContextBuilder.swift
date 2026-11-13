@@ -106,10 +106,6 @@ public struct CustomSidebarDataContextBuilder {
             fields["branch"] = .string(branch)
             fields["dirty"] = .bool(workspace.gitIsDirty)
         }
-        if let firstPullRequest = workspace.pullRequestValues.first {
-            fields["pr"] = firstPullRequest
-            fields["prs"] = .array(workspace.pullRequestValues)
-        }
         if let progress = workspace.progress {
             var progressFields: [String: SwiftValue] = ["value": .double(progress.value)]
             if let label = progress.label {
@@ -125,13 +121,6 @@ public struct CustomSidebarDataContextBuilder {
         }
         if let at = workspace.latestSubmittedAt {
             fields["latestAt"] = .int(Int(at.timeIntervalSince1970))
-        }
-        if let remote = workspace.remote {
-            fields["remote"] = .object([
-                "target": .string(remote.target),
-                "state": .string(remote.stateRawValue),
-                "connected": .bool(remote.isConnected),
-            ])
         }
         if !workspace.agents.isEmpty {
             fields["agents"] = .array(workspace.agents.map(agentValue(_:)))

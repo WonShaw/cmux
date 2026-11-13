@@ -101,3 +101,15 @@ extension CmuxUndoableWebView {
         return true
     }
 }
+
+extension WKWebView {
+    /// Whether a key event is addressed to this web view: its window's first
+    /// responder is the web view itself or one of its descendants.
+    func cmuxOwnsKeyEvent(_ event: NSEvent) -> Bool {
+        guard let eventWindow = event.window ?? window,
+              eventWindow === window,
+              let responder = eventWindow.firstResponder else { return false }
+        if responder === self { return true }
+        return (responder as? NSView)?.isDescendant(of: self) == true
+    }
+}

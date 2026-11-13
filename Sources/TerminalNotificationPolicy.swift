@@ -222,8 +222,8 @@ struct TerminalNotificationPolicyEnvelope: Codable, Sendable, Equatable {
     /// Present only for agent-originated notifications; omitted from the hook
     /// stdin JSON otherwise. Additive to the version-1 envelope contract.
     var agent: TerminalNotificationPolicyAgentContext?
-    /// Present only for remote-origin notifications (a `cmux ssh` host, a cloud
-    /// machine); omitted for local ones. Informational, never hook-patchable.
+    /// Present only for remote-origin notifications; omitted for local ones.
+    /// Informational, never hook-patchable.
     var origin: TerminalNotificationPolicyOriginContext?
     var effects: TerminalNotificationPolicyEffects = TerminalNotificationPolicyEffects()
     var stop: Bool?
@@ -657,7 +657,7 @@ private final class NotificationHookProcessRun: @unchecked Sendable {
         env["CMUX_NOTIFICATION_BODY"] = envelope.notification.body
         env["CMUX_NOTIFICATION_WORKSPACE_ID"] = envelope.notification.workspaceId
         env["CMUX_NOTIFICATION_SURFACE_ID"] = envelope.notification.surfaceId ?? ""
-        // `local`, `ssh-relay:<workspace>`, or `cloud-vm:<machine>`: lets a hook treat
+        // `local`: lets a hook treat
         // remote-origin title/body as untrusted text (never interpolate into code).
         env["CMUX_NOTIFICATION_ORIGIN"] = envelope.origin?.value ?? TerminalNotificationOrigin.localWireValue
         env["CMUX_NOTIFICATION_POLICY_JSON"] = String(data: inputData, encoding: .utf8) ?? ""

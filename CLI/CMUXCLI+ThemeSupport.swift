@@ -350,13 +350,13 @@ extension CMUXCLI {
         case "cmux.sock":
             return Self.cmuxThemeOverrideBundleIdentifier
         case "cmux-debug.sock":
-            return "com.cmuxterm.app.debug"
+            return "com.comux.app.debug"
         case "cmux-nightly.sock":
-            return "com.cmuxterm.app.nightly"
+            return "com.comux.app.nightly"
         case "cmux-rc.sock":
-            return "com.cmuxterm.app.rc"
+            return "com.comux.app.rc"
         case "cmux-staging.sock":
-            return "com.cmuxterm.app.staging"
+            return "com.comux.app.staging"
         default:
             break
         }
@@ -366,16 +366,16 @@ extension CMUXCLI {
         }
 
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-debug-", suffix: ".sock") {
-            return "com.cmuxterm.app.debug.\(slug)"
+            return "com.comux.app.debug.\(slug)"
         }
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-nightly-", suffix: ".sock") {
-            return "com.cmuxterm.app.nightly.\(slug)"
+            return "com.comux.app.nightly.\(slug)"
         }
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-rc-", suffix: ".sock") {
-            return "com.cmuxterm.app.rc.\(slug)"
+            return "com.comux.app.rc.\(slug)"
         }
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-staging-", suffix: ".sock") {
-            return "com.cmuxterm.app.staging.\(slug)"
+            return "com.comux.app.staging.\(slug)"
         }
         return nil
     }
@@ -437,7 +437,7 @@ extension CMUXCLI {
 
     func isRightSidebarCLIMode(_ value: String) -> Bool {
         switch value.lowercased() {
-        case "files", "find", "vault", "sessions", "feed", "dock", "cloud", "machines", "vms", "custom", "custom-sidebar":
+        case "files", "find", "vault", "sessions", "feed", "dock", "custom", "custom-sidebar":
             return true
         default:
             return false
@@ -446,10 +446,8 @@ extension CMUXCLI {
 
     func normalizedRightSidebarCLIArgument(_ value: String) -> String {
         switch value.lowercased() {
-        case "files", "find", "vault", "sessions", "feed", "dock", "machines", "custom", "custom-sidebar":
+        case "files", "find", "vault", "sessions", "feed", "dock", "custom", "custom-sidebar":
             return value.lowercased()
-        case "cloud", "vms":
-            return "machines"
         default:
             return value
         }

@@ -71,7 +71,7 @@ struct AboutLicenseContent {
         bundleIdentifier: String?,
         commit: String?
     ) -> URL {
-        if bundleIdentifier == "com.cmuxterm.app", let version = normalized(version) {
+        if bundleIdentifier == "com.comux.app", let version = normalized(version) {
             return repositoryURL
                 .appendingPathComponent("tree", isDirectory: true)
                 .appendingPathComponent("v\(version)")

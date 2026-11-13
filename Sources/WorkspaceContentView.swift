@@ -92,10 +92,7 @@ private struct WorkspacePanelContentHostView: View {
             onRequestPanelFocus: onRequestPanelFocus,
             onResumeAgentHibernation: onResumeAgentHibernation,
             onAutoResumeAgentHibernation: onAutoResumeAgentHibernation,
-            onTriggerFlash: onTriggerFlash,
-            onRequestDeferredBrowserMaterialization: {
-                workspace.requestDeferredBrowserMaterialization(panelId: panel.id, isVisibleInUI: isVisibleInUI)
-            }
+            onTriggerFlash: onTriggerFlash
         )
     }
 }
@@ -241,86 +238,59 @@ struct WorkspaceContentView: View {
                     isWorkspaceManuallyUnread: isWorkspaceManuallyUnread,
                     isWorkspaceManualUnreadRepresentative: workspaceManualUnreadPanelId == panel.id
                 )
-                if let windowMirror = workspace.remoteTmuxWindowMirror(forPanelId: panel.id) {
-                    // Every tmux window renders through one stable container,
-                    // including its initial one-pane layout.
-                    RemoteTmuxWindowMirrorSplitView(
-                        mirror: windowMirror,
-                        appearance: appearance,
-                        isOuterFocused: isFocused,
-                        isVisibleInUI: isVisibleInUI,
-                        portalPriority: workspacePortalPriority,
-                        onOuterFocus: { workspace.focusRemoteTmuxContainerPaneIfNeeded(paneId) },
-                        unreadSurfaceIDs: Set(
-                            windowMirror.surfaceIDsInLayoutOrder.lazy
-                                .filter {
-                                    notificationStore.hasVisibleNotificationIndicator(
-                                        forTabId: workspace.id,
-                                        surfaceId: $0
-                                    )
-                                }
+                WorkspacePanelContentHostView(
+                    workspace: workspace,
+                    panel: panel,
+                    paneId: paneId,
+                    isFocused: isFocused,
+                    isSelectedInPane: isSelectedInPane,
+                    isVisibleInUI: isVisibleInUI,
+                    allowsPointerInput: isWorkspaceInputActive
+                        && isWorkspaceVisible
+                        && isSelectedInPane,
+                    portalPriority: workspacePortalPriority,
+                    isSplit: isSplit,
+                    appearance: appearance,
+                    windowAppearance: windowAppearance,
+                    customSidebarTabManager: workspace.owningTabManager,
+                    hasUnreadNotification: showsNotificationRing && !usesWorkspacePaneOverlay,
+                    onFocus: {
+                        // Keep bonsplit focus in sync with the AppKit first responder for the
+                        // active workspace. This prevents divergence between the blue focused-tab
+                        // indicator and where keyboard input/flash-focus actually lands.
+                        guard isWorkspaceInputActive else { return }
+                        guard workspace.panels[panel.id] != nil else { return }
+                        workspace.focusPanel(
+                            panel.id,
+                            trigger: .terminalFirstResponder,
+                            focusTransactionId: workspace.activeFocusTransactionId
                         )
-                    )
-                    .onTapGesture {
-                        workspace.focusRemoteTmuxContainerPaneIfNeeded(paneId)
-                    }
-                } else {
-                    WorkspacePanelContentHostView(
-                        workspace: workspace,
-                        panel: panel,
-                        paneId: paneId,
-                        isFocused: isFocused,
-                        isSelectedInPane: isSelectedInPane,
-                        isVisibleInUI: isVisibleInUI,
-                        allowsPointerInput: isWorkspaceInputActive
-                            && isWorkspaceVisible
-                            && isSelectedInPane,
-                        portalPriority: workspacePortalPriority,
-                        isSplit: isSplit,
-                        appearance: appearance,
-                        windowAppearance: windowAppearance,
-                        customSidebarTabManager: workspace.owningTabManager,
-                        hasUnreadNotification: showsNotificationRing && !usesWorkspacePaneOverlay,
-                        onFocus: {
-                            // Keep bonsplit focus in sync with the AppKit first responder for the
-                            // active workspace. This prevents divergence between the blue focused-tab
-                            // indicator and where keyboard input/flash-focus actually lands.
-                            guard isWorkspaceInputActive else { return }
-                            guard workspace.panels[panel.id] != nil else { return }
-                            workspace.focusPanel(
-                                panel.id,
-                                trigger: .terminalFirstResponder,
-                                focusTransactionId: workspace.activeFocusTransactionId
-                            )
-                        },
-                        onRequestPanelFocus: {
-                            guard isWorkspaceInputActive else { return }
-                            guard workspace.panels[panel.id] != nil else { return }
-                            AppDelegate.shared?.noteMainPanelKeyboardFocusIntent(
-                                workspaceId: workspace.id,
-                                panelId: panel.id,
-                                in: NSApp.keyWindow ?? NSApp.mainWindow
-                            )
-                            workspace.focusPanel(panel.id)
-                        },
-                        onResumeAgentHibernation: {
-                            guard isWorkspaceInputActive else { return }
-                            guard workspace.panels[panel.id] != nil else { return }
-                            workspace.resumeAgentHibernation(panelId: panel.id, focus: true)
-                        },
-                        onAutoResumeAgentHibernation: {
-                            guard isWorkspaceInputActive else { return }
-                            guard workspace.panels[panel.id] != nil else { return }
-                            workspace.resumeAgentHibernation(panelId: panel.id, focus: false)
-                        },
-                        onTriggerFlash: { workspace.triggerDebugFlash(panelId: panel.id) }
-                    )
-                    .onTapGesture {
-                        workspace.bonsplitController.focusPane(paneId)
-                    }
+                    },
+                    onRequestPanelFocus: {
+                        guard isWorkspaceInputActive else { return }
+                        guard workspace.panels[panel.id] != nil else { return }
+                        AppDelegate.shared?.noteMainPanelKeyboardFocusIntent(
+                            workspaceId: workspace.id,
+                            panelId: panel.id,
+                            in: NSApp.keyWindow ?? NSApp.mainWindow
+                        )
+                        workspace.focusPanel(panel.id)
+                    },
+                    onResumeAgentHibernation: {
+                        guard isWorkspaceInputActive else { return }
+                        guard workspace.panels[panel.id] != nil else { return }
+                        workspace.resumeAgentHibernation(panelId: panel.id, focus: true)
+                    },
+                    onAutoResumeAgentHibernation: {
+                        guard isWorkspaceInputActive else { return }
+                        guard workspace.panels[panel.id] != nil else { return }
+                        workspace.resumeAgentHibernation(panelId: panel.id, focus: false)
+                    },
+                    onTriggerFlash: { workspace.triggerDebugFlash(panelId: panel.id) }
+                )
+                .onTapGesture {
+                    workspace.bonsplitController.focusPane(paneId)
                 }
-            } else if workspace.cloudVMID != nil {
-                TerminalPanelUnavailableView(appearance: appearance)
             } else {
                 EmptyPanelView(workspace: workspace, paneId: paneId)
             }
@@ -334,7 +304,7 @@ struct WorkspaceContentView: View {
         .internalOnlyTabDrag()
         // Split zoom swaps Bonsplit between the full split tree and a single pane view.
         // Recreate the Bonsplit subtree on zoom enter/exit so stale pre-zoom pane chrome
-        // cannot remain stacked above portal-hosted browser content.
+        // cannot remain stacked above portal-hosted content.
         .id(splitZoomRenderIdentity)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -413,19 +383,10 @@ struct WorkspaceContentView: View {
                 bonsplitView
             }
         }
-        .overlay {
-            if workspace.isManagedCloudVMWorkspace {
-                CloudSurfaceDropGate(workspaceID: workspace.id, isActive: isWorkspaceInputActive)
-            }
-        }
         .modifier(WorkspaceContentMinimalModeSafeAreaModifier(isFullScreen: isFullScreen))
         // A workspace is a page: accept the parent proposal instead of
         // contributing a hidden child's content-derived ideal to its ZStack.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .modifier(CloudPaneCreationFailurePresentation(
-            failureStore: workspace.cloudPaneCreationFailureStore,
-            isWorkspaceVisible: isWorkspaceVisible
-        ))
     }
     private func syncBonsplitNotificationBadges() {
         let manualUnread = workspace.manualUnreadPanelIds
@@ -735,7 +696,6 @@ struct EmptyPanelView: View {
     @ObservedObject var workspace: Workspace
     let paneId: PaneID
     @State private var keyboardShortcutSettingsObserver = KeyboardShortcutSettingsObserver.shared
-    @State private var browserAvailable = BrowserAvailabilitySettings.isEnabled()
 
     private struct ShortcutHint: View {
         let text: String
@@ -762,22 +722,9 @@ struct EmptyPanelView: View {
         _ = workspace.newTerminalSurface(inPane: paneId, inheritWorkingDirectoryFallback: true)
     }
 
-    private func createBrowser() {
-        #if DEBUG
-        cmuxDebugLog("emptyPane.newBrowser pane=\(paneId.id.uuidString.prefix(5))")
-        #endif
-        focusPane()
-        _ = workspace.newBrowserSurface(inPane: paneId)
-    }
-
     private var newSurfaceShortcut: StoredShortcut {
         let _ = keyboardShortcutSettingsObserver.revision
         return KeyboardShortcutSettings.shortcut(for: .newSurface)
-    }
-
-    private var openBrowserShortcut: StoredShortcut {
-        let _ = keyboardShortcutSettingsObserver.revision
-        return KeyboardShortcutSettings.shortcut(for: .openBrowser)
     }
 
     @ViewBuilder
@@ -827,40 +774,10 @@ struct EmptyPanelView: View {
                     shortcut: newSurfaceShortcut,
                     action: createTerminal
                 )
-
-                if browserAvailable {
-                    emptyPaneActionButton(
-                        title: String(localized: "emptyPanel.action.browser", defaultValue: "Browser"),
-                        systemImage: "globe",
-                        shortcut: openBrowserShortcut,
-                        action: createBrowser
-                    )
-                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: GhosttyBackgroundTheme.currentColor()))
-        .task {
-            browserAvailable = BrowserAvailabilitySettings.isEnabled()
-            // The gate is mutated from several entrypoints that signal
-            // differently: palette/policy post didChangeNotification, the
-            // Settings toggle writes defaults directly (defaults
-            // notification), and the CLI writes from another process
-            // (caught on app activation at the latest).
-            await withTaskGroup(of: Void.self) { group in
-                for name in [
-                    BrowserAvailabilitySettings.didChangeNotification,
-                    UserDefaults.didChangeNotification,
-                    NSApplication.didBecomeActiveNotification,
-                ] {
-                    group.addTask { @MainActor in
-                        for await _ in NotificationCenter.default.notifications(named: name) {
-                            browserAvailable = BrowserAvailabilitySettings.isEnabled()
-                        }
-                    }
-                }
-            }
-        }
 #if DEBUG
         .onAppear {
             DebugUIEventCounters.emptyPanelAppearCount += 1

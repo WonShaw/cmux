@@ -41,10 +41,6 @@ extension DockSplitStore {
                 respectForeignFirstResponder: false
             )
             return terminal.hostedView.isSurfaceViewFirstResponder()
-        case let browser as BrowserPanel:
-            return browser.restoreFocusIntent(
-                browser.preferredFocusIntentForActivation()
-            )
         default:
             panel.focus()
             return true
@@ -116,8 +112,6 @@ extension DockSplitStore {
                 observe(.terminalSurfaceDidBecomeReady, object: terminal.surface)
                 observe(.terminalSurfaceHostedViewDidMoveToWindow, object: terminal.surface)
                 observe(.terminalPortalVisibilityDidChange, object: terminal.hostedView)
-            } else if let browser = panel as? BrowserPanel {
-                observe(.browserPortalRegistryDidChange, object: browser.webView)
             }
         }
     }
@@ -158,9 +152,6 @@ extension DockSplitStore {
         for panel in selectedVisibleDockPortalPanels() {
             if let terminal = panel as? TerminalPanel {
                 append(terminal.hostedView.window)
-            } else if let browser = panel as? BrowserPanel {
-                append(browser.portalAnchorView.window)
-                append(browser.webView.window)
             }
         }
         if let app = AppDelegate.shared,
@@ -261,9 +252,6 @@ extension DockSplitStore {
         if let terminal = panel as? TerminalPanel {
             return reconcileVisibleDockTerminalPortal(terminal, isActive: isActive)
         }
-        if let browser = panel as? BrowserPanel {
-            return reconcileVisibleDockBrowserPortal(browser, reason: reason)
-        }
         return false
     }
 
@@ -294,82 +282,5 @@ extension DockSplitStore {
         }
 
         return needsFollowUpPass
-    }
-
-    private func reconcileVisibleDockBrowserPortal(_ browser: BrowserPanel, reason: String) -> Bool {
-        browser.noteWebViewVisibility(true, reason: "portal.\(reason)", recordIfUnchanged: true)
-
-        let anchorView = browser.portalAnchorView
-        guard dockBrowserPortalAnchorReady(anchorView) else { return true }
-
-        let webView = browser.webView
-        let paneDropContext = paneId(forPanelId: browser.id).map {
-            BrowserPaneDropContext(
-                workspaceId: workspaceId,
-                panelId: browser.id,
-                paneId: $0,
-                isDockHosted: true
-            )
-        }
-        let snapshot = BrowserWindowPortalRegistry.debugSnapshot(for: webView)
-        if snapshot?.visibleInUI == false {
-            BrowserWindowPortalRegistry.updateEntryVisibility(
-                for: webView,
-                visibleInUI: true,
-                zPriority: 1
-            )
-        }
-
-        let wasReady = dockBrowserPortalReady(browser)
-        if !wasReady &&
-            (snapshot == nil || !BrowserWindowPortalRegistry.isWebView(webView, boundTo: anchorView)) {
-            BrowserWindowPortalRegistry.bind(
-                webView: webView,
-                to: anchorView,
-                visibleInUI: true,
-                zPriority: 1,
-                paneDropContext: paneDropContext
-            )
-        }
-        // Reconciliation is also responsible for clearing an obsolete active
-        // drop target when the panel-to-pane mapping briefly disappears. The
-        // portal keeps Dock divider ownership separately while its visible slot
-        // is mounted, so a nil context is safe here and will not lose the
-        // trailing-edge hit-test classification.
-        BrowserWindowPortalRegistry.updatePaneDropContext(
-            for: webView,
-            context: paneDropContext
-        )
-
-        if !wasReady && !dockBrowserPortalReady(browser) {
-            BrowserWindowPortalRegistry.synchronizeForAnchor(anchorView)
-        }
-        let isReady = dockBrowserPortalReady(browser)
-        if isReady && (!wasReady || snapshot?.containerHidden == true) {
-            BrowserWindowPortalRegistry.refresh(webView: webView, reason: reason)
-        }
-        return !isReady
-    }
-
-    func dockBrowserPortalAnchorReady(_ anchorView: NSView) -> Bool {
-        anchorView.window != nil &&
-            anchorView.superview != nil &&
-            anchorView.bounds.width > 1 &&
-            anchorView.bounds.height > 1
-    }
-
-    func dockBrowserPortalReady(_ browser: BrowserPanel) -> Bool {
-        dockBrowserPortalAnchorReady(browser.portalAnchorView) &&
-            browser.webView.window != nil &&
-            browser.webView.cmuxBrowserViewportAttachmentSuperview != nil &&
-            BrowserWindowPortalRegistry.isWebView(browser.webView, boundTo: browser.portalAnchorView)
-    }
-
-    func dockBrowserPortalNeedsReconcile(_ browser: BrowserPanel) -> Bool {
-        let snapshot = BrowserWindowPortalRegistry.debugSnapshot(for: browser.webView)
-        return snapshot == nil ||
-            snapshot?.visibleInUI == false ||
-            snapshot?.containerHidden == true ||
-            !dockBrowserPortalReady(browser)
     }
 }

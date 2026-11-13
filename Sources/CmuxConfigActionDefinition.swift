@@ -99,14 +99,18 @@ struct CmuxConfigActionDefinition: Codable, Sendable, Hashable {
         switch inferredType {
         case "builtin":
             let raw = try Self.trimmedString(forKey: .builtin, in: container) ?? ""
-            guard let builtIn = CmuxSurfaceTabBarBuiltInAction(configID: raw) else {
+            if let builtIn = CmuxSurfaceTabBarBuiltInAction(configID: raw) {
+                action = .builtIn(builtIn)
+            } else if CmuxSurfaceTabBarBuiltInAction.isRemovedConfigID(raw) {
+                // Removed built-in: keep the file loading; the action is not runnable.
+                action = nil
+            } else {
                 throw DecodingError.dataCorruptedError(
                     forKey: .builtin,
                     in: container,
                     debugDescription: "Unknown built-in action '\(raw)'"
                 )
             }
-            action = .builtIn(builtIn)
         case "command":
             let command = try Self.requiredTrimmedString(forKey: .command, in: container)
             action = .command(command)

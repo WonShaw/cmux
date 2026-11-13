@@ -1,11 +1,9 @@
 import AppKit
 import CmuxFoundation
 import Foundation
-import WebKit
 
 extension Notification.Name {
     static let terminalPortalDidBecomePresentable = Notification.Name("cmux.terminalPortalDidBecomePresentable")
-    static let browserPortalDidBecomePresentable = Notification.Name("cmux.browserPortalDidBecomePresentable")
     static let workspaceSwitchDidFinish = Notification.Name("cmux.workspaceSwitchDidFinish")
 }
 
@@ -136,7 +134,6 @@ final class WorkspaceSwitchCoordinator {
             renderedFrameSequence: target.terminalRenderedFrameSequence,
             in: &transaction
         )
-        transaction.targetWebViewID = target.browserWebView.map(ObjectIdentifier.init)
         let firstFramePresented: Bool
         if target.contentKind == .terminal {
             firstFramePresented =
@@ -195,19 +192,6 @@ final class WorkspaceSwitchCoordinator {
         finishIfPossible(&transaction)
     }
 
-    func noteBrowserPortalPresented(webView: WKWebView) {
-        guard var transaction = active,
-              transaction.targetWebViewID == ObjectIdentifier(webView),
-              var readiness = transaction.readiness else {
-            return
-        }
-        readiness.portalPresented = true
-        transaction.readiness = readiness
-        releaseRendererProtectionIfTargetIsPresented(&transaction)
-        signposts.end(transaction.portalShowInterval)
-        transaction.portalShowInterval = nil
-        finishIfPossible(&transaction)
-    }
     func noteFirstFrame(
         surfaceID: UUID,
         requestID: UUID,
@@ -243,11 +227,6 @@ final class WorkspaceSwitchCoordinator {
         signposts.end(transaction.interactiveInterval)
         transaction.interactiveInterval = nil
         finishIfPossible(&transaction)
-    }
-
-    func noteBrowserInteractionReady(workspaceID: UUID, webView _: WKWebView) {
-        guard active?.targetWorkspaceID == workspaceID else { return }
-        noteInteractionReady(workspaceID: workspaceID)
     }
 
     func noteInteractionNoLongerRequired(workspaceID: UUID) {

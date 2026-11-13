@@ -30,8 +30,6 @@ struct SidebarWorkspaceRowActions {
     let createGroup: ([UUID]) -> Void
     let addTargetsToGroup: ([UUID], UUID) -> Void
     let removeTargetsFromGroup: ([UUID]) -> Void
-    let reconnectTargets: ([UUID]) -> Void
-    let disconnectTargets: ([UUID]) -> Void
     let applyColor: (String?, [UUID]) -> Void
     let applyTodoStatus: (WorkspaceTaskStatus?, [UUID]) -> Void
     let hideTodoStatus: ([UUID]) -> Void
@@ -44,7 +42,6 @@ struct SidebarWorkspaceRowActions {
     let setNotificationsMuted: ([UUID], Bool) -> Void
     let openNotification: (TerminalNotification) -> Void
     let copyWorkspaceLinks: ([UUID]) -> Void
-    let openPullRequest: (URL) -> Void
     let openPort: (Int) -> Void
     let checklist: SidebarWorkspaceChecklistActions
     let onToggleChecklistExpansion: () -> Void

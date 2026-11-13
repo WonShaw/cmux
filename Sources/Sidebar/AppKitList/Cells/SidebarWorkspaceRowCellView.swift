@@ -28,21 +28,14 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private var leadingSpinner: GPUSpinnerNSView?
     private let pinImageView = NSImageView()
     private let muteImageView = NSImageView()
-    private let mediaAudioView = NSImageView()
-    private let mediaMicView = NSImageView()
-    private let mediaCameraView = NSImageView()
     private let statusGlyphButton = SidebarRowTaskStatusGlyphButton()
     private let titleView = SidebarRowTextView(lines: 1)
-    private let cloudImageView = NSImageView()
     private let trailingBadge = SidebarRowUnreadBadgeView()
     private var trailingSpinner: GPUSpinnerNSView?
     private let closeButton = SidebarHeaderGlyphButton()
     // Detail slots
     private let descriptionView = SidebarRowTextView(lines: 12)
     private let subtitleView = SidebarRowTextView(lines: 2)
-    private let remoteTargetView = SidebarRowTextView(lines: 1)
-    private let remoteStatusView = SidebarRowTextView(lines: 1)
-    private let remoteReconnectButton = NSButton()
     private var metadataRows: [SidebarRowIconTextLine] = []
     private let metadataToggleButton = SidebarRowLinkButton()
     private var markdownBlocks: [SidebarRowTextView] = []
@@ -51,7 +44,6 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private let progressView = SidebarRowProgressView()
     private let branchIconView = NSImageView()
     private var branchLines: [SidebarRowIconTextLine] = []
-    private var pullRequestRows: [SidebarRowPullRequestLine] = []
     private var portButtons: [SidebarRowLinkButton] = []
     private let checklistSection = SidebarRowChecklistSection()
     /// Presents the legacy SwiftUI `SidebarWorkspaceStatusPopover` from the
@@ -200,7 +192,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         addSubview(railView)
         addSubview(contentContainer)
 
-        for view in [pinImageView, muteImageView, cloudImageView, mediaAudioView, mediaMicView, mediaCameraView] {
+        for view in [pinImageView, muteImageView] {
             view.imageScaling = .scaleProportionallyDown
             contentContainer.addSubview(view)
         }
@@ -209,8 +201,6 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         contentContainer.addSubview(statusGlyphButton)
         contentContainer.addSubview(leadingBadge)
         contentContainer.addSubview(titleView)
-        cloudImageView.setAccessibilityIdentifier("sidebarCloudBadge")
-        cloudImageView.setAccessibilityElement(false)
         contentContainer.addSubview(trailingBadge)
         closeButton.onClick = { [weak self] in self?.actions?.commands.closeWorkspace() }
         contentContainer.addSubview(closeButton)
@@ -222,13 +212,6 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             self.actions?.onOpenWorkspaceDescriptionURL(url)
         }
         contentContainer.addSubview(subtitleView)
-        contentContainer.addSubview(remoteTargetView)
-        contentContainer.addSubview(remoteStatusView)
-        remoteReconnectButton.isBordered = false
-        remoteReconnectButton.imagePosition = .imageLeading
-        remoteReconnectButton.target = self
-        remoteReconnectButton.action = #selector(didClickReconnect)
-        contentContainer.addSubview(remoteReconnectButton)
         contentContainer.addSubview(metadataToggleButton)
         contentContainer.addSubview(markdownToggleButton)
         contentContainer.addSubview(logLine)
@@ -412,10 +395,6 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         }
 
         // Title line
-        cloudImageView.configureSidebarWorkspaceAccessory(
-            symbol: "cloud", label: snapshot.cloudWorkspaceLabel,
-            pointSize: model.scaled(10), tint: palette.secondary(0.7), weight: .regular
-        )
         pinImageView.configureSidebarWorkspaceAccessory(
             symbol: "pin.fill", label: snapshot.isPinned
                 ? String(localized: "sidebar.pinnedWorkspaceProtected.tooltip", defaultValue: "Pinned workspace — protected from Close") : nil,
@@ -426,29 +405,6 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
                 ? String(localized: "sidebar.mutedWorkspace.tooltip", defaultValue: "Notifications muted for this workspace") : nil,
             pointSize: model.scaled(9), tint: palette.secondary(0.8)
         )
-        let media = snapshot.mediaActivity
-        mediaAudioView.isHidden = !media.isPlayingAudio
-        if media.isPlayingAudio {
-            mediaAudioView.image = RenderableSystemSymbol.configuredAppKitImage(
-                systemName: "speaker.wave.2.fill", pointSize: model.scaled(9), weight: .semibold
-            )
-            mediaAudioView.contentTintColor = palette.secondary(0.8)
-            mediaAudioView.toolTip = String(localized: "sidebar.mediaActivity.audio.tooltip", defaultValue: "Playing audio in a background browser")
-        }
-        mediaMicView.isHidden = !media.isUsingMicrophone
-        if media.isUsingMicrophone {
-            mediaMicView.image = RenderableSystemSymbol.configuredAppKitImage(
-                systemName: "mic.fill", pointSize: model.scaled(9), weight: nil
-            )
-            mediaMicView.contentTintColor = .systemOrange
-        }
-        mediaCameraView.isHidden = !media.isUsingCamera
-        if media.isUsingCamera {
-            mediaCameraView.image = RenderableSystemSymbol.configuredAppKitImage(
-                systemName: "video.fill", pointSize: model.scaled(9), weight: nil
-            )
-            mediaCameraView.contentTintColor = .systemGreen
-        }
 
         // Manual task-status glyph (legacy `SidebarWorkspaceManualStatusIndicatorMenu`):
         // only a human-set status draws row chrome; automatic status stays out.
@@ -549,36 +505,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             subtitleView.textColor = palette.secondary(0.8)
         }
 
-        // Remote
-        let showsRemote = !settings.hidesAllDetails && settings.showsSSH && snapshot.remoteWorkspaceSidebarText != nil
-        remoteTargetView.isHidden = !showsRemote
-        remoteStatusView.isHidden = !showsRemote
-        remoteReconnectButton.isHidden = !(showsRemote && snapshot.showsRemoteReconnectAffordance)
-        if showsRemote {
-            remoteTargetView.stringValue = snapshot.remoteWorkspaceSidebarText ?? ""
-            remoteTargetView.font = .monospacedSystemFont(ofSize: model.scaled(10), weight: .regular)
-            remoteTargetView.textColor = palette.secondary(0.8)
-            remoteTargetView.lineBreakMode = .byTruncatingMiddle
-            remoteTargetView.toolTip = snapshot.remoteStateHelpText
-            remoteStatusView.stringValue = snapshot.remoteConnectionStatusText
-            remoteStatusView.font = .systemFont(ofSize: model.scaled(9), weight: .medium)
-            remoteStatusView.textColor = palette.secondary(0.58)
-            if !remoteReconnectButton.isHidden {
-                remoteReconnectButton.attributedTitle = NSAttributedString(
-                    string: String(localized: "sidebar.remote.reconnect.button", defaultValue: "Reconnect"),
-                    attributes: [
-                        .font: NSFont.systemFont(ofSize: model.scaled(9), weight: .semibold),
-                        .foregroundColor: palette.secondary(0.9),
-                    ]
-                )
-                remoteReconnectButton.toolTip = String(localized: "sidebar.remote.reconnect.help", defaultValue: "Reconnect to the remote host")
-            }
-        }
-
         configureMetadata(model: model, palette: palette)
         configureLogAndProgress(model: model, palette: palette)
         configureBranchDirectory(model: model, palette: palette)
-        configurePullRequestsAndPorts(model: model, palette: palette)
+        configurePorts(model: model, palette: palette)
         if let actions {
             checklistSection.configure(model: model, palette: palette, actions: actions)
         }
@@ -889,20 +819,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         }
     }
 
-    private func configurePullRequestsAndPorts(model: SidebarWorkspaceRowModel, palette: SidebarRowPalette) {
+    private func configurePorts(model: SidebarWorkspaceRowModel, palette: SidebarRowPalette) {
         let snapshot = model.snapshot
         let settings = model.settings
-        let prs = settings.visibleAuxiliaryDetails.showsPullRequests ? snapshot.pullRequestRows : []
-        Self.pool(&pullRequestRows, count: prs.count, parent: contentContainer) { SidebarRowPullRequestLine() }
-        for (index, pr) in prs.enumerated() {
-            pullRequestRows[index].configure(
-                pr, model: model, palette: palette,
-                clickable: settings.makesPullRequestsClickable
-            ) { [weak self] in
-                self?.actions?.commands.updateSelection()
-                self?.actions?.onOpenPullRequest(pr.url)
-            }
-        }
         let ports = settings.visibleAuxiliaryDetails.showsPorts ? snapshot.listeningPorts : []
         Self.pool(&portButtons, count: ports.count, parent: contentContainer) { SidebarRowLinkButton() }
         for (index, port) in ports.enumerated() {
@@ -936,10 +855,6 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     }
 
     // MARK: Interaction
-
-    @objc private func didClickReconnect() {
-        actions?.commands.reconnectRemoteConnection()
-    }
 
     // MARK: Status popover + compact status menu
 
@@ -1135,20 +1050,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             place(muteImageView, size: NSSize(width: side, height: side), centerY: firstLineCenter)
             x += side + titleRowSpacing
         }
-        for view in [mediaAudioView, mediaMicView, mediaCameraView] where !view.isHidden {
-            let side = model.scaled(9) + 4
-            place(view, size: NSSize(width: side, height: side), centerY: firstLineCenter)
-            x += side + titleRowSpacing
-        }
         if !statusGlyphButton.isHidden {
             let glyphSize = SidebarRowTaskStatusGlyphButton.occupiedSize(fontScale: model.fontScale)
             place(statusGlyphButton, size: glyphSize, centerY: firstLineCenter)
             x += glyphSize.width + titleRowSpacing
         }
 
-        x = cloudImageView.layoutLeadingSidebarWorkspaceAccessory(
-            minX: x, centerY: firstLineCenter, side: model.scaled(10) + 4, spacing: titleRowSpacing, apply: apply
-        )
         // Trailing slot
         let closeHit = max(16, 16 * model.fontScale)
         let closeWidth = max(16, closeHit)
@@ -1198,27 +1105,6 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
 
         placeBlock(descriptionView)
         placeBlock(subtitleView)
-
-        if !remoteTargetView.isHidden {
-            y += model.latestNotificationText == nil ? 1 : 2
-            y += spacing
-            let statusSize = remoteStatusView.isHidden ? .zero : remoteStatusView.sidebarNaturalCellSize
-            let reconnectSize = remoteReconnectButton.isHidden ? .zero : remoteReconnectButton.intrinsicContentSize
-            let rightWidth = statusSize.width + (reconnectSize.width > 0 ? reconnectSize.width + 6 : 0)
-            let targetWidth = max(10, contentWidth - rightWidth - 6)
-            let lineHeight = max(remoteTargetView.sidebarNaturalCellSize.height, statusSize.height, reconnectSize.height)
-            if apply {
-                remoteTargetView.frame = NSRect(x: leading, y: y, width: targetWidth, height: lineHeight)
-                var rightX = trailing - statusSize.width
-                if !remoteReconnectButton.isHidden {
-                    rightX = trailing - reconnectSize.width
-                    remoteReconnectButton.frame = NSRect(x: rightX, y: y, width: reconnectSize.width, height: lineHeight)
-                    rightX -= statusSize.width + 6
-                }
-                remoteStatusView.frame = NSRect(x: rightX, y: y, width: statusSize.width, height: lineHeight)
-            }
-            y += lineHeight
-        }
 
         for row in metadataRows where !row.isHidden {
             y += 2
@@ -1284,17 +1170,6 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             for line in visibleBranchLines {
                 let height = line.measuredHeight(width: lineWidth)
                 if apply { line.frame = NSRect(x: lineX, y: y, width: lineWidth, height: height) }
-                y += height + 1
-            }
-            y -= 1
-        }
-
-        let visiblePRs = pullRequestRows.filter { !$0.isHidden }
-        if !visiblePRs.isEmpty {
-            y += spacing
-            for row in visiblePRs {
-                let height = row.measuredHeight(width: contentWidth)
-                if apply { row.frame = NSRect(x: leading, y: y, width: contentWidth, height: height) }
                 y += height + 1
             }
             y -= 1

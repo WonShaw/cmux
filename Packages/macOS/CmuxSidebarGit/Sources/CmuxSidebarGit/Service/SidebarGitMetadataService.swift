@@ -39,9 +39,6 @@ public final class SidebarGitMetadataService: SidebarGitMetadataServing {
     let workspaceGitMetadataReader: any WorkspaceGitMetadataReading
     // Resolves the Git-aware event plan for a directory.
     let gitMetadataService: any GitMetadataWatchDescriptorReading
-    // PR polling: a local probe that finds a branch schedules a refresh here,
-    // and probe teardown clears the matching PR tracking.
-    let pullRequestProbing: any PullRequestProbing
     // Process-wide cap on concurrent snapshot probes (injected, shared
     // across windows by the composition root).
     let probeLimiter: WorkspaceGitMetadataProbeLimiter
@@ -88,7 +85,6 @@ public final class SidebarGitMetadataService: SidebarGitMetadataServing {
     ///   - workspaceGitMetadataReader: Reads a directory's git metadata;
     ///     tests pass a fake.
     ///   - gitMetadataService: Resolves watched git paths for the watcher.
-    ///   - pullRequestProbing: The PR poll service driven by probe outcomes.
     ///   - probeLimiter: Process-wide concurrent probe cap.
     ///   - clock: Initial-probe retry clock; tests inject virtual time.
     ///   - mobileHostDeferral: Mobile-host deferral intervals.
@@ -96,7 +92,6 @@ public final class SidebarGitMetadataService: SidebarGitMetadataServing {
     public init(
         workspaceGitMetadataReader: any WorkspaceGitMetadataReading,
         gitMetadataService: any GitMetadataWatchDescriptorReading,
-        pullRequestProbing: any PullRequestProbing,
         probeLimiter: WorkspaceGitMetadataProbeLimiter,
         clock: any GitPollClock = SystemGitPollClock(),
         mobileHostDeferral: MobileHostDeferralPolicy = .standard,
@@ -104,7 +99,6 @@ public final class SidebarGitMetadataService: SidebarGitMetadataServing {
     ) {
         self.workspaceGitMetadataReader = workspaceGitMetadataReader
         self.gitMetadataService = gitMetadataService
-        self.pullRequestProbing = pullRequestProbing
         self.probeLimiter = probeLimiter
         self.clock = clock
         self.mobileHostDeferral = mobileHostDeferral
@@ -130,10 +124,6 @@ public final class SidebarGitMetadataService: SidebarGitMetadataServing {
 
     var sidebarGitMetadataActivePollingEnabled: Bool {
         host?.gitMetadataActivity.performsActivePolling ?? false
-    }
-
-    var sidebarPullRequestPollingEnabled: Bool {
-        host?.pullRequestActivity.performsActivePolling ?? false
     }
 
     // MARK: Explicit refresh
@@ -230,7 +220,6 @@ public final class SidebarGitMetadataService: SidebarGitMetadataServing {
     ) -> Set<UUID> {
         guard let host else { return [] }
         var candidatePanelIds = host.panelGitBranchPanelIds(in: workspaceId)
-        candidatePanelIds.formUnion(host.panelPullRequestPanelIds(in: workspaceId))
         // Only keep background polling panels whose current directory has already
         // proven to yield sidebar git metadata. Initial multi-attempt probes handle
         // startup races; this avoids polling non-repo directories forever.
@@ -284,16 +273,11 @@ public final class SidebarGitMetadataService: SidebarGitMetadataServing {
             return
         }
         host.clearPanelGitBranch(workspaceId: key.workspaceId, panelId: key.panelId)
-        host.clearPanelPullRequest(workspaceId: key.workspaceId, panelId: key.panelId)
     }
 
     func clearWorkspaceGitProbeTracking(for key: WorkspaceGitProbeKey) {
         clearWorkspaceGitProbe(key)
         workspaceGitTrackedDirectoryByKey.removeValue(forKey: key)
-        pullRequestProbing.clearWorkspacePullRequestTracking(
-            workspaceId: key.workspaceId,
-            panelId: key.panelId
-        )
     }
 
     public func clearWorkspaceGitProbes(workspaceId: UUID) {
@@ -315,7 +299,6 @@ public final class SidebarGitMetadataService: SidebarGitMetadataServing {
             key.workspaceId != workspaceId
         }
         stopWorkspaceGitMetadataWatchers(workspaceId: workspaceId)
-        pullRequestProbing.clearWorkspacePullRequestTracking(workspaceId: workspaceId)
     }
 
     public func resetAllWorkspaceGitProbeTracking() {
@@ -330,7 +313,6 @@ public final class SidebarGitMetadataService: SidebarGitMetadataServing {
         workspaceGitCleanIndexSignatureByKey.removeAll()
         workspaceGitCleanIndexContentSignatureByKey.removeAll()
         workspaceGitHeadSignatureByKey.removeAll()
-        pullRequestProbing.resetWorkspacePullRequestRefreshState()
     }
 
     // MARK: Test seams

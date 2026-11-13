@@ -174,10 +174,8 @@ extension TerminalController {
     }
 
     func controlSidebarCreatePaneSplit(
-        isBrowser: Bool,
         orientationIsHorizontal: Bool,
-        insertFirst: Bool,
-        url: URL?
+        insertFirst: Bool
     ) -> ControlSidebarPaneSplitResolution {
         let focus = Self.socketCommandAllowsInAppFocusMutations()
         guard let tabManager,
@@ -188,24 +186,6 @@ extension TerminalController {
         }
 
         let orientation: SplitOrientation = orientationIsHorizontal ? .horizontal : .vertical
-        if isBrowser {
-            guard let id = tab.newBrowserSplit(
-                from: focusedPanelId,
-                orientation: orientation,
-                insertFirst: insertFirst,
-                url: url,
-                focus: focus,
-                creationPolicy: .automationPreload
-            )?.id else {
-                return .failed
-            }
-            return .created(id)
-        }
-        if tab.isRemoteTmuxMirror, insertFirst {
-            // Routed tmux `split-window` cannot insert before the target
-            // pane; reject before mutating the remote session.
-            return .mirrorInsertFirstRejected
-        }
         switch tab.newTerminalSplitOutcome(
             from: focusedPanelId,
             orientation: orientation,
@@ -224,7 +204,7 @@ extension TerminalController {
 
     // MARK: - New / close surface
 
-    func controlSidebarNewSurface(isBrowser: Bool, paneArg: String?, url: URL?) -> ControlSidebarNewSurfaceResolution {
+    func controlSidebarNewSurface(paneArg: String?) -> ControlSidebarNewSurfaceResolution {
         let focus = Self.socketCommandAllowsInAppFocusMutations()
         guard let tabManager,
               let tabId = tabManager.selectedTabId,
@@ -251,17 +231,6 @@ extension TerminalController {
             return .paneNotFound
         }
 
-        if isBrowser {
-            guard let id = tab.newBrowserSurface(
-                inPane: targetPaneId,
-                url: url,
-                focus: focus,
-                creationPolicy: .automationPreload
-            )?.id else {
-                return .failed
-            }
-            return .created(id)
-        }
         switch tab.newTerminalSurfaceOutcome(
             inPane: targetPaneId,
             focus: focus,
@@ -411,8 +380,6 @@ extension TerminalController {
                     portalHosted: controlSidebarIsPortalHosted(tp.hostedView),
                     viewDepth: controlSidebarViewDepth(of: tp.hostedView)
                 )
-            } else if let bp = panel as? BrowserPanel {
-                kind = .browser(inWindow: bp.webView.window != nil)
             } else {
                 kind = .other
             }

@@ -4,14 +4,12 @@ import Foundation
 extension CMUXCLI {
     func runClaudePushNotificationHook(
         client: SocketClient,
-        telemetry: CLISocketSentryTelemetry,
         parsedInput: ClaudeHookParsedInput,
         sessionStore: ClaudeHookSessionStore,
         routing: ClaudeHookRoutingContext,
         markFeedTelemetryHandled: () -> Void,
         sendFeedTelemetry: (String?, String?) -> Void
     ) throws {
-        telemetry.breadcrumb("claude-hook.push-notification")
         // PostToolUse bridge for Claude Code's PushNotification tool. The
         // tool delivers through a raw OSC desktop notification, and cmux
         // deliberately drops raw OSC notifications from surfaces running a
@@ -23,17 +21,14 @@ extension CMUXCLI {
         // (tool_response.localSent); fail open when an older client omits
         // the structured response.
         guard let pushMessage = claudePushNotificationMessage(parsedInput.rawObject) else {
-            telemetry.breadcrumb("claude-hook.push-notification.empty")
             printClaudeHookAck()
             return
         }
         guard claudePushNotificationShouldBridge(parsedInput.rawObject) else {
-            telemetry.breadcrumb("claude-hook.push-notification.skipped")
             printClaudeHookAck()
             return
         }
         guard let sessionID = parsedInput.sessionId, !sessionID.isEmpty else {
-            telemetry.breadcrumb("claude-hook.push-notification.missing-session")
             printClaudeHookAck()
             return
         }
@@ -44,7 +39,6 @@ extension CMUXCLI {
             client: client
         ), resolvedTarget.isAuthoritative else {
             markFeedTelemetryHandled()
-            telemetry.breadcrumb("claude-hook.push-notification.unresolved")
             printClaudeHookAck()
             return
         }
@@ -55,10 +49,8 @@ extension CMUXCLI {
             sessionStore: sessionStore,
             parsedInput: parsedInput,
             workspaceId: workspaceId,
-            surfaceId: surfaceId,
-            telemetry: telemetry
+            surfaceId: surfaceId
         ) else {
-            telemetry.breadcrumb("claude-hook.push-notification.stale")
             printClaudeHookAck()
             return
         }
@@ -67,7 +59,6 @@ extension CMUXCLI {
             currentAgentPID: claudePid,
             env: ProcessInfo.processInfo.environment
         ) else {
-            telemetry.breadcrumb("claude-hook.push-notification.nested-suppressed")
             printClaudeHookAck()
             return
         }

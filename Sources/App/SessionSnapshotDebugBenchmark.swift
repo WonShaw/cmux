@@ -77,7 +77,6 @@ enum SessionSnapshotDebugBenchmark {
                 "workspaces": 0,
                 "panels": 0,
                 "terminals": 0,
-                "browsers": 0,
                 "markdown": 0,
                 "scrollback_chars": 0,
                 "status_entries": 0,
@@ -90,7 +89,6 @@ enum SessionSnapshotDebugBenchmark {
         var workspaces = 0
         var panels = 0
         var terminals = 0
-        var browsers = 0
         var markdown = 0
         var scrollbackChars = 0
         var statusEntries = 0
@@ -111,7 +109,6 @@ enum SessionSnapshotDebugBenchmark {
                         terminals += 1
                         scrollbackChars += terminal.scrollback?.count ?? 0
                     }
-                    if panel.browser != nil { browsers += 1 }
                     if panel.markdown != nil { markdown += 1 }
                     if panel.gitBranch != nil { gitEntries += 1 }
                 }
@@ -123,7 +120,6 @@ enum SessionSnapshotDebugBenchmark {
             "workspaces": workspaces,
             "panels": panels,
             "terminals": terminals,
-            "browsers": browsers,
             "markdown": markdown,
             "scrollback_chars": scrollbackChars,
             "status_entries": statusEntries,

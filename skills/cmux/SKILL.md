@@ -5,12 +5,12 @@ description: End-user control of cmux topology and routing (windows, workspaces,
 
 # cmux Core Control
 
-Non-browser cmux topology and routing.
+cmux topology and routing.
 
 - **Window**: top-level macOS cmux window.
 - **Workspace**: tab-like group within a window.
 - **Pane**: split container in a workspace.
-- **Surface**: a tab within a pane (terminal or browser panel).
+- **Surface**: a tab within a pane (terminal, markdown viewer, or file preview).
 
 ## Fast start
 
@@ -47,18 +47,7 @@ cmux-owned settings live in `~/.config/cmux/cmux.json`. `cmux docs settings` pri
 
 `cmux reload-config` reloads both `cmux.json` and `~/.config/ghostty/config`, refreshing terminals in place with no app restart.
 
-Terminal rendering (font, cursor style, theme, scrollback, `background-opacity`, `background-blur`) belongs in Ghostty config, not cmux settings. Everything else (app behavior, sidebar, notifications, browser behavior, automation, workspace colors, cmux-owned shortcuts) is cmux settings. Before editing, copy any existing `cmux.json` to a timestamped `.bak` next to it. Legacy `~/.config/cmux/settings.json` and `~/Library/Application Support/com.cmuxterm.app/settings.json` are read only as fallback for missing keys.
-
-For a completed download, the CLI can inspect the bounded history owned by the
-target browser surface without consuming a waiter:
-
-```bash
-cmux browser --surface <surface> download list
-cmux browser --surface <surface> download list --limit 5 --json
-```
-
-Use the browser skill for the full response fields and wait/path compatibility
-details.
+Terminal rendering (font, cursor style, theme, scrollback, `background-opacity`, `background-blur`) belongs in Ghostty config, not cmux settings. Everything else (app behavior, sidebar, notifications, automation, workspace colors, cmux-owned shortcuts) is cmux settings. Before editing, copy any existing `cmux.json` to a timestamped `.bak` next to it. Legacy `~/.config/cmux/settings.json` and `~/Library/Application Support/com.comux.app/settings.json` are read only as fallback for missing keys.
 
 ## Deep-dive references
 
@@ -70,5 +59,4 @@ details.
 | [references/trigger-flash-and-health.md](references/trigger-flash-and-health.md) | Flash cue and surface health checks |
 | [../cmux-workspace/SKILL.md](../cmux-workspace/SKILL.md) | Current caller workspace rules and non-disruptive automation |
 | [../cmux-settings/SKILL.md](../cmux-settings/SKILL.md) | Safe cmux.json settings edits and validation |
-| [../cmux-browser/SKILL.md](../cmux-browser/SKILL.md) | Browser automation on surface-backed webviews |
 | [../cmux-markdown/SKILL.md](../cmux-markdown/SKILL.md) | Markdown viewer panel with live file watching |

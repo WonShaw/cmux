@@ -497,56 +497,6 @@ struct RecoverableMainWindowLifecycleTests {
         #expect(frozen.dock?.panels[0].terminal?.scrollback == "window dock output")
     }
 
-    @Test("Browser-only close retires its closing lifecycle record immediately")
-    func browserOnlyCloseRetiresClosingLifecycleRecordImmediately() throws {
-        _ = NSApplication.shared
-        let previousAppDelegate = AppDelegate.shared
-        let app = AppDelegate()
-        AppDelegate.shared = app
-
-        let windowId = UUID()
-        let window = makeMainWindow(id: windowId)
-        let manager = TabManager()
-        defer {
-            app.forgetRecoverableMainWindowRoute(windowId: windowId)
-            window.orderOut(nil)
-            TerminalController.shared.setActiveTabManager(nil)
-            AppDelegate.shared = previousAppDelegate
-        }
-
-        app.registerMainWindow(
-            window,
-            windowId: windowId,
-            tabManager: manager,
-            sidebarState: SidebarState(),
-            sidebarSelectionState: SidebarSelectionState(),
-            fileExplorerState: FileExplorerState()
-        )
-        let workspace = try #require(manager.selectedWorkspace)
-        let terminal = try #require(workspace.focusedTerminalPanel)
-        let paneId = try #require(workspace.bonsplitController.allPaneIds.first)
-        let browser = try #require(workspace.newBrowserSurface(
-            inPane: paneId,
-            url: nil,
-            focus: true,
-            creationPolicy: .restoration
-        ))
-        #expect(workspace.closePanel(terminal.id, force: true))
-        #expect(workspace.panels[browser.id] != nil)
-        #expect(!workspace.panels.values.contains { $0 is TerminalPanel })
-
-        app.unregisterMainWindowContextForTesting(windowId: windowId)
-        #expect(app.tabManagerForWindowTeardown(windowId: windowId) === manager)
-
-        NotificationCenter.default.post(
-            name: NSWindow.willCloseNotification,
-            object: window
-        )
-
-        #expect(app.tabManagerForWindowTeardown(windowId: windowId) == nil)
-        #expect(app.mainWindowLifecycleCoordinator.teardownRoute(windowId: windowId) == nil)
-    }
-
     @Test("Recovery freeze makes an unverified process-detected Dock binding manual")
     func recoveryFreezeMakesUnverifiedProcessDetectedDockBindingManual() throws {
         let sourceWorkspaceId = UUID()

@@ -21,7 +21,7 @@ pluginkit -m -p <host-bundle-id>.cmux.sidebar
 ## New tag-ready sample extension checklist
 
 - appex Info.plist: `EXAppExtensionAttributes:EXExtensionPointIdentifier = $(CMUX_SIDEBAR_EXTENSION_POINT_ID)`.
-- app and appex targets define `CMUX_SIDEBAR_EXTENSION_POINT_ID` (default `com.cmuxterm.app.cmux.sidebar`), `CMUX_BUNDLE_ID_SUFFIX` (default empty), and `CMUX_DISPLAY_NAME_SUFFIX` (default empty) in all build configs.
+- app and appex targets define `CMUX_SIDEBAR_EXTENSION_POINT_ID` (default `com.comux.app.cmux.sidebar`), `CMUX_BUNDLE_ID_SUFFIX` (default empty), and `CMUX_DISPLAY_NAME_SUFFIX` (default empty) in all build configs.
 - app `PRODUCT_BUNDLE_IDENTIFIER` = `<appBase>$(CMUX_BUNDLE_ID_SUFFIX)`; appex = `<appBase>$(CMUX_BUNDLE_ID_SUFFIX).<leaf>`, so the suffix lands before the appex leaf and the appex id stays prefixed by the app id.
 - appex `INFOPLIST_KEY_CFBundleDisplayName` (or the `CFBundleDisplayName` value) = `<Name>$(CMUX_DISPLAY_NAME_SUFFIX)`.
 - xcodebuild ad-hoc signs the appex with Info.plist bound and entitlements intact; do not re-sign post-build.

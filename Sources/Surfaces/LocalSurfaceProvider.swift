@@ -4,7 +4,7 @@ import Foundation
 
 /// This Mac as a surface provider.
 ///
-/// Every live terminal and browser pane on this Mac is a resource whose single projection
+/// Every live terminal pane on this Mac is a resource whose single projection
 /// is the pane itself: Ghostty owns the PTY and WebKit owns the page, so a local resource
 /// cannot be shown twice — "projecting" it somewhere else moves the pane. Resources are
 /// keyed by the panel UUID and stay in sync through the workspace hooks in
@@ -51,10 +51,6 @@ final class LocalSurfaceProvider: SurfaceProvider {
         SurfaceResourceID(machine: .local, kind: .terminal, key: panelID.uuidString)
     }
 
-    static func resourceID(forBrowserPanel panelID: UUID) -> SurfaceResourceID {
-        SurfaceResourceID(machine: .local, kind: .browser, key: panelID.uuidString)
-    }
-
     /// The resource a pane represents, or nil for pane kinds that are not surfaces
     /// (markdown, file preview, tools, loading placeholders, …).
     func resource(for panel: any Panel, in workspace: Workspace) -> SurfaceResource? {
@@ -69,18 +65,6 @@ final class LocalSurfaceProvider: SurfaceProvider {
                 remoteWorkspace: nil,
                 port: nil,
                 url: nil
-            )
-        }
-        if let browser = panel as? BrowserPanel {
-            return SurfaceResource(
-                id: Self.resourceID(forBrowserPanel: panel.id),
-                title: title,
-                detail: browser.currentURL?.absoluteString,
-                lifecycle: .running,
-                agent: nil,
-                remoteWorkspace: nil,
-                port: nil,
-                url: browser.currentURL?.absoluteString
             )
         }
         return nil
@@ -235,7 +219,7 @@ final class LocalSurfaceProvider: SurfaceProvider {
         return SurfaceProjection(resource: resource.id, workspaceID: target.id, panelID: panelID)
     }
 
-    func createTerminal(command: [String]?, cwd: String?, name: String?, remoteWorkspaceID: String?) async throws -> SurfaceResource {
+    func createTerminal(command: [String]?, cwd: String?, name: String?) async throws -> SurfaceResource {
         let all = workspaces()
         guard let workspace = all.first(where: { $0.owningTabManager?.selectedTabId == $0.id }) ?? all.first else {
             throw SurfaceCatalogError.destinationNotFound("a workspace")

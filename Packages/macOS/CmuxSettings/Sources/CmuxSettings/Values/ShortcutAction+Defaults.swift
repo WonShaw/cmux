@@ -9,16 +9,6 @@ extension ShortcutAction {
                 first: ShortcutStroke(key: "g"),
                 second: ShortcutStroke(key: "g")
             )
-        case .diffViewerNextFile:
-            return StoredShortcut(
-                first: ShortcutStroke(key: "]"),
-                second: ShortcutStroke(key: "f")
-            )
-        case .diffViewerPreviousFile:
-            return StoredShortcut(
-                first: ShortcutStroke(key: "["),
-                second: ShortcutStroke(key: "f")
-            )
         default:
             return defaultStroke.map { StoredShortcut(first: $0) }
         }
@@ -33,7 +23,7 @@ extension ShortcutAction {
     /// the package table.
     public func defaultShortcut(using resolver: ShortcutDefaultResolver) -> StoredShortcut? {
         switch self {
-        case .diffViewerScrollToTop, .diffViewerNextFile, .diffViewerPreviousFile:
+        case .diffViewerScrollToTop:
             return defaultShortcut
         default:
             return defaultStroke(using: resolver).map { StoredShortcut(first: $0) }
@@ -77,9 +67,6 @@ extension ShortcutAction {
         case .quit: return ShortcutStroke(key: "q", command: true)
         case .toggleSidebar: return ShortcutStroke(key: "b", command: true)
         case .newTab: return ShortcutStroke(key: "n", command: true)
-        case .newBrowserWorkspace: return ShortcutStroke(key: "n", command: true, option: true)
-        case .newCloudWorkspace: return ShortcutStroke(key: "y", command: true)
-        case .newCloudMachine: return ShortcutStroke(key: "y", command: true, shift: true)
         case .saveLayoutTemplate: return ShortcutStroke(key: "s", command: true, control: true)
         case .openFolder: return ShortcutStroke(key: "o", command: true)
         case .reopenPreviousSession: return ShortcutStroke(key: "o", command: true, shift: true)
@@ -87,7 +74,6 @@ extension ShortcutAction {
         case .commandPalette: return ShortcutStroke(key: "p", command: true, shift: true)
         case .commandPaletteNext: return ShortcutStroke(key: "n", control: true)
         case .commandPalettePrevious: return ShortcutStroke(key: "p", control: true)
-        case .sendFeedback: return nil
         case .showNotifications: return ShortcutStroke(key: "i", command: true)
         case .jumpToUnread: return ShortcutStroke(key: "u", command: true, shift: true)
         case .toggleUnread: return ShortcutStroke(key: "u", command: true, option: true)
@@ -99,7 +85,6 @@ extension ShortcutAction {
         case .switchRightSidebarToSessions: return ShortcutStroke(key: "3", control: true)
         case .switchRightSidebarToFeed: return ShortcutStroke(key: "4", control: true)
         case .switchRightSidebarToDock: return ShortcutStroke(key: "5", control: true)
-        case .switchRightSidebarToMachines: return ShortcutStroke(key: "6", control: true)
         case .triggerFlash: return ShortcutStroke(key: "h", command: true, shift: true)
         case .nextSidebarTab: return ShortcutStroke(key: "]", command: true, control: true)
         case .prevSidebarTab: return ShortcutStroke(key: "[", command: true, control: true)
@@ -143,8 +128,6 @@ extension ShortcutAction {
         case .resizePaneRight: return ShortcutStroke(key: "l", shift: true, control: true)
         case .resizePaneUp: return ShortcutStroke(key: "k", shift: true, control: true)
         case .resizePaneDown: return ShortcutStroke(key: "j", shift: true, control: true)
-        case .splitBrowserRight: return ShortcutStroke(key: "d", command: true, option: true)
-        case .splitBrowserDown: return ShortcutStroke(key: "d", command: true, shift: true, option: true)
         case .toggleCanvasLayout: return ShortcutStroke(key: "c", command: true, control: true)
         case .canvasRevealFocusedPane: return ShortcutStroke(key: "r", command: true, control: true)
         case .canvasOverview: return ShortcutStroke(key: "o", command: true, control: true)
@@ -188,14 +171,7 @@ extension ShortcutAction {
         case .toggleRightSidebar: return ShortcutStroke(key: "b", command: true, option: true)
         case .fileExplorerOpenSelection: return ShortcutStroke(key: "\r")
         case .fileExplorerOpenSelectionFinderAlias: return ShortcutStroke(key: "↓", command: true)
-        case .openDiffViewer: return ShortcutStroke(key: "d", command: true, shift: true, control: true)
         case .saveFilePreview: return ShortcutStroke(key: "s", command: true)
-        case .openBrowser: return ShortcutStroke(key: "l", command: true, shift: true)
-        case .focusBrowserAddressBar: return ShortcutStroke(key: "l", command: true)
-        case .browserBack: return ShortcutStroke(key: "[", command: true)
-        case .browserForward: return ShortcutStroke(key: "]", command: true)
-        case .browserReload: return ShortcutStroke(key: "r", command: true)
-        case .browserHardReload: return ShortcutStroke(key: "r", command: true, shift: true)
         case .browserZoomIn: return ShortcutStroke(key: "=", command: true)
         case .browserZoomOut: return ShortcutStroke(key: "-", command: true)
         case .browserZoomReset: return ShortcutStroke(key: "0", command: true)
@@ -208,11 +184,6 @@ extension ShortcutAction {
         case .findPrevious: return ShortcutStroke(key: "g", command: true, option: true)
         case .hideFind: return ShortcutStroke(key: "f", command: true, shift: true, option: true)
         case .useSelectionForFind: return ShortcutStroke(key: "e", command: true)
-        case .toggleBrowserDeveloperTools: return ShortcutStroke(key: "i", command: true, option: true)
-        case .showBrowserJavaScriptConsole: return ShortcutStroke(key: "c", command: true, option: true)
-        case .toggleBrowserFocusMode: return ShortcutStroke(key: "\r", command: true, option: true)
-        case .toggleBrowserDesignMode: return ShortcutStroke(key: "d", command: true, option: true, control: true)
-        case .toggleReactGrab: return ShortcutStroke(key: "g", command: true, shift: true)
         case .diffViewerScrollDown: return ShortcutStroke(key: "j")
         case .diffViewerScrollUp: return ShortcutStroke(key: "k")
         case .diffViewerScrollHalfPageDown: return ShortcutStroke(key: "d", control: true)
@@ -221,14 +192,11 @@ extension ShortcutAction {
         case .diffViewerScrollUpEmacs: return ShortcutStroke(key: "p", control: true)
         case .diffViewerScrollToBottom: return ShortcutStroke(key: "g", shift: true)
         case .diffViewerScrollToTop: return nil
-        case .diffViewerOpenFileSearch: return ShortcutStroke(key: "/")
         case .simulatorHome: return ShortcutStroke(key: "h", command: true, shift: true)
         case .simulatorRotateLeft: return ShortcutStroke(key: "←", command: true)
         case .simulatorRotateRight: return ShortcutStroke(key: "→", command: true)
         case .simulatorToggleAppearance: return ShortcutStroke(key: "a", command: true, shift: true)
         case .simulatorToggleSoftwareKeyboard: return ShortcutStroke(key: "k", command: true)
-        case .diffViewerNextFile: return nil
-        case .diffViewerPreviousFile: return nil
         }
     }
 }

@@ -5,7 +5,7 @@ public import Foundation
 ///
 /// The app target (today `TerminalController`, the interim composition owner)
 /// conforms by reading live `TabManager` / `Workspace` / `TerminalPanel` /
-/// `BrowserPanel` state, the Ghostty surfaces, the `TerminalSurfaceRegistry`,
+/// the Ghostty surfaces, the `TerminalSurfaceRegistry`,
 /// and the `SurfaceResumeApprovalStore`. Every method is `@MainActor` because its
 /// conformer and the coordinator both live on the main actor, so these are plain
 /// in-isolation calls — the per-read `v2MainSync` hops the legacy command bodies
@@ -303,17 +303,11 @@ public protocol ControlSurfaceContext: AnyObject {
     ///   - workspaceID: The target workspace.
     ///   - requestedSurfaceID: The explicit `surface_id`, or `nil` to resolve.
     ///   - ttyName: The reported (trimmed, non-empty) TTY name.
-    ///   - authenticatedRemoteWorkspaceID: Relay-authenticated origin, when remote.
-    ///   - terminalLifecycleID: Runtime lifecycle carried by a remote report.
-    ///   - attemptID: Attach attempt carried by a remote report.
     /// - Returns: The report resolution.
     func controlSurfaceReportTTY(
         workspaceID: UUID,
         requestedSurfaceID: UUID?,
-        ttyName: String,
-        authenticatedRemoteWorkspaceID: UUID?,
-        terminalLifecycleID: UUID?,
-        attemptID: UUID?
+        ttyName: String
     ) -> ControlSurfaceReportTTYResolution
 
     /// Records a reported current working directory for `surface.report_pwd`.

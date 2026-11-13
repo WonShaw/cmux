@@ -24,7 +24,6 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
     case sessions
     case feed
     case dock
-    case machines
     case customSidebar = "custom-sidebar"
 
     var label: String {
@@ -34,7 +33,6 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return String(localized: "rightSidebar.mode.sessions", defaultValue: "Vault")
         case .feed: return String(localized: "rightSidebar.mode.feed", defaultValue: "Feed")
         case .dock: return String(localized: "rightSidebar.mode.dock", defaultValue: "Dock")
-        case .machines: return String(localized: "rightSidebar.mode.machines", defaultValue: "Cloud")
         case .customSidebar: return String(localized: "rightSidebar.mode.customSidebar", defaultValue: "Custom")
         }
     }
@@ -47,7 +45,6 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return "books.vertical"
         case .feed: return "dot.radiowaves.left.and.right"
         case .dock: return "dock.rectangle"
-        case .machines: return "cloud"
         case .customSidebar: return "wand.and.stars"
         }
     }
@@ -59,14 +56,13 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return .switchRightSidebarToSessions
         case .feed: return .switchRightSidebarToFeed
         case .dock: return .switchRightSidebarToDock
-        case .machines: return .switchRightSidebarToMachines
         case .customSidebar: return nil
         }
     }
 }
 
 extension RightSidebarMode {
-    static let paneModes: [RightSidebarMode] = [.files, .find, .sessions, .machines]
+    static let paneModes: [RightSidebarMode] = [.files, .find, .sessions]
 
     var canOpenAsPane: Bool {
         Self.paneModes.contains(self)
@@ -85,7 +81,7 @@ enum FileExplorerRootSyncPolicy {
         switch mode {
         case .files, .find:
             return true
-        case .sessions, .feed, .dock, .machines, .customSidebar:
+        case .sessions, .feed, .dock, .customSidebar:
             return false
         }
     }
@@ -151,8 +147,6 @@ struct RightSidebarPanelView: View {
     private var feedEnabled = RightSidebarBetaFeatureSettings.defaultFeedEnabled
     @AppStorage(RightSidebarBetaFeatureSettings.dockEnabledKey)
     private var dockEnabled = RightSidebarBetaFeatureSettings.defaultDockEnabled
-    @AppStorage(RightSidebarBetaFeatureSettings.cloudMachinesEnabledKey)
-    private var cloudMachinesBetaEnabled = RightSidebarBetaFeatureSettings.defaultCloudMachinesEnabled
     @LiveSetting(\.customSidebars.renderer) private var customSidebarRenderer
     /// The right rail's OWN worker client. Never share the left sidebar's:
     /// the remote host swaps files in place on one client, so a shared client
@@ -170,8 +164,7 @@ struct RightSidebarPanelView: View {
         _ = managedPolicyRevision
         return RightSidebarMode.availableModes(
             feedEnabled: feedEnabled,
-            dockEnabled: dockEnabled,
-            machinesEnabled: CloudMachinesFeature.isEnabled
+            dockEnabled: dockEnabled
         )
     }
 
@@ -266,7 +259,6 @@ struct RightSidebarPanelView: View {
         }
         .onChange(of: feedEnabled) { _, _ in refreshModeAvailabilityAndFocusIfNeeded() }
         .onChange(of: dockEnabled) { _, _ in refreshModeAvailabilityAndFocusIfNeeded() }
-        .onChange(of: cloudMachinesBetaEnabled) { _, _ in refreshModeAvailabilityAndFocusIfNeeded() }
         .onReceive(NotificationCenter.default.publisher(for: RightSidebarTabPreferences.didChangeNotification)) { _ in
             refreshModeAvailabilityAndFocusIfNeeded()
         }
@@ -514,19 +506,6 @@ struct RightSidebarPanelView: View {
                 )
             case .dock:
                 dockPanel(windowAppearance: windowAppearance)
-            case .machines:
-                if let store = AppDelegate.shared?.cloudWorkspaceCoordinator?.defaultMachineStore {
-                    MachinesPanelView(
-                        chromeBackgroundColor: windowAppearance.resolvedChromeBackgroundColor,
-                        defaultMachineStore: store,
-                        tabManager: tabManager
-                    )
-                } else {
-                    MachinesPanelView(
-                        chromeBackgroundColor: windowAppearance.resolvedChromeBackgroundColor,
-                        tabManager: tabManager
-                    )
-                }
             case .customSidebar:
                 customSidebarPanel
             }

@@ -190,8 +190,6 @@ extension TerminalController {
         switch v2NormalizedToken(rawToken) {
         case "terminal":
             return .terminal
-        case "browser":
-            return .browser
         case "markdown":
             return .markdown
         case "filepreview":

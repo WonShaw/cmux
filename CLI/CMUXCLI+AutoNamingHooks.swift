@@ -9,8 +9,7 @@ extension CMUXCLI {
         workspaceId: String,
         surfaceId: String,
         sessionStore: ClaudeHookSessionStore,
-        client: SocketClient,
-        telemetry: CLISocketSentryTelemetry
+        client: SocketClient
     ) {
         guard let sessionId = parsedInput.sessionId else { return }
         let env = ProcessInfo.processInfo.environment
@@ -18,27 +17,22 @@ extension CMUXCLI {
             method: "workspace.set_auto_title",
             params: ["probe": true, "workspace_id": workspaceId, "panel_id": surfaceId]
         ), probe["enabled"] as? Bool == true else {
-            telemetry.breadcrumb("claude-hook.auto-name.disabled")
             return
         }
         guard probe["workspace_user_owned"] as? Bool != true else {
-            telemetry.breadcrumb("claude-hook.auto-name.user-owned")
             return
         }
 
         let claudePid = mappedSession?.pid ?? claudeAgentPID(from: env)
         guard !shouldSuppressNestedAgentVisibleMutations(currentAgentPID: claudePid, env: env) else {
-            telemetry.breadcrumb("claude-hook.auto-name.nested-suppressed")
             return
         }
         guard shouldApplyClaudeHookVisibleMutation(
             sessionStore: sessionStore,
             parsedInput: parsedInput,
             workspaceId: workspaceId,
-            surfaceId: surfaceId,
-            telemetry: telemetry
+            surfaceId: surfaceId
         ) else {
-            telemetry.breadcrumb("claude-hook.auto-name.stale")
             return
         }
 
@@ -57,7 +51,6 @@ extension CMUXCLI {
             engine: engine
         ) else { return }
         guard case .proceed(let baseline) = outcome.decision else {
-            telemetry.breadcrumb("claude-hook.auto-name.throttled")
             return
         }
 
@@ -76,16 +69,14 @@ extension CMUXCLI {
         let prompt = engine.buildPrompt(currentTitle: outcome.lastTitle, context: context)
 
         let resolution = resolvedSummarizerAgent(
-            probe: probe, sessionAgent: "claude", env: env, telemetry: telemetry
+            probe: probe, sessionAgent: "claude", env: env
         )
         guard let rawResponse = summarize(
             summarizerAgent: resolution.agent,
             prompt: prompt,
             env: env,
-            timeout: engine.config.llmTimeout,
-            telemetry: telemetry
+            timeout: engine.config.llmTimeout
         ) else {
-            telemetry.breadcrumb("claude-hook.auto-name.llm-failed")
             reportAutoNamingProblem("failed", agent: resolution.agent, workspaceId: workspaceId, client: client)
             return
         }
@@ -97,9 +88,7 @@ extension CMUXCLI {
             surfaceId: surfaceId,
             previousTitle: outcome.lastTitle,
             cloudNameContext: probe["cloud_name_context"],
-            client: client,
-            telemetryKey: "claude-hook.auto-name",
-            telemetry: telemetry
+            client: client
         )
         // Re-report a missing override only after the fallback apply, so the
         // app's clear-on-apply doesn't immediately wipe the Settings note.
@@ -116,8 +105,7 @@ extension CMUXCLI {
         surfaceId: String,
         transcriptPath: String?,
         cwd: String?,
-        env: [String: String],
-        telemetry: CLISocketSentryTelemetry
+        env: [String: String]
     ) {
         let selfPath: String = {
             if let first = ProcessInfo.processInfo.arguments.first,
@@ -153,7 +141,6 @@ extension CMUXCLI {
         do {
             try process.run()
         } catch {
-            telemetry.breadcrumb("\(def.name)-hook.auto-name.spawn-failed")
             return
         }
         if ((try? waitForProcessExit(process, timeout: 2)) ?? false) == false {
@@ -169,7 +156,6 @@ extension CMUXCLI {
     func runCodexAutoNameHook(
         commandArgs: [String],
         client: SocketClient,
-        telemetry: CLISocketSentryTelemetry,
         env: [String: String]
     ) {
         guard let sessionId = optionValue(commandArgs, name: "--session"),
@@ -181,17 +167,14 @@ extension CMUXCLI {
             method: "workspace.set_auto_title",
             params: ["probe": true, "workspace_id": workspaceId, "panel_id": surfaceId]
         ), probe["enabled"] as? Bool == true else {
-            telemetry.breadcrumb("codex-hook.auto-name.disabled")
             return
         }
         guard probe["workspace_user_owned"] as? Bool != true else {
-            telemetry.breadcrumb("codex-hook.auto-name.user-owned")
             return
         }
 
         let sessionStore = ClaudeHookSessionStore(processEnv: env)
         guard (try? sessionStore.isCurrent(sessionId: sessionId, workspaceId: workspaceId, surfaceId: surfaceId)) ?? false else {
-            telemetry.breadcrumb("codex-hook.auto-name.stale")
             return
         }
         let transcriptPath = normalizedHookValue(optionValue(commandArgs, name: "--transcript"))
@@ -202,7 +185,7 @@ extension CMUXCLI {
             return
         }
         let resolution = resolvedSummarizerAgent(
-            probe: probe, sessionAgent: "codex", env: env, telemetry: telemetry
+            probe: probe, sessionAgent: "codex", env: env
         )
         runFileBackedAutoName(
             sessionId: sessionId,
@@ -213,9 +196,7 @@ extension CMUXCLI {
             sessionStore: sessionStore,
             cloudNameContext: probe["cloud_name_context"],
             client: client,
-            missingOverride: resolution.missingOverride,
-            telemetryKey: "codex-hook.auto-name",
-            telemetry: telemetry
+            missingOverride: resolution.missingOverride
         ) { engine, outcome in
             let messages = engine.extractCodexMessages(fromRolloutLines: lines)
             guard let context = engine.buildContext(from: messages) else { return nil }
@@ -224,10 +205,8 @@ extension CMUXCLI {
                 summarizerAgent: resolution.agent,
                 prompt: prompt,
                 env: env,
-                timeout: engine.config.llmTimeout,
-                telemetry: telemetry
+                timeout: engine.config.llmTimeout
             ) else {
-                telemetry.breadcrumb("codex-hook.auto-name.llm-failed")
                 reportAutoNamingProblem("failed", agent: resolution.agent, workspaceId: workspaceId, client: client)
                 return nil
             }

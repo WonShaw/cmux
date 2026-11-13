@@ -6,8 +6,7 @@ extension CMUXCLI {
         def: AgentHookDef,
         prompt: String,
         env: [String: String],
-        timeout: TimeInterval,
-        telemetry: CLISocketSentryTelemetry
+        timeout: TimeInterval
     ) -> String? {
         let policy = AutoNamingEnvironmentPolicy()
         // Generic agents (grok/opencode/pi/omp) need their OWN provider/cloud
@@ -86,7 +85,6 @@ extension CMUXCLI {
         }
 
         guard let executablePath else {
-            telemetry.breadcrumb("\(def.name)-hook.auto-name.no-binary")
             return nil
         }
         return runAutoNamingSummarizer(

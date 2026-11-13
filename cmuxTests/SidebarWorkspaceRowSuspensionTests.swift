@@ -39,10 +39,8 @@ struct SidebarWorkspaceRowSuspensionTests {
             compactBranchDirectoryCandidates: [],
             branchDirectoryLines: [],
             branchLinesContainBranch: false,
-            pullRequestRows: [],
             listeningPorts: [],
             finderDirectoryPath: nil,
-            mediaActivity: BrowserMediaActivity(),
             taskStatus: manualTaskStatus,
             todoStatusMenuModel: manualTaskStatus.map {
                 SidebarWorkspaceCompactStatusMenuModel(
@@ -152,7 +150,6 @@ struct SidebarWorkspaceRowSuspensionTests {
             commands: commands,
             onOpenStatusURL: { _ in },
             onOpenWorkspaceDescriptionURL: { _ in },
-            onOpenPullRequest: { _ in },
             onOpenPort: { _ in },
             onToggleChecklistExpansion: {},
             onToggleMetadataExpansion: {},

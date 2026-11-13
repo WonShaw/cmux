@@ -52,7 +52,7 @@ extension TerminalSurface {
                 Task { @MainActor in
                     callbackTarget.surface?.rendererFrameDidFail(token: token, status: status)
                 }
-            },
+            }
         ))
         surfaceConfig.userdata = callbackContext.toOpaque()
         surfaceConfig.renderer_event_cb = terminalRendererEventCallback
@@ -187,10 +187,6 @@ extension TerminalSurface {
         if !spawnPolicy.ampHooksEnabled {
             setManagedEnvironmentValue("CMUX_AMP_HOOKS_DISABLED", "1")
         }
-        setManagedEnvironmentValue(
-            Self.computerUseAppEnabledEnvironmentKey,
-            spawnPolicy.computerUseEnabled ? "1" : "0"
-        )
 
         if let cliBinURL = Bundle.main.resourceURL?.appendingPathComponent("bin") {
             let cliBinPath = cliBinURL.path
@@ -228,7 +224,6 @@ extension TerminalSurface {
             setManagedEnvironmentValue("CMUX_SHELL_INTEGRATION_DIR", integrationDir)
             Self.applyManagedGitWatchEnvironment(
                 watchGitStatusEnabled: spawnPolicy.watchGitStatusEnabled,
-                showPullRequestsEnabled: spawnPolicy.showPullRequestsEnabled,
                 to: &env,
                 protectedKeys: &protectedStartupEnvironmentKeys
             )

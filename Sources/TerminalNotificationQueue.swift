@@ -1,4 +1,3 @@
-import CmuxRemoteSession
 import CmuxNotifications
 import CmuxSettings
 import Foundation
@@ -44,7 +43,7 @@ fileprivate struct TerminalSocketMutationEntry {
 enum TerminalMutationReplaceKey: Hashable, Sendable {
     enum ScopedKind: Hashable, Sendable {
         case gitBranch, directory
-        case portsKick(PortScanKickReason)
+        case portsKick
     }
 
     /// Shell reports follow a live surface across workspace and Dock moves, so

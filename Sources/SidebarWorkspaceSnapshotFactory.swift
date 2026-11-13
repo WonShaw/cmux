@@ -10,8 +10,6 @@ import Foundation
 /// of the lazy-list boundary while preserving the existing presentation rules.
 @MainActor
 struct SidebarWorkspaceSnapshotFactory {
-    private static let legacyVMWebSocketDescription = "VM WebSocket PTY"
-
     let workspace: Workspace
     let settings: SidebarTabItemSettingsSnapshot
     let showsAgentActivity: Bool
@@ -47,10 +45,6 @@ struct SidebarWorkspaceSnapshotFactory {
             }
             return verticalBranchDirectoryLines(orderedPanelIds: orderedPanelIds)
         }()
-        let pullRequestRows: [SidebarWorkspaceSnapshotBuilder.PullRequestDisplay] = {
-            guard detailVisibility.showsPullRequests else { return [] }
-            return pullRequestDisplays(orderedPanelIds: orderedPanelIds)
-        }()
         let todoControlsEnabled = WorkspaceTodoFeature.isEnabled
         let workspaceStatusVisible = todoControlsEnabled && !workspace.todoState.statusHidden
         let inferredTaskStatus = workspaceStatusVisible ? taskStatusInput.inferred : nil
@@ -77,20 +71,6 @@ struct SidebarWorkspaceSnapshotFactory {
             isPinned: workspace.isPinned,
             isMuted: workspace.isMuted,
             customColorHex: workspace.customColor,
-            cloudWorkspaceLabel: workspace.cloudVMID.map { machine in
-                let template = String(
-                    localized: "sidebar.cloudWorkspace.label",
-                    defaultValue: "Cloud workspace on %@"
-                )
-                return String.localizedStringWithFormat(template, machine)
-            },
-            remoteWorkspaceSidebarText: remoteWorkspaceSidebarText,
-            remoteConnectionStatusText: remoteConnectionStatusText,
-            remoteStateHelpText: remoteStateHelpText,
-            showsRemoteReconnectAffordance: !workspace.isManagedCloudVMWorkspace
-                && (workspace.remoteConnectionState == .suspended
-                    || workspace.remoteConnectionState == .disconnected),
-            copyableSidebarSSHError: copyableSidebarSSHError,
             latestConversationMessage: workspace.latestConversationMessage,
             metadataEntries: detailVisibility.showsMetadata
                 ? workspace.sidebarStatusEntriesInDisplayOrder()
@@ -110,10 +90,8 @@ struct SidebarWorkspaceSnapshotFactory {
             branchDirectoryLines: branchDirectoryLines,
             branchLinesContainBranch: settings.showsGitBranch
                 && branchDirectoryLines.contains { $0.branch != nil },
-            pullRequestRows: pullRequestRows,
             listeningPorts: detailVisibility.showsPorts ? workspace.listeningPorts : [],
             finderDirectoryPath: WorkspaceFinderDirectoryResolver.path(for: workspace),
-            mediaActivity: workspace.browserMediaActivity,
             taskStatus: taskStatusResolution?.effective,
             todoStatusMenuModel: todoStatusMenuModel,
             hasManualTaskStatus: hasManualTaskStatus,
@@ -145,112 +123,7 @@ struct SidebarWorkspaceSnapshotFactory {
 
     private var visibleCustomDescription: String? {
         guard let description = workspace.customDescription else { return nil }
-        if workspace.title.hasPrefix("vm:"),
-           description.trimmingCharacters(in: .whitespacesAndNewlines)
-            == Self.legacyVMWebSocketDescription {
-            return nil
-        }
         return description
-    }
-
-    private var remoteWorkspaceSidebarText: String? {
-        guard workspace.isRemoteWorkspace else { return nil }
-        let target = workspace.remoteDisplayTarget?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let target, !target.isEmpty { return target }
-        return String(localized: "sidebar.remote.subtitleFallback", defaultValue: "Remote workspace")
-    }
-
-    private var copyableSidebarSSHError: String? {
-        let target = workspace.remoteDisplayTarget ?? String(
-            localized: "sidebar.remote.help.targetFallback",
-            defaultValue: "remote host"
-        )
-        let detail = workspace.remoteConnectionDetail?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if workspace.remoteConnectionState == .error || workspace.remoteConnectionState == .suspended,
-           let detail,
-           !detail.isEmpty {
-            return SidebarRemoteErrorCopySupport.clipboardText(for: [SidebarRemoteErrorCopyEntry(
-                workspaceTitle: workspace.title,
-                target: target,
-                detail: detail
-            )])
-        }
-        if let statusValue = workspace.statusEntries["remote.error"]?.value
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !statusValue.isEmpty {
-            return SidebarRemoteErrorCopySupport.clipboardText(for: [SidebarRemoteErrorCopyEntry(
-                workspaceTitle: workspace.title,
-                target: target,
-                detail: statusValue
-            )])
-        }
-        return nil
-    }
-
-    private var remoteConnectionStatusText: String {
-        switch workspace.remoteConnectionState {
-        case .connected:
-            return String(localized: "remote.status.connected", defaultValue: "Connected")
-        case .connecting:
-            return String(localized: "remote.status.connecting", defaultValue: "Connecting")
-        case .reconnecting:
-            return String(localized: "remote.status.reconnecting", defaultValue: "Reconnecting")
-        case .error:
-            return String(localized: "remote.status.error", defaultValue: "Error")
-        case .disconnected:
-            return String(localized: "remote.status.disconnected", defaultValue: "Disconnected")
-        case .suspended:
-            return String(localized: "remote.status.suspended", defaultValue: "Unreachable")
-        }
-    }
-
-    private var remoteStateHelpText: String {
-        let target = workspace.remoteDisplayTarget ?? String(
-            localized: "sidebar.remote.help.targetFallback",
-            defaultValue: "remote host"
-        )
-        let detail = workspace.remoteConnectionDetail?.trimmingCharacters(in: .whitespacesAndNewlines)
-        switch workspace.remoteConnectionState {
-        case .connected:
-            return remoteHelp("sidebar.remote.help.connected", "Remote connected to %@", target)
-        case .connecting:
-            return remoteHelp("sidebar.remote.help.connecting", "Remote connecting to %@", target)
-        case .reconnecting:
-            return remoteHelp("sidebar.remote.help.reconnecting", "Remote reconnecting to %@", target)
-        case .error:
-            if let detail, !detail.isEmpty {
-                return String(
-                    format: String(
-                        localized: "sidebar.remote.help.errorWithDetail",
-                        defaultValue: "Remote error for %@: %@"
-                    ),
-                    locale: .current,
-                    target,
-                    detail
-                )
-            }
-            return remoteHelp("sidebar.remote.help.error", "Remote error for %@", target)
-        case .disconnected:
-            return remoteHelp("sidebar.remote.help.disconnected", "Remote disconnected from %@", target)
-        case .suspended:
-            return remoteHelp(
-                "sidebar.remote.help.suspended",
-                "SSH host %@ is unreachable. Automatic reconnect is paused — use Reconnect to retry.",
-                target
-            )
-        }
-    }
-
-    private func remoteHelp(
-        _ key: StaticString,
-        _ fallback: String.LocalizationValue,
-        _ target: String
-    ) -> String {
-        String(
-            format: String(localized: key, defaultValue: fallback),
-            locale: .current,
-            target
-        )
     }
 
     private func compactBranchDirectoryCandidatesList(
@@ -336,20 +209,5 @@ struct SidebarWorkspaceSnapshotFactory {
             indices[index] += 1
         }
         return result
-    }
-
-    private func pullRequestDisplays(
-        orderedPanelIds: [UUID]
-    ) -> [SidebarWorkspaceSnapshotBuilder.PullRequestDisplay] {
-        workspace.sidebarPullRequestsInDisplayOrder(orderedPanelIds: orderedPanelIds).map {
-            SidebarWorkspaceSnapshotBuilder.PullRequestDisplay(
-                id: "\($0.label.lowercased())#\($0.number)|\($0.url.absoluteString)",
-                number: $0.number,
-                label: $0.label,
-                url: $0.url,
-                status: $0.status,
-                isStale: $0.isStale
-            )
-        }
     }
 }

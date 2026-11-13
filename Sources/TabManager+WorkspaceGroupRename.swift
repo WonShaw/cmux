@@ -11,8 +11,7 @@ extension TabManager {
         _ = setCustomTitle(
             tabId: anchor.id,
             title: name,
-            source: .user,
-            propagateToRemoteTmux: false
+            source: .user
         )
     }
 }

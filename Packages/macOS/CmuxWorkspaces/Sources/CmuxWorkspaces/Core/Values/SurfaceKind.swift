@@ -17,8 +17,6 @@ public struct SurfaceKind: RawRepresentable, Hashable, Sendable {
 
     /// A Ghostty terminal surface.
     public static let terminal = SurfaceKind(rawValue: "terminal")
-    /// A browser pane.
-    public static let browser = SurfaceKind(rawValue: "browser")
     /// A markdown preview pane.
     public static let markdown = SurfaceKind(rawValue: "markdown")
     /// A file (Quick Look style) preview pane.
@@ -33,16 +31,8 @@ public struct SurfaceKind: RawRepresentable, Hashable, Sendable {
     public static let agentSession = SurfaceKind(rawValue: "agentSession")
     /// A project pane.
     public static let project = SurfaceKind(rawValue: "project")
-    /// A browser pane owned by a sidebar extension.
-    public static let extensionBrowser = SurfaceKind(rawValue: "extensionBrowser")
     /// A workspace todo pane.
     public static let todo = SurfaceKind(rawValue: "todo")
     /// A notifications pane.
     public static let notifications = SurfaceKind(rawValue: "notifications")
-    /// A transient Cloud VM loading pane.
-    public static let cloudVMLoading = SurfaceKind(rawValue: "cloudVMLoading")
-    /// A transient iPhone pairing pane.
-    public static let mobilePairing = SurfaceKind(rawValue: "mobilePairing")
-    /// A transient Stack account sign-in pane.
-    public static let accountSignIn = SurfaceKind(rawValue: "accountSignIn")
 }

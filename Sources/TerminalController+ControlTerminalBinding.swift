@@ -15,7 +15,7 @@ import OSLog
 @MainActor
 struct ControlTerminalSocketTarget {
     nonisolated private static let logger = Logger(
-        subsystem: "com.cmuxterm.app",
+        subsystem: "com.comux.app",
         category: "socket.terminal-binding"
     )
 
@@ -230,11 +230,10 @@ extension TerminalController {
                     ?? terminalPanel.surface.renderHealth.rawValue
             )
         }
-        let inWindow = (panel as? BrowserPanel).map { $0.webView.window != nil }
         return ControlSurfaceHealthEntry(
             surfaceID: panel.id,
             typeRawValue: panel.panelType.rawValue,
-            inWindow: inWindow
+            inWindow: nil
         )
     }
 

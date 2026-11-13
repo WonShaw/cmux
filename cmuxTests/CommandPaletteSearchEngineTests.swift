@@ -2058,7 +2058,6 @@ final class CommandPaletteSearchEngineTests: XCTestCase {
     func testCommandContextFingerprintTracksExactContextValues() {
         let base = CommandPaletteContextSnapshot.fingerprint(
             boolValues: [
-                "workspace.hasPullRequests": true,
                 "panel.hasUnread": false,
                 "panel.isTerminal": true,
             ],
@@ -2069,7 +2068,6 @@ final class CommandPaletteSearchEngineTests: XCTestCase {
         )
         let unreadChanged = CommandPaletteContextSnapshot.fingerprint(
             boolValues: [
-                "workspace.hasPullRequests": true,
                 "panel.hasUnread": true,
                 "panel.isTerminal": true,
             ],
@@ -2080,7 +2078,6 @@ final class CommandPaletteSearchEngineTests: XCTestCase {
         )
         let renamed = CommandPaletteContextSnapshot.fingerprint(
             boolValues: [
-                "workspace.hasPullRequests": true,
                 "panel.hasUnread": false,
                 "panel.isTerminal": true,
             ],
