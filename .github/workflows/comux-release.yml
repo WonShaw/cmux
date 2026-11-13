@@ -1,0 +1,97 @@
+# Builds comux and publishes a GitHub release when a comux tag is pushed.
+#
+#   git tag comux-v0.64.25-1
+#   git push origin comux-v0.64.25-1
+#
+# The app is ad-hoc signed and not notarized. After downloading, clear the
+# quarantine attribute before opening it:
+#   xattr -dr com.apple.quarantine comux.app
+name: comux release
+
+on:
+  push:
+    tags:
+      - "comux-v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: comux-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      # Plain git instead of actions/checkout, so the workflow runs when the
+      # repository only allows actions defined in the owner's own repositories.
+      - name: Check out the tagged source
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$TOKEN" | base64)"
+          git init -q .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c http.extraheader="$auth" fetch -q --depth 1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+          git log --oneline -1
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          uname -m
+          xcodebuild -version
+
+      - name: Build comux
+        env:
+          COMUX_DERIVED_DATA: ${{ runner.temp }}/comux-build
+        run: comux/build.sh
+
+      - name: Show the end of the build log on failure
+        if: failure()
+        env:
+          COMUX_DERIVED_DATA: ${{ runner.temp }}/comux-build
+        run: tail -n 200 "$COMUX_DERIVED_DATA/build.log" || true
+
+      - name: Package
+        id: package
+        env:
+          COMUX_DERIVED_DATA: ${{ runner.temp }}/comux-build
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          app="$COMUX_DERIVED_DATA/Build/Products/Release/comux.app"
+          codesign --verify --deep --strict "$app"
+          archive="$RUNNER_TEMP/${TAG}-arm64.zip"
+          ditto -c -k --keepParent "$app" "$archive"
+          (cd "$RUNNER_TEMP" && shasum -a 256 "$(basename "$archive")" > "${archive}.sha256")
+          cat "${archive}.sha256"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/notes.md"
+          {
+            echo "comux is a modified version of cmux that makes no outbound network requests of its own."
+            echo "See comux/NOTICE.md in the source for what was changed and why."
+            echo
+            echo "Apple silicon only. The app is ad-hoc signed and not notarized. After unzipping, run:"
+            echo
+            echo '    xattr -dr com.apple.quarantine comux.app'
+            echo
+            echo "Source for this build: commit ${GITHUB_SHA}. License: GPL-3.0-or-later."
+            echo
+            echo "SHA-256:"
+            echo
+            echo "    $(cat "${ARCHIVE}.sha256")"
+          } > "$notes"
+          gh release create "$TAG" "$ARCHIVE" "${ARCHIVE}.sha256" \
+            --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes-file "$notes" --verify-tag
