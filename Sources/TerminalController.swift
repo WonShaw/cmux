@@ -1480,6 +1480,27 @@ class TerminalController {
                 : nil
             let trimmed = (parsedCommandEnvelope?.command ?? authorizedCommand)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
+            // comux: socket clients (any process in a terminal, including
+            // agents) may only report status and manage layout.
+            if case let .deny(command, isV2) = ControlSocketClientPolicy.evaluate(trimmed) {
+                let message = String(
+                    localized: "socket.policy.denied",
+                    defaultValue: "This command is not allowed from a terminal in comux."
+                )
+                let response: String
+                if isV2 {
+                    let requestID = Self.v2Parser.lenientRequest(fromLine: trimmed)?.id
+                    response = Self.v2Encoder.error(
+                        id: requestID,
+                        code: "forbidden",
+                        message: message + " (" + command + ")"
+                    )
+                } else {
+                    response = "ERROR: " + message + " (" + command + ")"
+                }
+                guard await writer.writeAll(Data((response + "\n").utf8)) else { return }
+                continue
+            }
             let commandOrigin = commandEnvelope?.origin
             lineReader.clearLimits()
             if holdsPreauthorizationSlot {
@@ -2504,7 +2525,6 @@ class TerminalController {
             "app.focus_override.set",
             "app.simulate_active",
             "file.open",
-            "markdown.open",
         ]
         methods.append(contentsOf: ControlCommandExecutionPolicy.simulatorMethods)
 #if DEBUG
@@ -3709,65 +3729,6 @@ class TerminalController {
         }
         guard let wsId = tabManager.selectedTabId else { return nil }
         return tabManager.tabs.first(where: { $0.id == wsId })
-    }
-
-    @MainActor
-
-    private func v2AgentSessionOptions(params: [String: Any]) -> (
-        providerID: AgentSessionProviderID,
-        rendererKind: AgentSessionRendererKind,
-        error: V2CallResult?
-    ) {
-        let providerRaw = v2String(params, "provider_id") ?? v2String(params, "provider")
-        let rendererRaw = v2String(params, "renderer_kind") ?? v2String(params, "renderer")
-
-        let providerID: AgentSessionProviderID
-        if let providerRaw {
-            switch v2NormalizedToken(providerRaw) {
-            case "codex":
-                providerID = .codex
-            case "claude", "claudecode":
-                providerID = .claude
-            case "opencode":
-                providerID = .opencode
-            default:
-                return (
-                    .codex,
-                    .react,
-                    .err(
-                        code: "invalid_params",
-                        message: "Invalid provider (codex|claude|opencode)",
-                        data: ["provider": providerRaw]
-                    )
-                )
-            }
-        } else {
-            providerID = .codex
-        }
-
-        let rendererKind: AgentSessionRendererKind
-        if let rendererRaw {
-            switch v2NormalizedToken(rendererRaw) {
-            case "react":
-                rendererKind = .react
-            case "solid":
-                rendererKind = .solid
-            default:
-                return (
-                    providerID,
-                    .react,
-                    .err(
-                        code: "invalid_params",
-                        message: "Invalid renderer (react|solid)",
-                        data: ["renderer": rendererRaw]
-                    )
-                )
-            }
-        } else {
-            rendererKind = .react
-        }
-
-        return (providerID, rendererKind, nil)
     }
 
     func v2DebugTerminals(params _: [String: Any]) -> V2CallResult {

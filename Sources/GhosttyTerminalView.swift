@@ -799,7 +799,7 @@ class GhosttyApp {
             ) -> Bool,
             to: ghostty_runtime_read_clipboard_cb.self
         )
-        runtimeConfig.confirm_read_clipboard_cb = { userdata, content, state, _ in
+        runtimeConfig.confirm_read_clipboard_cb = { userdata, content, state, request in
             guard let content,
                   let callbackContext = GhosttyApp.callbackContext(from: userdata) else { return }
             // Libghostty invokes this synchronously from the main-actor
@@ -812,7 +812,8 @@ class GhosttyApp {
                 callbackContext.confirmClipboardRead(
                     String(cString: content),
                     stateAddress: UInt(bitPattern: state),
-                    surfaceIdentity: surfaceIdentity
+                    surfaceIdentity: surfaceIdentity,
+                    isPaste: request == GHOSTTY_CLIPBOARD_REQUEST_PASTE
                 )
             }
         }
@@ -1243,6 +1244,15 @@ class GhosttyApp {
             into: config,
             prefix: "cmux-shell-integration-override",
             logLabel: "shell integration override"
+        )
+        // Programs writing to the terminal (a remote host, a script, an agent)
+        // must never be able to read the system clipboard through OSC 52.
+        // Loaded after the user's config so it cannot be re-enabled there.
+        loadInlineGhosttyConfig(
+            "clipboard-read = deny",
+            into: config,
+            prefix: "cmux-clipboard-read-deny",
+            logLabel: "clipboard read deny"
         )
         loadCmuxManagedTerminalSettingsConfig(config)
         loadGlobalFontMagnificationConfig(config)

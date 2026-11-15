@@ -518,10 +518,6 @@ struct cmuxApp: App {
                 }
 
                 Group {
-                    AgentSessionDebugMenuButtons(
-                        openReact: { appDelegate.openDebugAgentSessionReact(nil) },
-                        openSolid: { appDelegate.openDebugAgentSessionSolid(nil) }
-                    )
                     NotificationDebugMenuButtons()
                 }
 

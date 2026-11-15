@@ -841,8 +841,7 @@ class TabManager: ObservableObject {
     }
 
     var isFindVisible: Bool {
-        selectedTerminalPanel?.searchState != nil ||
-            focusedMarkdownPanel?.searchState != nil
+        selectedTerminalPanel?.searchState != nil
     }
 
     var canUseSelectionForFind: Bool {
@@ -872,9 +871,7 @@ class TabManager: ObservableObject {
 #endif
             return handled
         }
-        guard let markdownPanel = focusedMarkdownPanel else { return false }
-        markdownPanel.startFind()
-        return markdownPanel.searchState != nil
+        return false
     }
 
     func searchSelection() {
@@ -898,7 +895,6 @@ class TabManager: ObservableObject {
             return
         }
 
-        focusedMarkdownPanel?.findNext()
     }
 
     func findPrevious() {
@@ -907,7 +903,6 @@ class TabManager: ObservableObject {
             return
         }
 
-        focusedMarkdownPanel?.findPrevious()
     }
 
     @discardableResult
@@ -1006,7 +1001,6 @@ class TabManager: ObservableObject {
             return
         }
 
-        focusedMarkdownPanel?.hideFind()
     }
 
     func makeWorkspaceForCreation(
@@ -3164,16 +3158,6 @@ class TabManager: ObservableObject {
         return panel
     }
 
-    /// Returns the focused panel if it's a MarkdownPanel showing the rendered
-    /// preview, nil otherwise. Zoom applies to the preview WKWebView, so the raw
-    /// text-edit mode is deliberately excluded.
-    var focusedMarkdownPanel: MarkdownPanel? {
-        guard let tab = selectedWorkspace,
-              let panelId = tab.focusedPanelId,
-              let panel = tab.panels[panelId] as? MarkdownPanel,
-              panel.displayMode == .preview else { return nil }
-        return panel
-    }
 
     func performFocusedTextFilePreviewZoom(_ action: (FilePreviewPanel) -> Bool) -> Bool? {
         guard let panel = focusedTextFilePreviewPanel else { return nil }
@@ -3197,17 +3181,17 @@ class TabManager: ObservableObject {
 
     @discardableResult
     func zoomInFocusedMarkdown() -> Bool {
-        focusedMarkdownPanel?.zoomIn() ?? false
+        false
     }
 
     @discardableResult
     func zoomOutFocusedMarkdown() -> Bool {
-        focusedMarkdownPanel?.zoomOut() ?? false
+        false
     }
 
     @discardableResult
     func resetZoomFocusedMarkdown() -> Bool {
-        focusedMarkdownPanel?.resetZoom() ?? false
+        false
     }
 
     /// Returns the exact focused surface.

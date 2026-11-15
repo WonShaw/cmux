@@ -436,11 +436,6 @@ extension Workspace {
                !directory.isEmpty {
                 return directory
             }
-            if let agentPanel = panel as? AgentSessionPanel,
-               let agentDirectory = agentPanel.workingDirectory?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !agentDirectory.isEmpty {
-                return agentDirectory
-            }
             if let restorableDirectory = effectiveRestorableAgent?.workingDirectory?.trimmingCharacters(in: .whitespacesAndNewlines),
                !restorableDirectory.isEmpty {
                 return restorableDirectory
@@ -640,13 +635,8 @@ extension Workspace {
             agentSessionSnapshot = nil
             projectSnapshot = nil
         case .markdown:
-            guard let markdownPanel = panel as? MarkdownPanel else { return nil }
-            terminalSnapshot = nil
-            markdownSnapshot = SessionMarkdownPanelSnapshot(filePath: markdownPanel.filePath)
-            filePreviewSnapshot = nil
-            rightSidebarToolSnapshot = nil
-            agentSessionSnapshot = nil
-            projectSnapshot = nil
+            // The markdown viewer was removed; no live panel has this type.
+            return nil
         case .filePreview:
             guard let filePreviewPanel = panel as? FilePreviewPanel else { return nil }
             terminalSnapshot = nil
@@ -672,17 +662,8 @@ extension Workspace {
             terminalSnapshot = nil; markdownSnapshot = nil; filePreviewSnapshot = nil; rightSidebarToolSnapshot = nil
             simulatorSnapshot = snapshot; agentSessionSnapshot = nil; projectSnapshot = nil
         case .agentSession:
-            guard let agentPanel = panel as? AgentSessionPanel else { return nil }
-            terminalSnapshot = nil
-            markdownSnapshot = nil
-            filePreviewSnapshot = nil
-            rightSidebarToolSnapshot = nil
-            agentSessionSnapshot = SessionAgentSessionPanelSnapshot(
-                rendererKind: agentPanel.rendererKind,
-                providerID: agentPanel.currentProviderID,
-                workingDirectory: directory
-            )
-            projectSnapshot = nil
+            // The agent session web panel was removed.
+            return nil
         case .project:
             guard let projectPanel = panel as? ProjectPanel else { return nil }
             terminalSnapshot = nil
@@ -1798,16 +1779,17 @@ extension Workspace {
             }
             return terminalPanel.id
         case .markdown:
+            // Markdown viewer tabs from older sessions reopen as file previews.
             guard let filePath = snapshot.markdown?.filePath,
-                  let markdownPanel = newMarkdownSurface(
+                  let filePreviewPanel = newFilePreviewSurface(
                     inPane: paneId,
                     filePath: filePath,
                     focus: false
                   ) else {
                 return nil
             }
-            applySessionPanelMetadata(snapshot, toPanelId: markdownPanel.id)
-            return markdownPanel.id
+            applySessionPanelMetadata(snapshot, toPanelId: filePreviewPanel.id)
+            return filePreviewPanel.id
         case .filePreview:
             guard let filePath = snapshot.filePreview?.filePath,
                   let filePreviewPanel = newFilePreviewSurface(
@@ -1835,18 +1817,8 @@ extension Workspace {
         case .customSidebar: return restoreCustomSidebarPanel(from: snapshot, inPane: paneId)
         case .simulator: return restoreSimulatorPanel(from: snapshot, inPane: paneId)
         case .agentSession:
-            guard let agentSession = snapshot.agentSession,
-                  let agentPanel = newAgentSessionSurface(
-                    inPane: paneId,
-                    providerID: agentSession.providerID,
-                    rendererKind: agentSession.rendererKind,
-                    workingDirectory: restoresUntrustedSavedDirectory ? nil : (agentSession.workingDirectory ?? snapshot.directory),
-                    focus: false
-                  ) else {
-                return nil
-            }
-            applySessionPanelMetadata(snapshot, toPanelId: agentPanel.id)
-            return agentPanel.id
+            // The agent session web panel was removed.
+            return nil
         case .project:
             guard let projectPath = snapshot.project?.projectPath,
                   let projectPanel = newProjectSurface(
@@ -2319,7 +2291,6 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     var surfaceTransferringPanelIds: Set<UUID> = []
     /// Subscriptions for panel updates (e.g., markdown title changes)
     var panelSubscriptions: [UUID: AnyCancellable] = [:]
-    private var agentSessionPanelCallbackIds: Set<UUID> = []
 
     /// When true, suppresses auto-creation in didSplitPane (programmatic splits handle their own panels);
     /// stored in the split-layout sub-model.
@@ -3771,35 +3742,6 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         tmuxWorkspaceFlashToken &+= 1
     }
 
-    private func installMarkdownPanelSubscription(_ markdownPanel: MarkdownPanel) {
-        let subscription = Publishers.CombineLatest(
-            markdownPanel.$displayTitle.removeDuplicates(),
-            markdownPanel.$isDirty.removeDuplicates()
-        )
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self, weak markdownPanel] newTitle, isDirty in
-                guard let self,
-                      let markdownPanel,
-                      let tabId = self.surfaceIdFromPanelId(markdownPanel.id) else { return }
-                guard let existing = self.bonsplitController.tab(tabId) else { return }
-
-                if self.panelTitles[markdownPanel.id] != newTitle {
-                    self.panelTitles[markdownPanel.id] = newTitle
-                }
-                let resolvedTitle = self.resolvedPanelTitle(panelId: markdownPanel.id, fallback: newTitle)
-                let titleUpdate: String? = existing.title == resolvedTitle ? nil : resolvedTitle
-                let dirtyUpdate: Bool? = existing.isDirty == isDirty ? nil : isDirty
-                guard titleUpdate != nil || dirtyUpdate != nil else { return }
-                self.bonsplitController.updateTab(
-                    tabId,
-                    title: titleUpdate,
-                    hasCustomTitle: self.panelCustomTitles[markdownPanel.id] != nil,
-                    isDirty: dirtyUpdate
-                )
-            }
-        panelSubscriptions[markdownPanel.id] = subscription
-    }
-
     /// Resolves the workspace tab currently owned by a file-preview panel.
     func filePreviewTabId(forPanelId panelId: UUID) -> TabID? {
         surfaceIdFromPanelId(panelId)
@@ -3820,36 +3762,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         )
     }
 
-    private func installAgentSessionPanelSubscription(_ agentPanel: AgentSessionPanel) {
-        agentPanel.onDisplayStateChanged = { [weak self, weak agentPanel] newTitle, isDirty in
-            guard let self,
-                  let agentPanel,
-                  let tabId = self.surfaceIdFromPanelId(agentPanel.id) else { return }
-            guard let existing = self.bonsplitController.tab(tabId) else { return }
-
-            if self.panelTitles[agentPanel.id] != newTitle {
-                self.panelTitles[agentPanel.id] = newTitle
-            }
-            let resolvedTitle = self.resolvedPanelTitle(panelId: agentPanel.id, fallback: newTitle)
-            let titleUpdate: String? = existing.title == resolvedTitle ? nil : resolvedTitle
-            let dirtyUpdate: Bool? = existing.isDirty == isDirty ? nil : isDirty
-            guard titleUpdate != nil || dirtyUpdate != nil else { return }
-            self.bonsplitController.updateTab(
-                tabId,
-                title: titleUpdate,
-                hasCustomTitle: self.panelCustomTitles[agentPanel.id] != nil,
-                isDirty: dirtyUpdate
-            )
-        }
-        agentSessionPanelCallbackIds.insert(agentPanel.id)
-    }
-
-    func discardAgentSessionPanelSubscription(panelId: UUID, panel: (any Panel)?) {
-        if let agentPanel = panel as? AgentSessionPanel {
-            agentPanel.onDisplayStateChanged = nil
-        }
-        agentSessionPanelCallbackIds.remove(panelId)
-    }
+    func discardAgentSessionPanelSubscription(panelId: UUID, panel: (any Panel)?) {}
 
     // MARK: - Panel Access
 
@@ -3861,11 +3774,6 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     func terminalPanel(for panelId: UUID) -> TerminalPanel? {
         panels[panelId] as? TerminalPanel
     }
-
-    func markdownPanel(for panelId: UUID) -> MarkdownPanel? {
-        panels[panelId] as? MarkdownPanel
-    }
-
     func filePreviewPanel(for panelId: UUID) -> FilePreviewPanel? {
         panels[panelId] as? FilePreviewPanel
     }
@@ -5743,168 +5651,6 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         }
         return newPanel
     }
-
-    /// Open the markdown viewer for `filePath`, reusing an existing
-    /// `MarkdownPanel` in this workspace that already shows the same file.
-    /// Paths are compared after symlink resolution so `./README.md` and a
-    /// symlink pointing at the same file focus the same viewer.
-    /// Returns `nil` when no existing viewer matches and split creation
-    /// fails, so callers can fall back to the preferred editor / system opener.
-    @discardableResult
-    func openOrFocusMarkdownSplit(
-        from panelId: UUID,
-        filePath: String
-    ) -> MarkdownPanel? {
-        guard !isRetiredFromOwningTabManager else { return nil }
-        let canonical = (filePath as NSString).resolvingSymlinksInPath
-        for (existingId, panel) in panels {
-            guard let md = panel as? MarkdownPanel else { continue }
-            if (md.filePath as NSString).resolvingSymlinksInPath == canonical {
-                focusPanel(existingId)
-                return md
-            }
-        }
-
-        if let targetPane = preferredRightSideTargetPane(fromPanelId: panelId) {
-            return newMarkdownSurface(inPane: targetPane, filePath: filePath, focus: true)
-        }
-
-        return newMarkdownSplit(
-            from: panelId,
-            orientation: .horizontal,
-            insertFirst: false,
-            filePath: filePath,
-            focus: true
-        )
-    }
-
-    func newMarkdownSplit(
-        from panelId: UUID,
-        orientation: SplitOrientation,
-        insertFirst: Bool = false,
-        filePath: String,
-        focus: Bool = true,
-        fontSize: Double? = nil
-    ) -> MarkdownPanel? {
-        guard !isRetiredFromOwningTabManager else { return nil }
-        guard let sourceTabId = surfaceIdFromPanelId(panelId) else { return nil }
-        var sourcePaneId: PaneID?
-        for paneId in bonsplitController.allPaneIds {
-            let tabs = bonsplitController.tabs(inPane: paneId)
-            if tabs.contains(where: { $0.id == sourceTabId }) {
-                sourcePaneId = paneId
-                break
-            }
-        }
-
-        guard let paneId = sourcePaneId else { return nil }
-
-        let markdownPanel = MarkdownPanel(
-            workspaceId: id,
-            filePath: filePath,
-            fontSize: fontSize,
-            fileContentChangeCoordinator: fileContentChangeCoordinator
-        )
-        panels[markdownPanel.id] = markdownPanel
-        panelTitles[markdownPanel.id] = markdownPanel.displayTitle
-
-        let newTab = Bonsplit.Tab(
-            title: markdownPanel.displayTitle,
-            icon: markdownPanel.displayIcon,
-            kind: SurfaceKind.markdown.rawValue,
-            isDirty: markdownPanel.isDirty,
-            isLoading: false,
-            isPinned: false
-        )
-        bindSurface(newTab.id, toPanelId: markdownPanel.id)
-        let previousFocusedPanelId = focusedPanelId
-
-        isProgrammaticSplit = true
-        defer { isProgrammaticSplit = false }
-        guard let newPaneId = bonsplitController.splitPane(paneId, orientation: orientation, withTab: newTab, insertFirst: insertFirst) else {
-            markdownPanel.close()
-            removeSurfaceMapping(forSurfaceId: newTab.id)
-            panels.removeValue(forKey: markdownPanel.id)
-            panelTitles.removeValue(forKey: markdownPanel.id)
-            return nil
-        }
-        publishCmuxSplitCreated(newPaneId, sourcePaneId: paneId, orientation: orientation, surfaceId: markdownPanel.id, kind: "markdown", origin: "markdown_split", focused: focus)
-
-        let previousHostedView = focusedTerminalInputTarget()?.panel.hostedView
-        if focus {
-            suppressReparentFocusUntilLayoutFollowUp(
-                previousHostedView,
-                reason: "workspace.markdownSplitReparent"
-            )
-            focusPanel(markdownPanel.id)
-        } else {
-            preserveFocusAfterNonFocusSplit(
-                preferredPanelId: previousFocusedPanelId,
-                splitPanelId: markdownPanel.id,
-                previousHostedView: previousHostedView
-            )
-        }
-
-        installMarkdownPanelSubscription(markdownPanel)
-        return markdownPanel
-    }
-
-    @discardableResult
-    func newMarkdownSurface(
-        inPane paneId: PaneID,
-        filePath: String,
-        focus: Bool? = nil,
-        targetIndex: Int? = nil
-    ) -> MarkdownPanel? {
-        guard !isRetiredFromOwningTabManager else { return nil }
-        let shouldFocusNewTab = focus ?? (bonsplitController.focusedPaneId == paneId)
-        let previousFocusedPanelId = focusedPanelId
-        let previousHostedView = focusedTerminalInputTarget()?.panel.hostedView
-
-        let markdownPanel = MarkdownPanel(
-            workspaceId: id,
-            filePath: filePath,
-            fileContentChangeCoordinator: fileContentChangeCoordinator
-        )
-        panels[markdownPanel.id] = markdownPanel
-        panelTitles[markdownPanel.id] = markdownPanel.displayTitle
-
-        guard let newTabId = bonsplitController.createTab(
-            title: markdownPanel.displayTitle,
-            icon: markdownPanel.displayIcon,
-            kind: SurfaceKind.markdown.rawValue,
-            isDirty: markdownPanel.isDirty,
-            isLoading: false,
-            isPinned: false,
-            inPane: paneId
-        ) else {
-            markdownPanel.close()
-            panels.removeValue(forKey: markdownPanel.id)
-            panelTitles.removeValue(forKey: markdownPanel.id)
-            return nil
-        }
-
-        bindSurface(newTabId, toPanelId: markdownPanel.id)
-        if let targetIndex {
-            _ = bonsplitController.reorderTab(newTabId, toIndex: targetIndex)
-        }
-        publishCmuxSurfaceCreated(markdownPanel.id, paneId: paneId, kind: "markdown", origin: "markdown_tab", focused: shouldFocusNewTab)
-        if shouldFocusNewTab {
-            bonsplitController.focusPane(paneId)
-            bonsplitController.selectTab(newTabId)
-            applyTabSelection(tabId: newTabId, inPane: paneId)
-        } else {
-            preserveFocusAfterNonFocusSplit(
-                preferredPanelId: previousFocusedPanelId,
-                splitPanelId: markdownPanel.id,
-                previousHostedView: previousHostedView
-            )
-        }
-
-        installMarkdownPanelSubscription(markdownPanel)
-        return markdownPanel
-    }
-
     @discardableResult
     func newProjectSurface(
         inPane paneId: PaneID,
@@ -5956,90 +5702,6 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
 
         projectPanel.reload()
         return projectPanel
-    }
-
-    @discardableResult
-    func openOrFocusMarkdownSurface(
-        inPane paneId: PaneID,
-        filePath: String,
-        focus: Bool = true,
-        duplicateWhenFocused: Bool = false
-    ) -> MarkdownPanel? {
-        guard !isRetiredFromOwningTabManager else { return nil }
-        let canonical = (filePath as NSString).resolvingSymlinksInPath
-        let matches = panels.compactMap { existingId, panel -> (UUID, MarkdownPanel)? in
-            guard let markdownPanel = panel as? MarkdownPanel,
-                  (markdownPanel.filePath as NSString).resolvingSymlinksInPath == canonical else {
-                return nil
-            }
-            return (existingId, markdownPanel)
-        }
-        if let (focusedId, focusedMatch) = matches.first(where: { $0.0 == focusedPanelId }) {
-            // Reveal on the first activation; an activation while the panel is
-            // already front-most asks for another occurrence (editor + preview
-            // pairs of one file), so interactive entrypoints opt in via
-            // `duplicateWhenFocused` while socket/CLI opens stay idempotent.
-            guard duplicateWhenFocused, focus else {
-                if focus {
-                    focusPanel(focusedId)
-                }
-                return focusedMatch
-            }
-        } else if let (existingId, existingMatch) = matches.first {
-            if focus {
-                focusPanel(existingId)
-            }
-            return existingMatch
-        }
-
-        return newMarkdownSurface(inPane: paneId, filePath: filePath, focus: focus)
-    }
-
-    @discardableResult
-    func splitPaneWithMarkdown(
-        targetPane paneId: PaneID,
-        orientation: SplitOrientation,
-        insertFirst: Bool,
-        filePath: String
-    ) -> MarkdownPanel? {
-        guard !isRetiredFromOwningTabManager else { return nil }
-        let markdownPanel = MarkdownPanel(
-            workspaceId: id,
-            filePath: filePath,
-            fileContentChangeCoordinator: fileContentChangeCoordinator
-        )
-        panels[markdownPanel.id] = markdownPanel
-        panelTitles[markdownPanel.id] = markdownPanel.displayTitle
-
-        let newTab = Bonsplit.Tab(
-            title: markdownPanel.displayTitle,
-            icon: markdownPanel.displayIcon,
-            kind: SurfaceKind.markdown.rawValue,
-            isDirty: markdownPanel.isDirty,
-            isLoading: false,
-            isPinned: false
-        )
-        bindSurface(newTab.id, toPanelId: markdownPanel.id)
-
-        isProgrammaticSplit = true
-        defer { isProgrammaticSplit = false }
-        guard bonsplitController.splitPane(
-            paneId,
-            orientation: orientation,
-            withTab: newTab,
-            insertFirst: insertFirst
-        ) != nil else {
-            markdownPanel.close()
-            panels.removeValue(forKey: markdownPanel.id)
-            panelTitles.removeValue(forKey: markdownPanel.id)
-            removeSurfaceMapping(forSurfaceId: newTab.id)
-            return nil
-        }
-
-        bonsplitController.selectTab(newTab.id)
-        focusPanel(markdownPanel.id)
-        installMarkdownPanelSubscription(markdownPanel)
-        return markdownPanel
     }
 
     @discardableResult
@@ -6231,85 +5893,6 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         }
 
         return toolPanel
-    }
-
-    @discardableResult
-    func newAgentSessionSurface(
-        inPane paneId: PaneID,
-        providerID: AgentSessionProviderID = .codex,
-        rendererKind: AgentSessionRendererKind,
-        workingDirectory: String? = nil,
-        focus: Bool? = nil,
-        targetIndex: Int? = nil
-    ) -> AgentSessionPanel? {
-        guard !isRetiredFromOwningTabManager else { return nil }
-        let shouldFocusNewTab = focus ?? (bonsplitController.focusedPaneId == paneId)
-        let previousFocusedPanelId = focusedPanelId
-        let previousHostedView = focusedTerminalInputTarget()?.panel.hostedView
-        let directory: String? = {
-            if let workingDirectory { return workingDirectory }
-            return usesRemoteDirectoryProvenance ? presentedCurrentDirectory : currentDirectory
-        }()
-        let focusedPanelUsesRemoteFallback = focusedPanelId.map { reportedPanelDirectory(panelId: $0) == nil && terminalPanel(for: $0) == nil } ?? true
-        let trustsAgentDirectory = workingDirectory == nil &&
-            (focusedPanelId.map { remoteDirectoryReportPanelIds.contains($0) } == true ||
-                (usesRemoteDirectoryProvenance && focusedPanelUsesRemoteFallback && directory != nil))
-
-        let agentPanel = AgentSessionPanel(
-            workspaceId: id,
-            rendererKind: rendererKind,
-            initialProviderID: providerID,
-            workingDirectory: directory
-        )
-        panels[agentPanel.id] = agentPanel
-        panelTitles[agentPanel.id] = agentPanel.displayTitle
-        if let directory, !directory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            panelDirectories[agentPanel.id] = directory
-            if trustsAgentDirectory { remoteDirectoryReportPanelIds.insert(agentPanel.id); remoteDirectoryTrustRequiredPanelIds.insert(agentPanel.id) }
-        }
-
-        guard let newTabId = bonsplitController.createTab(
-            title: agentPanel.displayTitle,
-            icon: agentPanel.displayIcon,
-            kind: SurfaceKind.agentSession.rawValue,
-            isDirty: agentPanel.isDirty,
-            isLoading: false,
-            isPinned: false,
-            inPane: paneId
-        ) else {
-            panels.removeValue(forKey: agentPanel.id)
-            panelTitles.removeValue(forKey: agentPanel.id)
-            return nil
-        }
-
-        bindSurface(newTabId, toPanelId: agentPanel.id)
-        if let targetIndex {
-            _ = bonsplitController.reorderTab(newTabId, toIndex: targetIndex)
-        }
-        publishCmuxSurfaceCreated(
-            agentPanel.id,
-            paneId: paneId,
-            kind: "agent_session",
-            origin: "agent_session_tab",
-            focused: shouldFocusNewTab
-        )
-
-        if shouldFocusNewTab {
-            bonsplitController.focusPane(paneId)
-            bonsplitController.selectTab(newTabId)
-            agentPanel.focus()
-            applyTabSelection(tabId: newTabId, inPane: paneId)
-        } else {
-            preserveFocusAfterNonFocusSplit(
-                preferredPanelId: previousFocusedPanelId,
-                splitPanelId: agentPanel.id,
-                previousHostedView: previousHostedView
-            )
-        }
-
-        installAgentSessionPanelSubscription(agentPanel)
-
-        return agentPanel
     }
 
     @discardableResult
@@ -6742,10 +6325,6 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             restoredUnreadPanelIndicators.removeValue(forKey: detached.panelId)
             manualUnreadMarkedAt.removeValue(forKey: detached.panelId)
             panelSubscriptions.removeValue(forKey: detached.panelId)
-            if let agentPanel = detached.panel as? AgentSessionPanel {
-                agentPanel.onDisplayStateChanged = nil
-                agentSessionPanelCallbackIds.remove(detached.panelId)
-            }
 #if DEBUG
             cmuxDebugLog(
                 "split.attach.fail ws=\(id.uuidString.prefix(5)) panel=\(detached.panelId.uuidString.prefix(5)) " +
@@ -6815,23 +6394,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             }
         }
         adoptDetachedAgentRuntimeState(detached.agentRuntime)
-        if let markdownPanel = detached.panel as? MarkdownPanel {
-            markdownPanel.updateWorkspaceId(
-                id,
-                fileContentChangeCoordinator: fileContentChangeCoordinator
-            )
-            if panelSubscriptions[markdownPanel.id] == nil {
-                installMarkdownPanelSubscription(markdownPanel)
-            }
-        }
         if let filePreviewPanel = detached.panel as? FilePreviewPanel {
             filePreviewPanel.bindTabMetadata(to: self)
-        }
-        if let agentPanel = detached.panel as? AgentSessionPanel {
-            agentPanel.updateWorkspaceId(id)
-            if !agentSessionPanelCallbackIds.contains(agentPanel.id) {
-                installAgentSessionPanelSubscription(agentPanel)
-            }
         }
         // Seed deferred restore work only after the destination binding is in
         // place. The resolver starts an asynchronous ownership scan.
@@ -8082,14 +7646,6 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         insertFirst: Bool,
         filePath: String
     ) -> (any Panel)? {
-        if MarkdownPanelFileLinkResolver.isMarkdownPathLike(filePath) {
-            return splitPaneWithMarkdown(
-                targetPane: paneId,
-                orientation: orientation,
-                insertFirst: insertFirst,
-                filePath: filePath
-            )
-        }
         return splitPaneWithFilePreview(
             targetPane: paneId,
             orientation: orientation,

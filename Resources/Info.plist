@@ -131,8 +131,6 @@
 	</dict>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>A program running within cmux would like to use AppleScript.</string>
-	<key>NSAppleScriptEnabled</key>
-	<true/>
 	<key>NSDockTilePlugIn</key>
 	<string>CmuxDockTilePlugin.plugin</string>
 	<key>NSHumanReadableCopyright</key>
@@ -182,8 +180,6 @@
 			</array>
 		</dict>
 	</array>
-	<key>OSAScriptingDefinition</key>
-	<string>cmux.sdef</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

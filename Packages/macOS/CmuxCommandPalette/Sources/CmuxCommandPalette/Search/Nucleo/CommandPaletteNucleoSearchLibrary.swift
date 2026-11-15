@@ -105,57 +105,16 @@ final class CommandPaletteNucleoSearchLibrary: @unchecked Sendable {
         return unsafeBitCast(pointer, to: T.self)
     }
 
+    /// Only the copy inside the app bundle is loaded. Environment overrides
+    /// and build-tree paths would let another process choose code that runs
+    /// inside cmux.
     private static func defaultLibraryPaths() -> [String] {
-        var paths: [String] = []
-        let environmentPath = ProcessInfo.processInfo.environment["CMUX_NUCLEO_FFI_LIB"]
-        if let environmentPath, !environmentPath.isEmpty {
-            paths.append(environmentPath)
-        }
-
-        if let privateFrameworksPath = Bundle.main.privateFrameworksPath {
-            paths.append(
-                URL(fileURLWithPath: privateFrameworksPath)
-                    .appendingPathComponent(Self.libraryFileName)
-                    .path
-            )
-        }
-
-        // Repo source root: this file lives at
-        // Packages/macOS/CmuxCommandPalette/Sources/CmuxCommandPalette/Search/Nucleo/.
-        let sourceRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        paths.append(
-            sourceRoot
-                .appendingPathComponent("Native/CommandPaletteNucleoFFI/target/cmux-nucleo-ffi")
+        guard let privateFrameworksPath = Bundle.main.privateFrameworksPath else { return [] }
+        return [
+            URL(fileURLWithPath: privateFrameworksPath)
                 .appendingPathComponent(Self.libraryFileName)
                 .path
-        )
-        paths.append(
-            sourceRoot
-                .appendingPathComponent("Native/CommandPaletteNucleoFFI/target/release")
-                .appendingPathComponent(Self.libraryFileName)
-                .path
-        )
-        paths.append(
-            sourceRoot
-                .appendingPathComponent("Native/CommandPaletteNucleoFFI/target/aarch64-apple-darwin/release")
-                .appendingPathComponent(Self.libraryFileName)
-                .path
-        )
-        paths.append(
-            sourceRoot
-                .appendingPathComponent("Native/CommandPaletteNucleoFFI/target/x86_64-apple-darwin/release")
-                .appendingPathComponent(Self.libraryFileName)
-                .path
-        )
-
-        return paths
+        ]
     }
 
     private static let libraryFileName = "libcmux_command_palette_nucleo_ffi.dylib"

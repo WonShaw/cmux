@@ -87,3 +87,77 @@ struct AgentSessionWebTheme: Equatable {
         )
     }
 }
+
+/// Whether `url` points at this machine. Agent Chat only talks to loopback.
+func agentSessionIsLoopbackURL(_ url: URL) -> Bool {
+    guard let host = url.host?.lowercased() else { return false }
+    return host == "localhost" || host == "127.0.0.1" || host == "::1"
+}
+
+extension NSColor {
+    var markdownOpaqueSRGB: NSColor {
+        (usingColorSpace(.sRGB) ?? self).withAlphaComponent(1)
+    }
+
+    var markdownCSSColor: String {
+        let color = usingColorSpace(.sRGB) ?? self
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 1
+        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        let r = min(255, max(0, Int((red * 255).rounded())))
+        let g = min(255, max(0, Int((green * 255).rounded())))
+        let b = min(255, max(0, Int((blue * 255).rounded())))
+        let a = min(1, max(0, alpha))
+        return String(format: "rgba(%d, %d, %d, %.3f)", r, g, b, Double(a))
+    }
+
+    func markdownThemeOverlay(targetContrast: CGFloat, of color: NSColor) -> NSColor {
+        let base = markdownOpaqueSRGB
+        let overlay = color.markdownOpaqueSRGB
+        var low: CGFloat = 0
+        var high: CGFloat = 1
+        var result: CGFloat = 1
+
+        for _ in 0..<18 {
+            let mid = (low + high) / 2
+            let candidate = base.blended(withFraction: mid, of: overlay) ?? base
+            if candidate.markdownContrastRatio(with: base) < Double(targetContrast) {
+                low = mid
+            } else {
+                high = mid
+                result = mid
+            }
+        }
+
+        return overlay.withAlphaComponent(result)
+    }
+
+    var markdownRelativeLuminance: Double {
+        let color = usingColorSpace(.sRGB) ?? self
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 1
+        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+
+        func linear(_ component: CGFloat) -> Double {
+            let value = Double(component)
+            if value <= 0.04045 {
+                return value / 12.92
+            }
+            return pow((value + 0.055) / 1.055, 2.4)
+        }
+
+        return (0.2126 * linear(red)) + (0.7152 * linear(green)) + (0.0722 * linear(blue))
+    }
+
+    func markdownContrastRatio(with other: NSColor) -> Double {
+        let first = markdownRelativeLuminance
+        let second = other.markdownRelativeLuminance
+        let lighter = max(first, second)
+        let darker = min(first, second)
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+}

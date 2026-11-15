@@ -33,8 +33,6 @@ extension ControlCommandCoordinator {
             return projectSetSettingsFilter(request.params)
         case "project.get_state":
             return projectGetState(request.params)
-        case "markdown.open":
-            return markdownOpen(request.params)
         case "file.open":
             return fileOpen(request.params)
         default:

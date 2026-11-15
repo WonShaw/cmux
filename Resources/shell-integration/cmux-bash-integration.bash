@@ -17,6 +17,9 @@ _cmux_detect_send_tool() {
 # keeps detached reporters authorized after launchd or tmux reparents them.
 _cmux_write_socket_payload() {
     local payload="$1"
+    # One payload is one socket command; control characters would smuggle in
+    # extra commands, so such payloads are dropped.
+    [[ "$payload" == *[[:cntrl:]]* ]] && return 0
     case "${CMUX_SOCKET_CAPABILITY:-}" in
         ""|*[[:space:]]*)
             printf '%s\n' "$payload"
@@ -109,7 +112,7 @@ _cmux_restore_scrollback_once() {
     # Valid kitty-shell-cwd URIs reach Ghostty's PWD action in PTY order. The
     # following real cwd report keeps the private boundary out of title state.
     builtin printf '\033]1337;CurrentDir=kitty-shell-cwd://%s/.cmux/session-scrollback-replay/%s/end\007' "$HOSTNAME" "$token"
-    builtin printf '\033]1337;CurrentDir=kitty-shell-cwd://%s%s\007' "$HOSTNAME" "$PWD"
+    [[ "$PWD" == *[[:cntrl:]]* ]] || builtin printf '\033]1337;CurrentDir=kitty-shell-cwd://%s%s\007' "$HOSTNAME" "$PWD"
 }
 _cmux_restore_scrollback_once
 _CMUX_CLAUDE_WRAPPER="${_CMUX_CLAUDE_WRAPPER:-}"

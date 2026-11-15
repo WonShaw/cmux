@@ -147,7 +147,9 @@ if test "$_cmux_integration_enabled" != 0
             /bin/rm -f -- "$path" >/dev/null 2>&1; or true
         end
         printf '\033]1337;CurrentDir=kitty-shell-cwd://%s/.cmux/session-scrollback-replay/%s/end\007' "$host" "$token"
-        printf '\033]1337;CurrentDir=kitty-shell-cwd://%s%s\007' "$host" "$PWD"
+        if not string match -qr '[[:cntrl:]]' -- "$PWD"
+            printf '\033]1337;CurrentDir=kitty-shell-cwd://%s%s\007' "$host" "$PWD"
+        end
     end
     _cmux_restore_scrollback_once
 
@@ -164,6 +166,11 @@ if test "$_cmux_integration_enabled" != 0
     end
 
     function _cmux_write_socket_payload --argument-names payload
+        # One payload is one socket command; control characters would smuggle
+        # in extra commands, so such payloads are dropped.
+        if string match -qr '[[:cntrl:]]' -- "$payload"
+            return 0
+        end
         if set -q CMUX_SOCKET_CAPABILITY
             and test -n "$CMUX_SOCKET_CAPABILITY"
             and not string match -qr '[[:space:]]' -- "$CMUX_SOCKET_CAPABILITY"

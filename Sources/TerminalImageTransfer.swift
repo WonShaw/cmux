@@ -360,6 +360,14 @@ enum TerminalImageTransferPlanner {
         return .reject
     }
 
+    /// Dropped text goes straight to the shell without a paste confirmation,
+    /// so line breaks (which would run the text) become spaces.
+    static func singleLineDroppedText(_ text: String) -> String {
+        text.replacingOccurrences(of: "\r\n", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+    }
+
     private static func prepareDrop(
         pasteboard: NSPasteboard,
         pasteboardService: TerminalPasteboardService
@@ -378,11 +386,11 @@ enum TerminalImageTransferPlanner {
         }
 
         if let rawURL = pasteboard.string(forType: .URL), !rawURL.isEmpty {
-            return .insertText(escapeForShell(rawURL))
+            return .insertText(escapeForShell(singleLineDroppedText(rawURL)))
         }
 
         if let string = pasteboard.string(forType: .string), !string.isEmpty {
-            return .insertText(string)
+            return .insertText(singleLineDroppedText(string))
         }
 
         return .reject

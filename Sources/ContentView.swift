@@ -6867,7 +6867,7 @@ struct ContentView: View {
             // the zoom commands when the panel is in raw text-edit mode.
             snapshot.setBool(
                 CommandPaletteContextKeys.panelIsMarkdown,
-                (panelContext.panel as? MarkdownPanel)?.displayMode == .preview
+                false
             )
             snapshot.setBool(
                 CommandPaletteContextKeys.panelIsFilePreviewTextEditor,

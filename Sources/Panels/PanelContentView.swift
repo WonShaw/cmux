@@ -66,16 +66,7 @@ struct PanelContentView: View {
                 TerminalPanelUnavailableView(appearance: appearance)
             }
         case .markdown:
-            if let markdownPanel = panel as? MarkdownPanel {
-                MarkdownPanelView(
-                    panel: markdownPanel,
-                    isFocused: isFocused,
-                    isVisibleInUI: isVisibleInUI,
-                    portalPriority: portalPriority,
-                    appearance: appearance,
-                    onRequestPanelFocus: onRequestPanelFocus
-                )
-            }
+            EmptyView()
         case .filePreview:
             if let filePreviewPanel = panel as? FilePreviewPanel {
                 FilePreviewPanelView(
@@ -133,16 +124,7 @@ struct PanelContentView: View {
                 }
             }
         case .agentSession:
-            if let agentSessionPanel = panel as? AgentSessionPanel {
-                AgentSessionPanelView(
-                    panel: agentSessionPanel,
-                    isFocused: isFocused,
-                    isVisibleInUI: isVisibleInUI,
-                    portalPriority: portalPriority,
-                    appearance: appearance,
-                    onRequestPanelFocus: onRequestPanelFocus
-                )
-            }
+            EmptyView()
         case .project:
             if let projectPanel = panel as? ProjectPanel {
                 ProjectPanelView(

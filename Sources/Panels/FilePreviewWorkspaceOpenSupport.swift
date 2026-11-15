@@ -39,22 +39,6 @@ extension Workspace {
                     focus: shouldFocusNewTabs,
                     targetIndex: nextIndex
                 )
-            } else if MarkdownPanelFileLinkResolver.isMarkdownPathLike(filePath) {
-                if reuseExisting {
-                    panel = openOrFocusMarkdownSurface(
-                        inPane: paneId,
-                        filePath: filePath,
-                        focus: shouldFocusNewTabs,
-                        duplicateWhenFocused: duplicateWhenFocused
-                    )
-                } else {
-                    panel = newMarkdownSurface(
-                        inPane: paneId,
-                        filePath: filePath,
-                        focus: shouldFocusNewTabs,
-                        targetIndex: nextIndex
-                    )
-                }
             } else if reuseExisting {
                 panel = openOrFocusFilePreviewSurface(
                     inPane: paneId,

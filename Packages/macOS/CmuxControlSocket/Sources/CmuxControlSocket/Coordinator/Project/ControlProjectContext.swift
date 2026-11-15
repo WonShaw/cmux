@@ -122,30 +122,6 @@ public protocol ControlProjectContext: AnyObject {
         surfaceID: UUID?
     ) -> ControlProjectStateResolution
 
-    /// Creates a markdown split for `markdown.open` (the path is already
-    /// validated), running the legacy in-block order: workspace, focus side
-    /// effects, source surface, direction, font-size validation, create.
-    ///
-    /// - Parameters:
-    ///   - routing: The routing selectors.
-    ///   - surfaceID: The explicit source `surface_id`, if any.
-    ///   - filePath: The resolved readable file path.
-    ///   - directionRaw: The raw direction token (default `"right"`).
-    ///   - fontSize: The parsed `font_size`, if numeric (the app clamps it).
-    ///   - fontSizeInvalid: Whether `font_size` was present but non-numeric.
-    ///   - requestedFocus: The requested `focus` flag (the app applies the
-    ///     focus-allowance policy).
-    /// - Returns: The open resolution.
-    func controlMarkdownOpen(
-        routing: ControlRoutingSelectors,
-        surfaceID: UUID?,
-        filePath: String,
-        directionRaw: String,
-        fontSize: Double?,
-        fontSizeInvalid: Bool,
-        requestedFocus: Bool
-    ) -> ControlMarkdownOpenResolution
-
     /// Opens file surfaces for `file.open` (the paths are already validated).
     ///
     /// Forwards to the shared `v2FileOpen` body (also driven by cmuxTests) and

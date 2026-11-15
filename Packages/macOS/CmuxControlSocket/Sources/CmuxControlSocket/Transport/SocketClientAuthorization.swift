@@ -87,10 +87,10 @@ public struct SocketClientAuthorization {
                 capabilityAuthority: capabilityAuthority,
                 isDescendant: isDescendant
             )
-        case .automation, .password:
+        case .automation, .password, .allowAll:
+            // comux: `allowAll` no longer admits other local accounts; it
+            // behaves like `automation` (same user only).
             guard peerHasSameUID else { return nil }
-            return SocketClientCapabilityCommand(command)?.command ?? command
-        case .allowAll:
             return SocketClientCapabilityCommand(command)?.command ?? command
         }
     }

@@ -3,7 +3,8 @@ import CmuxSettings
 import CmuxSimulatorUI
 
 struct ShortcutEventFocusContext {
-    let markdownPanel: MarkdownPanel?
+    /// The markdown viewer was removed, so no markdown panel is ever focused.
+    var markdownPanel: Bool? { nil }
     let filePreviewTextEditorFocused: Bool
     let simulatorFocused: Bool
     let simulatorPanel: SimulatorPanel?
@@ -13,7 +14,6 @@ struct ShortcutEventFocusContext {
     let shortcutContext: ShortcutContext
 
     init(
-        markdownPanel: MarkdownPanel?,
         filePreviewTextEditorFocused: Bool,
         simulatorFocused: Bool,
         simulatorPanel: SimulatorPanel? = nil,
@@ -21,7 +21,6 @@ struct ShortcutEventFocusContext {
         rightSidebarFocused: Bool,
         shortcutContext: ShortcutContext
     ) {
-        self.markdownPanel = markdownPanel
         self.filePreviewTextEditorFocused = filePreviewTextEditorFocused
         self.simulatorFocused = simulatorFocused
         self.simulatorPanel = simulatorPanel
@@ -38,7 +37,7 @@ struct ShortcutEventFocusContext {
     /// ``ShortcutWhenClause`` evaluates against.
     var focusState: ShortcutFocusState {
         ShortcutFocusState(
-            markdown: markdownPanel != nil,
+            markdown: false,
             sidebar: rightSidebarFocused,
             filePreviewTextEditor: filePreviewTextEditorFocused,
             simulator: simulatorFocused
@@ -62,10 +61,6 @@ struct ShortcutEventFocusContextCache {
 }
 
 extension AppDelegate {
-    func shortcutEventMarkdownPanel(_ event: NSEvent) -> MarkdownPanel? {
-        shortcutEventFocusContext(event).markdownPanel
-    }
-
     func shortcutEventFocusContext(_ event: NSEvent) -> ShortcutEventFocusContext {
         if let cache = shortcutEventFocusContextCache, cache.event === event {
             return cache.context
@@ -76,20 +71,16 @@ extension AppDelegate {
         let simulatorFocused = simulatorPanel != nil
         let simulatorTextEditorFocused = simulatorFocused
             && shortcutWindow?.firstResponder.map(shortcutResponderAcceptsTextEditing) == true
-        let markdownPanel = shortcutFocusedMarkdownPanel(in: shortcutWindow)
-        let filePreviewTextEditorFocused = markdownPanel == nil
-            ? shortcutFocusedFilePreviewTextEditor(in: shortcutWindow)
-            : false
+        let filePreviewTextEditorFocused = shortcutFocusedFilePreviewTextEditor(in: shortcutWindow)
         let rightSidebarFocused = !simulatorFocused
             && (shortcutWindow.map { shouldRouteRightSidebarModeShortcut(in: $0) } ?? false)
         let focusState = ShortcutFocusState(
-            markdown: markdownPanel != nil,
+            markdown: false,
             sidebar: rightSidebarFocused,
             filePreviewTextEditor: filePreviewTextEditorFocused,
             simulator: simulatorFocused
         )
         let context = ShortcutEventFocusContext(
-            markdownPanel: markdownPanel,
             filePreviewTextEditorFocused: filePreviewTextEditorFocused,
             simulatorFocused: simulatorFocused,
             simulatorPanel: simulatorPanel,
@@ -141,19 +132,6 @@ extension AppDelegate {
         guard let window else { return nil }
         return mainWindowContexts[ObjectIdentifier(window)] ??
             mainWindowContexts.values.first(where: { $0.window === window })
-    }
-
-    private func shortcutFocusedMarkdownPanel(in window: NSWindow?) -> MarkdownPanel? {
-        // `focusedMarkdownPanel` is already gated to preview mode, where the
-        // rendered viewer responds to zoom (the raw text editor does not).
-        if let window {
-            guard let context = shortcutMainWindowContext(in: window) else {
-                return nil
-            }
-            return context.tabManager.focusedMarkdownPanel
-        }
-
-        return tabManager?.focusedMarkdownPanel
     }
 
     private func shortcutFocusedFilePreviewTextEditor(in window: NSWindow?) -> Bool {

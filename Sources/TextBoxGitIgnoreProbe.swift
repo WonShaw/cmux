@@ -11,10 +11,9 @@ struct TextBoxGitIgnoreProbe: Sendable {
 
     func isWorkTree() async -> Bool {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
         process.environment = GitOfflineEnvironment.applying()
         process.arguments = [
-            "git",
             "-C", rootURL.path,
             "rev-parse",
             "--is-inside-work-tree"
@@ -36,10 +35,9 @@ struct TextBoxGitIgnoreProbe: Sendable {
         guard !relativePaths.isEmpty else { return [] }
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
         process.environment = GitOfflineEnvironment.applying()
         process.arguments = [
-            "git",
             "-C", rootURL.path,
             "check-ignore",
             "--stdin"

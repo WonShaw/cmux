@@ -1,4 +1,5 @@
 public import Foundation
+import Darwin
 #if canImport(Security)
 import Security
 #endif
@@ -203,8 +204,24 @@ public struct SocketControlPasswordStore: Sendable {
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
+        try? fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        // Create the file 0600 from the start (a plain atomic write would leave
+        // it world-readable until the chmod), then move it into place.
         let data = Data(normalized.utf8)
-        try data.write(to: fileURL, options: .atomic)
+        let temporaryURL = directory.appendingPathComponent(
+            ".\(fileURL.lastPathComponent).\(UUID().uuidString)"
+        )
+        guard fileManager.createFile(
+            atPath: temporaryURL.path,
+            contents: data,
+            attributes: [.posixPermissions: 0o600]
+        ) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        guard Darwin.rename(temporaryURL.path, fileURL.path) == 0 else {
+            try? fileManager.removeItem(at: temporaryURL)
+            throw CocoaError(.fileWriteUnknown)
+        }
         try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
         NotificationCenter.default.post(name: Self.didChangeNotification, object: nil)
     }

@@ -63,9 +63,6 @@ extension TerminalController {
         if let previewPanel = panel as? FilePreviewPanel {
             payload["path"] = previewPanel.filePath
             payload["preview_mode"] = previewPanel.previewMode.socketName
-        } else if let markdownPanel = panel as? MarkdownPanel {
-            payload["path"] = markdownPanel.filePath
-            payload["display_mode"] = markdownPanel.displayMode.rawValue
         }
         return payload
     }

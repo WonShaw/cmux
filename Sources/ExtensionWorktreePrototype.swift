@@ -703,9 +703,33 @@ enum CmuxExtensionWorktreePrototype {
         failureDescription: String = "Could not create worktree."
     ) async throws -> Data {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.environment = GitOfflineEnvironment.applying()
-        process.arguments = [executable] + arguments
+        let environment = GitOfflineEnvironment.applying()
+        process.environment = environment
+        if executable == "git" {
+            // Never resolve git through PATH, and never let the repository's
+            // own filter drivers run during checkout or status.
+            let gitURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.executableURL = gitURL
+            var directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            if let flagIndex = arguments.firstIndex(of: "-C"), flagIndex + 1 < arguments.count {
+                directory = URL(fileURLWithPath: arguments[flagIndex + 1])
+            }
+            guard let neutralizing = GitOfflineEnvironment.repositoryFilterNeutralizingArguments(
+                gitExecutable: gitURL,
+                directory: directory,
+                environment: environment
+            ) else {
+                throw NSError(
+                    domain: "CmuxExtensionWorktreePrototype",
+                    code: 6,
+                    userInfo: [NSLocalizedDescriptionKey: failureDescription]
+                )
+            }
+            process.arguments = neutralizing + arguments
+        } else {
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = [executable] + arguments
+        }
         let standardOutputPipe = Pipe()
         let standardErrorPipe = Pipe()
         process.standardOutput = standardOutputPipe

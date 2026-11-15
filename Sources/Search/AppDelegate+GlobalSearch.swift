@@ -183,16 +183,9 @@ extension AppDelegate {
 
         if let panelID = hit.panelID, workspace.panels[panelID] != nil {
             tabManager.focusSurface(tabId: workspace.id, surfaceId: panelID)
-            if let markdownPanel = workspace.markdownPanel(for: panelID) {
-                applyMarkdownInlineSearch(query: query, hit: hit, to: markdownPanel)
-            }
         }
     }
 
-    private func applyMarkdownInlineSearch(query: String, hit: SearchIndexHit, to panel: MarkdownPanel) {
-        guard let needle = GlobalSearchInlineSearch.needle(for: query, hit: hit) else { return }
-        panel.applySearchNeedle(needle)
-    }
 }
 
 enum GlobalSearchInlineSearch {

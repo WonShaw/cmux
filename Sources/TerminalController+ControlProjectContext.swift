@@ -181,69 +181,6 @@ extension TerminalController: ControlProjectContext {
 
     // MARK: - markdown.open
 
-    func controlMarkdownOpen(
-        routing: ControlRoutingSelectors,
-        surfaceID: UUID?,
-        filePath: String,
-        directionRaw: String,
-        fontSize: Double?,
-        fontSizeInvalid: Bool,
-        requestedFocus: Bool
-    ) -> ControlMarkdownOpenResolution {
-        guard let tabManager = resolveTabManager(routing: routing) else {
-            return .workspaceNotFound
-        }
-        guard let ws = controlProjectResolveWorkspace(routing: routing, tabManager: tabManager) else {
-            return .workspaceNotFound
-        }
-        v2MaybeFocusWindow(for: tabManager)
-        v2MaybeSelectWorkspace(tabManager, workspace: ws)
-
-        let sourceSurfaceId = surfaceID ?? ws.focusedPanelId
-        guard let sourceSurfaceId else {
-            return .noFocusedSurface
-        }
-        guard ws.panels[sourceSurfaceId] != nil else {
-            return .sourceSurfaceNotFound(sourceSurfaceId)
-        }
-
-        let sourcePaneUUID = ws.paneId(forPanelId: sourceSurfaceId)?.id
-
-        guard let direction = parseSplitDirection(directionRaw) else {
-            return .invalidDirection
-        }
-        let orientation: SplitOrientation = direction.isHorizontal ? .horizontal : .vertical
-        let insertFirst = (direction == .left || direction == .up)
-
-        if fontSizeInvalid {
-            return .invalidFontSize
-        }
-        let clampedFontSize = fontSize.map { MarkdownFontSizeSettings.clamp($0) }
-
-        let createdPanel = ws.newMarkdownSplit(
-            from: sourceSurfaceId,
-            orientation: orientation,
-            insertFirst: insertFirst,
-            filePath: filePath,
-            focus: v2FocusAllowed(requested: requestedFocus),
-            fontSize: clampedFontSize
-        )
-
-        guard let markdownPanelId = createdPanel?.id else {
-            return .createFailed
-        }
-
-        let targetPaneUUID = ws.paneId(forPanelId: markdownPanelId)?.id
-        return .opened(ControlMarkdownOpenResolution.Created(
-            windowID: v2ResolveWindowId(tabManager: tabManager),
-            workspaceID: ws.id,
-            targetPaneID: targetPaneUUID,
-            surfaceID: markdownPanelId,
-            sourceSurfaceID: sourceSurfaceId,
-            sourcePaneID: sourcePaneUUID
-        ))
-    }
-
     // MARK: - file.open
 
     /// `file.open` forwards to the single shared `v2FileOpen` body (also driven

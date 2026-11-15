@@ -176,10 +176,11 @@ private func cmuxInjectedCodexHookArgumentPrefixEnd(_ args: [String]) -> Int? {
     } else {
         return nil
     }
-    guard index < args.count, args[index] == "--dangerously-bypass-hook-trust" else {
-        return nil
+    // Older wrappers also passed `--dangerously-bypass-hook-trust`; comux no
+    // longer does, but saved commands may still carry it.
+    if index < args.count, args[index] == "--dangerously-bypass-hook-trust" {
+        index += 1
     }
-    index += 1
 
     // New wrappers prepend the current complete ordered block in one operation.
     // Exact compatibility schemas keep saved commands replayable across

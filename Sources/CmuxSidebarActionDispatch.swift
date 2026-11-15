@@ -1,6 +1,8 @@
 import AppKit
+import CmuxControlSocket
 import CmuxSwiftRender
 import CmuxSwiftRenderUI
+import CmuxWorkspaces
 import Foundation
 
 /// Serial lane for in-process `cmux(...)` sidebar actions. Worker-lane methods
@@ -72,11 +74,15 @@ func makeCmuxSidebarActionDispatch() -> SidebarActionDispatch {
                     }
                     guard let data = try? JSONSerialization.data(withJSONObject: payload),
                           let line = String(data: data, encoding: .utf8) else { continue }
+                    // Sidebar scripts get the same allowlist as socket clients.
+                    guard ControlSocketClientPolicy.evaluate(line) == .allow else { continue }
                     _ = controller.handleSocketLine(line)
                 case let .openURL(urlString):
                     // NSWorkspace.open is main-only; run it synchronously to keep the
                     // command's position in the sequence.
-                    if let url = URL(string: urlString) {
+                    // Sidebar scripts may only open web and mail links.
+                    if let url = URL(string: urlString),
+                       SystemOpenSafetyPolicy.isDirectlyOpenable(url) {
                         DispatchQueue.main.sync { _ = NSWorkspace.shared.open(url) }
                     }
                 case .log:

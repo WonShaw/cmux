@@ -20,12 +20,10 @@ enum CommandClickFileOpenRouter {
         defaults: UserDefaults = .standard
     ) -> Bool {
         let store = FileRouteSettingsStore(defaults: defaults)
-        if store.shouldRouteMarkdown(path: filePath),
-           workspace.openOrFocusMarkdownSplit(from: sourcePanelId, filePath: filePath) != nil {
-            return true
-        }
-
-        guard store.shouldRouteSupportedFile(path: filePath) else {
+        // The markdown viewer was removed; markdown files open as plain-text
+        // file previews.
+        guard store.shouldRouteMarkdown(path: filePath)
+            || store.shouldRouteSupportedFile(path: filePath) else {
             return false
         }
 

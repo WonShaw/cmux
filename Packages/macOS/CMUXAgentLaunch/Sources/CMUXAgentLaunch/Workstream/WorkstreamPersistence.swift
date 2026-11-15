@@ -148,13 +148,20 @@ public actor WorkstreamPersistence {
     private func handleForWriting() throws -> FileHandle {
         if let handle { return handle }
         let fm = FileManager.default
+        // The workstream holds prompts and agent replies: keep it private.
         try fm.createDirectory(
             at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try? fm.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: fileURL.deletingLastPathComponent().path
         )
         if !fm.fileExists(atPath: fileURL.path) {
-            fm.createFile(atPath: fileURL.path, contents: nil)
+            fm.createFile(atPath: fileURL.path, contents: nil, attributes: [.posixPermissions: 0o600])
         }
+        try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
         let fh = try FileHandle(forWritingTo: fileURL)
         handle = fh
         return fh

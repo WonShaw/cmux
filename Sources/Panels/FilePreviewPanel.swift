@@ -1,4 +1,5 @@
 import CmuxFoundation
+import CmuxWorkspaces
 import AppKit
 import Bonsplit
 import Combine
@@ -98,6 +99,11 @@ struct FileExternalOpenApplicationResolver: Sendable {
 enum FileExternalOpenAction {
     @discardableResult
     static func openDefault(fileURL: URL) -> Bool {
+        // Never launch something that could execute; show it in Finder.
+        guard SystemOpenSafetyPolicy.isSafeToLaunch(fileURL: fileURL) else {
+            NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+            return true
+        }
         let resolver = FileExternalOpenApplicationResolver.live
         guard let defaultURL = resolver.defaultApplicationURL(fileURL) else {
             return open(fileURL: fileURL, applicationURL: nil)

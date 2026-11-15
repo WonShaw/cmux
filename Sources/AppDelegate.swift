@@ -9,8 +9,6 @@ import CmuxTerminalCore
 import CmuxTerminal
 import CmuxSettings
 import CmuxSettingsUI
-import CmuxSudoBroker
-import CmuxSudoBrokerUI
 import CmuxWorkspaces
 import SwiftUI
 import Bonsplit
@@ -25,11 +23,6 @@ import CmuxFoundation
 import CmuxSidebar
 import CmuxGit
 import os
-
-private nonisolated let sudoApprovalLogger = Logger(
-    subsystem: "com.comux.app",
-    category: "SudoApproval"
-)
 
 private enum CmuxThemeNotifications {
     static let reloadConfig = Notification.Name("com.cmuxterm.themes.reload-config")
@@ -469,7 +462,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         Self.cachedIsRunningUnderXCTest
     }
     private let cmuxThemePreviewReloadScheduler = MainActorDeferredActionScheduler()
-    private let sudoApprovalCoordinator: SudoApprovalCoordinator?
 
     private func isRunningUnderXCTest(_ env: [String: String]) -> Bool {
         Self.isRunningUnderXCTest(environment: env)
@@ -1073,30 +1065,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     override init() {
         let fileManager = FileManager.default
-        if let bundleIdentifier = Bundle.main.bundleIdentifier,
-           !bundleIdentifier.isEmpty,
-           let applicationSupportDirectory = fileManager.urls(
-               for: .applicationSupportDirectory,
-               in: .userDomainMask
-           ).first,
-           let runnerExecutableURL = Bundle.main.resourceURL?
-               .appendingPathComponent("bin/cmux", isDirectory: false),
-           fileManager.isExecutableFile(atPath: runnerExecutableURL.path) {
-            let broker = SudoBroker(
-                paths: SudoBrokerPaths(
-                    applicationSupportDirectory: applicationSupportDirectory,
-                    bundleIdentifier: bundleIdentifier
-                ),
-                runnerExecutableURL: runnerExecutableURL,
-                messages: .localized
-            )
-            sudoApprovalCoordinator = SudoApprovalCoordinator(
-                broker: broker,
-                presenter: SudoApprovalWindowPresenter()
-            )
-        } else {
-            sudoApprovalCoordinator = nil
-        }
         let hangDirectory = fileManager.urls(
             for: .libraryDirectory,
             in: .userDomainMask
@@ -1176,7 +1144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard !terminalFileRequests.isEmpty || !fileURLs.isEmpty || !directories.isEmpty else { return }
 
         prepareForExplicitOpenIntentAtStartup()
-        for request in terminalFileRequests {
+        for request in terminalFileRequests where confirmRunningOpenedFile(request.fileURL) {
             openTerminalDefaultFileRequest(
                 request,
                 debugSource: "application.openURLs.defaultTerminal"
@@ -1194,6 +1162,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 debugSource: "application.openURLs"
             )
         }
+    }
+
+    /// Opening a script or executable with comux runs it. Files can be handed
+    /// to the app by other programs (`open -a`, Open With), so the user
+    /// confirms each one; Cancel is the default.
+    private func confirmRunningOpenedFile(_ fileURL: URL) -> Bool {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(
+            localized: "openFile.confirmRun.title",
+            defaultValue: "Run this file in a new terminal?"
+        )
+        alert.informativeText = String(
+            localized: "openFile.confirmRun.message",
+            defaultValue: "Opening this file with comux runs it as a program:"
+        ) + "\n\n" + fileURL.path(percentEncoded: false)
+        let cancel = alert.addButton(withTitle: String(
+            localized: "openFile.confirmRun.cancel",
+            defaultValue: "Cancel"
+        ))
+        cancel.keyEquivalent = "\r"
+        let run = alert.addButton(withTitle: String(
+            localized: "openFile.confirmRun.run",
+            defaultValue: "Run"
+        ))
+        run.keyEquivalent = ""
+        return alert.runModal() == .alertSecondButtonReturn
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -1237,9 +1233,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             syncActivationPolicy()
         }
         StartupBreadcrumbLog.append("appDelegate.didFinish.activationPolicy.synced")
-        if !isRunningUnderXCTest {
-            startSudoApprovalCoordinator()
-        }
         // Prewarm the shared restorable-agent index off the main thread so the first
         // tab/workspace/window close after launch reads a warm cache instead of paying a
         // synchronous RestorableAgentSessionIndex.load() on the main thread. See
@@ -1682,9 +1675,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func deferTerminateForOwnedCleanupAndFreshSnapshot(reason: String) -> Bool {
         let simulatorCleanupTasks = SimulatorPanel.beginApplicationTerminationCleanup()
-        let hasSudoApprovalRuntime = sudoApprovalCoordinator?.requiresShutdown == true
         let hasOwnedRuntimeCleanup = !simulatorCleanupTasks.isEmpty
-            || hasSudoApprovalRuntime
         guard hasOwnedRuntimeCleanup else {
             return false
         }
@@ -1696,14 +1687,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 fields: [
                     "simulatorPanels": String(simulatorCleanupTasks.count),
                     "freshAgentIndex": "1",
-                    "sudoApproval": hasSudoApprovalRuntime ? "1" : "0",
                     "reason": reason,
                 ]
             )
             let cleanupTask = Task { @MainActor [weak self] in
                 guard let self else { return }
-                await self.sudoApprovalCoordinator?.stop()
-                guard !Task.isCancelled else { return }
                 for cleanupTask in simulatorCleanupTasks {
                     await cleanupTask.value
                     guard !Task.isCancelled else { return }
@@ -1800,7 +1788,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         isTerminatingApp = false
         isQuitWarningConfirmed = false
         replyToTerminateOnce(false)
-        startSudoApprovalCoordinator()
 
         let alert = NSAlert()
         alert.alertStyle = .warning
@@ -1956,7 +1943,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         ghosttyCrashBreadcrumbTask = nil
         pendingCrashScanTask?.cancel()
         pendingCrashScanTask = nil
-        sudoApprovalCoordinator?.cancelForImmediateTermination()
         notificationStore?.clearAll()
         GhosttyCrashBreadcrumb.markCleanExit()
         unregisterDisplayReconfigurationCallbackIfNeeded()
@@ -2051,17 +2037,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         pendingCrashScanTask = task
         return task
-    }
-
-    private func startSudoApprovalCoordinator() {
-        sudoApprovalCoordinator?.start { error in
-            sudoApprovalLogger.error(
-                "startup failed: \(String(describing: error), privacy: .private)"
-            )
-#if DEBUG
-            cmuxDebugLog("sudo.approval.start failed error=\(String(describing: error))")
-#endif
-        }
     }
 
     private func scheduleGhosttyCrashBreadcrumbIfNeeded(notificationStore: TerminalNotificationStore) {
@@ -2598,10 +2573,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                         guard let filePreview = panel as? FilePreviewPanel else { return false }
                         return (filePreview.filePath as NSString).resolvingSymlinksInPath == canonicalOpenedPath
                     }
-                    let openedInMarkdownViewer = workspace.panels.values.contains { panel in
-                        guard let markdown = panel as? MarkdownPanel else { return false }
-                        return (markdown.filePath as NSString).resolvingSymlinksInPath == canonicalOpenedPath
-                    }
+                    let openedInMarkdownViewer = false
                     payload["lastCommandOpenedInFilePreview"] = openedInFilePreview ? "1" : "0"
                     payload["lastCommandOpenedInMarkdownViewer"] = openedInMarkdownViewer ? "1" : "0"
                     payload["lastCommandSucceeded"] = "1"
@@ -9445,29 +9417,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         sendTextWhenReady(payload, to: tab)
     }
 
-    @objc func openDebugAgentSessionReact(_ sender: Any?) {
-        openDebugAgentSession(rendererKind: .react)
-    }
-
-    @objc func openDebugAgentSessionSolid(_ sender: Any?) {
-        openDebugAgentSession(rendererKind: .solid)
-    }
-
-    private func openDebugAgentSession(rendererKind: AgentSessionRendererKind) {
-        guard let manager = activeTabManagerForCommands(),
-              let workspace = manager.selectedWorkspace,
-              let paneId = workspace.bonsplitController.focusedPaneId ?? workspace.bonsplitController.allPaneIds.first else {
-            return
-        }
-        _ = workspace.newAgentSessionSurface(
-            inPane: paneId,
-            providerID: .codex,
-            rendererKind: rendererKind,
-            workingDirectory: workspace.currentDirectory,
-            focus: true
-        )
-    }
-
     @objc func openDebugColorComparisonWorkspaces(_ sender: Any?) {
         guard let tabManager else { return }
 
@@ -13140,15 +13089,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if matchConfiguredShortcut(event: event, action: .browserZoomReset) { return performBrowserOrTextPreviewZoomShortcut(event: event, action: .browserZoomReset) }
 
         if matchConfiguredShortcut(event: event, action: .markdownZoomIn) {
-            return shortcutEventMarkdownPanel(event)?.zoomIn() ?? false
+            return false
         }
 
         if matchConfiguredShortcut(event: event, action: .markdownZoomOut) {
-            return shortcutEventMarkdownPanel(event)?.zoomOut() ?? false
+            return false
         }
 
         if matchConfiguredShortcut(event: event, action: .markdownZoomReset) {
-            return shortcutEventMarkdownPanel(event)?.resetZoom() ?? false
+            return false
         }
 
         if matchConfiguredShortcut(event: event, action: .findInDirectory) {

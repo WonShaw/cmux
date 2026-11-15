@@ -24,7 +24,7 @@ struct GitStatusProvider: Sendable {
         // both to one spelling for the containment check, and emit keys under the caller's
         // spelling so FileExplorerStore lookups match.
         return parseGitStatus(
-            output: runGit(in: repoRoot, arguments: ["status", "--porcelain=v1", "-z"]),
+            output: runStatus(in: repoRoot),
             repoRoot: Self.canonicalPath(repoRoot),
             explorerRoot: Self.canonicalPath(directory),
             keyRoot: directory
@@ -138,6 +138,20 @@ struct GitStatusProvider: Sendable {
     private func gitRepoRoot(for directory: String) -> String? {
         runGit(in: directory, arguments: ["rev-parse", "--show-toplevel"])?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// `git status` with repository-defined filter drivers disabled and
+    /// submodules skipped, so a repository cannot make cmux run a program.
+    private func runStatus(in directory: String) -> String? {
+        guard let neutralizing = GitOfflineEnvironment.repositoryFilterNeutralizingArguments(
+            gitExecutable: gitExecutableURL,
+            directory: URL(fileURLWithPath: directory),
+            environment: nonLockingGitEnvironment()
+        ) else { return nil }
+        return runGit(
+            in: directory,
+            arguments: neutralizing + ["status", "--porcelain=v1", "-z", "--ignore-submodules=all"]
+        )
     }
 
     private func runGit(in directory: String, arguments: [String]) -> String? {

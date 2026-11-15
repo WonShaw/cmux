@@ -128,14 +128,25 @@ final class CmuxEventLogWriter: @unchecked Sendable {
     private func append(_ lines: [String]) {
         guard !lines.isEmpty else { return }
         do {
+            // The log records prompts and agent activity: keep it private.
             try FileManager.default.createDirectory(
                 at: eventLogURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
             )
             let fileManager = FileManager.default
+            try? fileManager.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: eventLogURL.deletingLastPathComponent().path
+            )
             if !fileManager.fileExists(atPath: eventLogURL.path) {
-                _ = fileManager.createFile(atPath: eventLogURL.path, contents: nil)
+                _ = fileManager.createFile(
+                    atPath: eventLogURL.path,
+                    contents: nil,
+                    attributes: [.posixPermissions: 0o600]
+                )
             }
+            try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: eventLogURL.path)
             var handle = try FileHandle(forWritingTo: eventLogURL)
             defer { try? handle.close() }
             try handle.seekToEnd()
@@ -164,7 +175,11 @@ final class CmuxEventLogWriter: @unchecked Sendable {
         }
         if currentSize > maxEventLogBytes {
             try fileManager.removeItem(at: eventLogURL)
-            _ = fileManager.createFile(atPath: eventLogURL.path, contents: nil)
+            _ = fileManager.createFile(
+                atPath: eventLogURL.path,
+                contents: nil,
+                attributes: [.posixPermissions: 0o600]
+            )
             return
         }
 
@@ -174,7 +189,11 @@ final class CmuxEventLogWriter: @unchecked Sendable {
         if fileManager.fileExists(atPath: eventLogURL.path) {
             try fileManager.moveItem(at: eventLogURL, to: rotatedURL)
         }
-        _ = fileManager.createFile(atPath: eventLogURL.path, contents: nil)
+        _ = fileManager.createFile(
+            atPath: eventLogURL.path,
+            contents: nil,
+            attributes: [.posixPermissions: 0o600]
+        )
     }
 
     private static func fileSize(at url: URL, fileManager: FileManager) -> UInt64 {

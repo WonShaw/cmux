@@ -39,6 +39,10 @@ _cmux_restore_status() {
 # the detached client authorized even after launchd or tmux reparents it.
 _cmux_write_socket_payload() {
     local payload="$1"
+    # One payload is one socket command. A newline or other control character
+    # (for example from a directory name or .git/HEAD) would smuggle in extra
+    # commands, so such payloads are dropped.
+    [[ "$payload" == *[[:cntrl:]]* ]] && return 0
     case "${CMUX_SOCKET_CAPABILITY:-}" in
         ""|*[[:space:]]*)
             print -r -- "$payload"
@@ -118,7 +122,7 @@ _cmux_restore_scrollback_once() {
     # Valid kitty-shell-cwd URIs reach Ghostty's PWD action in PTY order. The
     # following real cwd report keeps the private boundary out of title state.
     builtin printf '\033]1337;CurrentDir=kitty-shell-cwd://%s/.cmux/session-scrollback-replay/%s/end\007' "$HOST" "$token"
-    builtin printf '\033]1337;CurrentDir=kitty-shell-cwd://%s%s\007' "$HOST" "$PWD"
+    [[ "$PWD" == *[[:cntrl:]]* ]] || builtin printf '\033]1337;CurrentDir=kitty-shell-cwd://%s%s\007' "$HOST" "$PWD"
 }
 _cmux_restore_scrollback_once
 
@@ -580,7 +584,7 @@ _cmux_git_branch_for_path() {
     local head_path="" head_line="" prefix="ref: refs/heads/"
     head_path="$(_cmux_git_resolve_head_path "$repo_path" 2>/dev/null || true)"
     [[ -n "$head_path" && -r "$head_path" ]] || return 1
-    head_line="$(<"$head_path")"
+    IFS= read -r head_line < "$head_path" || [[ -n "$head_line" ]] || return 1
     [[ "$head_line" == "$prefix"* ]] || return 1
     print -r -- "${head_line#$prefix}"
 }

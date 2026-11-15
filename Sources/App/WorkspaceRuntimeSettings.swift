@@ -513,6 +513,9 @@ enum UITestLaunchManifest {
             setenv(key, value, 1)
         }
     ) {
+        // UI tests only: in release builds a launch argument must not be able
+        // to inject arbitrary environment variables into cmux.
+        #if DEBUG
         guard let path = manifestPath(from: arguments),
               let data = loadData(path),
               let payload = try? JSONDecoder().decode(Payload.self, from: data) else {
@@ -522,6 +525,7 @@ enum UITestLaunchManifest {
         for (key, value) in payload.environment {
             applyEnvironment(key, value)
         }
+        #endif
     }
 
     static func manifestPath(from arguments: [String]) -> String? {

@@ -148,13 +148,67 @@ extension GhosttySurfaceCallbackContext {
         }
     }
 
+    /// Ghostty asks for confirmation when a paste looks unsafe (it contains a
+    /// newline outside bracketed paste) or when a program requests the
+    /// clipboard through OSC 52. Unsafe pastes are shown to the user first;
+    /// OSC 52 reads are always answered with nothing.
     @MainActor
     func confirmClipboardRead(
         _ text: String,
         stateAddress: UInt,
-        surfaceIdentity: TerminalClipboardRequestSurfaceIdentity
+        surfaceIdentity: TerminalClipboardRequestSurfaceIdentity,
+        isPaste: Bool
     ) {
         surfaceView?.clipboardReadRequiresConfirmation(stateAddress)
+        guard isPaste else {
+            finishConfirmedClipboardRead("", stateAddress: stateAddress, surfaceIdentity: surfaceIdentity)
+            return
+        }
+        // Present after Ghostty's synchronous callback returns; typed input is
+        // buffered by the sequencer until the request completes.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let approved = Self.userApprovesUnsafePaste(text)
+            self.finishConfirmedClipboardRead(
+                approved ? text : "",
+                stateAddress: stateAddress,
+                surfaceIdentity: surfaceIdentity
+            )
+        }
+    }
+
+    @MainActor
+    private static func userApprovesUnsafePaste(_ text: String) -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(
+            localized: "terminal.paste.confirmUnsafe.title",
+            defaultValue: "Paste text that may run commands?"
+        )
+        let preview = text.count > 1200 ? String(text.prefix(1200)) + "\n…" : text
+        alert.informativeText = String(
+            localized: "terminal.paste.confirmUnsafe.message",
+            defaultValue: "The text contains line breaks, so the shell may run it as soon as it is pasted:"
+        ) + "\n\n" + preview
+        let cancel = alert.addButton(withTitle: String(
+            localized: "terminal.paste.confirmUnsafe.cancel",
+            defaultValue: "Cancel"
+        ))
+        cancel.keyEquivalent = "\r"
+        let paste = alert.addButton(withTitle: String(
+            localized: "terminal.paste.confirmUnsafe.paste",
+            defaultValue: "Paste"
+        ))
+        paste.keyEquivalent = ""
+        return alert.runModal() == .alertSecondButtonReturn
+    }
+
+    @MainActor
+    private func finishConfirmedClipboardRead(
+        _ text: String,
+        stateAddress: UInt,
+        surfaceIdentity: TerminalClipboardRequestSurfaceIdentity
+    ) {
         guard let state = UnsafeMutableRawPointer(bitPattern: stateAddress),
               let terminalSurface,
               surfaceIdentity.matches(terminalSurface),

@@ -149,6 +149,54 @@ struct SystemWorkspaceChangesGitRunner: WorkspaceChangesGitRunning {
         )
     }
 
+    /// Subcommands that can run content filter drivers on worktree files.
+    static let filterCapableSubcommands: Set<String> = [
+        "status", "diff", "diff-files", "diff-index", "add", "checkout", "switch",
+        "restore", "worktree", "stash", "reset", "commit", "merge", "rebase",
+        "cherry-pick", "apply", "cat-file", "blame", "grep",
+    ]
+
+    /// The subcommand of a git argument vector, skipping global options.
+    static func subcommand(of arguments: [String]) -> String? {
+        var index = 0
+        while index < arguments.count {
+            let argument = arguments[index]
+            if argument == "-c" || argument == "-C" || argument == "--git-dir" || argument == "--work-tree" {
+                index += 2
+                continue
+            }
+            if argument.hasPrefix("-") {
+                index += 1
+                continue
+            }
+            return argument
+        }
+        return nil
+    }
+
+    /// Prefixes `-c` overrides that disable repository-defined filter drivers
+    /// for commands that may run them. Throws when the drivers cannot be read,
+    /// so a filter-capable command never runs unprotected.
+    static func argumentsNeutralizingRepositoryFilters(
+        _ arguments: [String],
+        executableURL: URL,
+        directory: URL,
+        environment: [String: String]
+    ) throws -> [String] {
+        guard let subcommand = subcommand(of: arguments),
+              filterCapableSubcommands.contains(subcommand) else {
+            return arguments
+        }
+        guard let neutralizing = GitOfflineEnvironment.repositoryFilterNeutralizingArguments(
+            gitExecutable: executableURL,
+            directory: directory,
+            environment: environment
+        ) else {
+            throw CocoaError(.executableLoad)
+        }
+        return neutralizing + arguments
+    }
+
     private func execute(
         arguments: [String],
         directory: URL,
@@ -168,9 +216,15 @@ struct SystemWorkspaceChangesGitRunner: WorkspaceChangesGitRunning {
                 / 1_000_000_000
             var attemptProducedOutput = false
             do {
+                let attemptArguments = try Self.argumentsNeutralizingRepositoryFilters(
+                    arguments,
+                    executableURL: candidate,
+                    directory: directory,
+                    environment: environment
+                )
                 let result = try executeOnce(
                     executableURL: candidate,
-                    arguments: arguments,
+                    arguments: attemptArguments,
                     directory: directory,
                     maximumOutputByteCount: maximumOutputByteCount,
                     wallTimeLimit: remaining,

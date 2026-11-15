@@ -48,6 +48,9 @@ def --env _cmux_socket_is_unix [] {
 # Sends one payload line to the cmux socket, synchronously.
 def _cmux_send [payload: string] {
     if ($payload | is-empty) { return }
+    # One payload is one socket command; control characters would smuggle in
+    # extra commands, so such payloads are dropped.
+    if ($payload =~ '[\x00-\x1f\x7f]') { return }
     let sock = ($env.CMUX_SOCKET_PATH? | default "")
     if ($sock | is-empty) { return }
     let tool = ($env._CMUX_SEND_TOOL? | default "")
@@ -175,7 +178,9 @@ def --env _cmux_restore_scrollback_once [] {
         ^/bin/rm -f -- $path | complete | ignore
     }
     print -n $"\e]1337;CurrentDir=kitty-shell-cwd://($host)/.cmux/session-scrollback-replay/($token)/end\u{07}"
-    print -n $"\e]1337;CurrentDir=kitty-shell-cwd://($host)($env.PWD)\u{07}"
+    if not ($env.PWD =~ '[\x00-\x1f\x7f]') {
+        print -n $"\e]1337;CurrentDir=kitty-shell-cwd://($host)($env.PWD)\u{07}"
+    }
 }
 
 # Locates a bundled cmux CLI wrapper relative to CMUX_SHELL_INTEGRATION_DIR.

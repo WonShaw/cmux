@@ -479,19 +479,15 @@ struct CmuxVaultAgentRegistry: Sendable {
         registrations.first { $0.id == id }
     }
 
+    /// Project-local `cmux.json` files are not trusted to register agents:
+    /// a registration carries a resume command that cmux runs on restore, so a
+    /// cloned repository could otherwise make cmux execute arbitrary commands.
+    /// Only the user's global `~/.config/cmux/cmux.json` may register agents.
     func mergingProjectConfig(
         workingDirectory: String?,
         fileManager: FileManager = .default
     ) -> CmuxVaultAgentRegistry {
-        guard let workingDirectory = workingDirectory?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !workingDirectory.isEmpty,
-              let path = Self.findLocalConfig(startingAt: workingDirectory, fileManager: fileManager),
-              let config = Self.decodeConfig(at: path, fileManager: fileManager),
-              let agents = config.vault?.agents,
-              !agents.isEmpty else {
-            return self
-        }
-        return CmuxVaultAgentRegistry(registrations: registrations + agents)
+        self
     }
 
     static func load(
@@ -524,35 +520,9 @@ struct CmuxVaultAgentRegistry: Sendable {
         fileManager: FileManager
     ) -> [String] {
         let home = (homeDirectory as NSString).standardizingPath
-        var paths = [(home as NSString).appendingPathComponent(".config/cmux/cmux.json")]
-        let startingDirectory = workingDirectory?.trimmingCharacters(in: .whitespacesAndNewlines)
-            ?? environment["PWD"]?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let startingDirectory, !startingDirectory.isEmpty,
-           let local = findLocalConfig(startingAt: startingDirectory, fileManager: fileManager) {
-            paths.append(local)
-        }
-        var seen = Set<String>()
-        return paths.filter { seen.insert(($0 as NSString).standardizingPath).inserted }
-    }
-
-    private static func findLocalConfig(startingAt path: String, fileManager: FileManager) -> String? {
-        var isDirectory: ObjCBool = false
-        let start = fileManager.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
-            ? path
-            : (path as NSString).deletingLastPathComponent
-        var current = (start as NSString).standardizingPath
-        while true {
-            let candidates = [
-                ((current as NSString).appendingPathComponent(".cmux") as NSString).appendingPathComponent("cmux.json"),
-                (current as NSString).appendingPathComponent("cmux.json"),
-            ]
-            for candidate in candidates where fileManager.fileExists(atPath: candidate) {
-                return candidate
-            }
-            let parent = (current as NSString).deletingLastPathComponent
-            if parent == current { return nil }
-            current = parent
-        }
+        // Project-local configuration is deliberately ignored; see
+        // ``mergingProjectConfig(workingDirectory:fileManager:)``.
+        return [(home as NSString).appendingPathComponent(".config/cmux/cmux.json")]
     }
 
     private static func decodeConfig(at path: String, fileManager: FileManager) -> CmuxConfigFile? {

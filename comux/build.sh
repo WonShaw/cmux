@@ -5,7 +5,11 @@
 #   comux/build.sh --install    also copy the result to ~/Applications/comux.app
 #   comux/build.sh --debug      build the Debug configuration instead
 #
-# Requirements: Xcode. No zig, cargo or bun.
+# Requirements: Xcode. No zig or bun. cargo is optional: when it is on PATH
+# the command palette's fuzzy-search library is built from
+# Native/CommandPaletteNucleoFFI (its crates are fetched from crates.io at
+# the versions pinned in Cargo.lock); without it the palette uses the
+# built-in Swift matcher.
 #
 # Network use (build time only, both cached after the first run):
 #   - GhosttyKit.xcframework, a prebuilt archive from GitHub Releases,
@@ -26,7 +30,7 @@ for arg in "$@"; do
   case "$arg" in
     --install) INSTALL=1 ;;
     --debug) CONFIGURATION=Debug ;;
-    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "error: unknown option $arg" >&2; exit 2 ;;
   esac
 done

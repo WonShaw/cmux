@@ -9,8 +9,10 @@ import Foundation
 ///
 /// Local files that leave cmux go through the shared ``FileOpening`` seam
 /// (`PreferredEditorService`), the single decision point for "open this file
-/// for the user": the preferred editor when configured, the system default
-/// otherwise. Non-file URLs go through `externalOpen` (the system browser).
+/// for the user": the preferred editor when configured, otherwise the system
+/// default for plain documents only (anything that could execute is shown in
+/// Finder). Web and mail URLs go through `externalOpen`; any other scheme is
+/// confirmed first.
 @MainActor
 struct TerminalLinkOpenCoordinator {
     private let defaults: UserDefaults
@@ -162,8 +164,40 @@ struct TerminalLinkOpenCoordinator {
             fileOpen.open(url)
             return true
         }
+        guard SystemOpenSafetyPolicy.isDirectlyOpenable(url) || confirmOpening(url) else {
+            log("link.openURL declined scheme=\(url.scheme ?? "") url=\(url)")
+            return false
+        }
         log("link.openURL opening externally reason=\(reason) url=\(url)")
         return externalOpen(url)
+    }
+
+    /// Asks before handing a non-web URL (custom app schemes, `ssh:`, `smb:`,
+    /// `x-apple...`) to Launch Services. Terminal output controls both the
+    /// visible link text and its real target, so the real target is shown and
+    /// Cancel is the default.
+    private func confirmOpening(_ url: URL) -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(
+            localized: "terminal.link.confirmExternal.title",
+            defaultValue: "Open this link in another app?"
+        )
+        alert.informativeText = String(
+            localized: "terminal.link.confirmExternal.message",
+            defaultValue: "The link was printed in the terminal and will be handed to the app registered for it:"
+        ) + "\n\n" + String(url.absoluteString.prefix(2000))
+        let cancel = alert.addButton(withTitle: String(
+            localized: "terminal.link.confirmExternal.cancel",
+            defaultValue: "Cancel"
+        ))
+        cancel.keyEquivalent = "\r"
+        let open = alert.addButton(withTitle: String(
+            localized: "terminal.link.confirmExternal.open",
+            defaultValue: "Open"
+        ))
+        open.keyEquivalent = ""
+        return alert.runModal() == .alertSecondButtonReturn
     }
 
     /// Returns whether a raw link is an explicit local `file` URL.

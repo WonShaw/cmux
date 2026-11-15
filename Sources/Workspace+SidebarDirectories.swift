@@ -66,9 +66,6 @@ extension Workspace {
 
     func allowsLocalDirectoryFallback(panelId: UUID) -> Bool {
         if !usesRemoteDirectoryProvenance { return true }
-        if let agentPanel = panels[panelId] as? AgentSessionPanel {
-            return normalizedSidebarDirectory(agentPanel.workingDirectory) != nil
-        }
         return terminalPanel(for: panelId) != nil
     }
 
